@@ -98,7 +98,7 @@ def build(out_dir: Path, skip: set[str] | None = None) -> dict:
             log.info("LSOA -> constituency lookup: %d LSOAs", len(lookup_cache["v"]))
         return lookup_cache["v"]
 
-    census, _census_names, prov = nomis.load_census(s, CENSUS_METRICS, lsoa_lookup)
+    census, _census_names, prov = nomis.load_census(s, CENSUS_METRICS, None if "lsoa" in skip else lsoa_lookup)
     frames.update(census)
     metas += [census_meta(m) for m in CENSUS_METRICS]
     record("census", "Census 2021 (ONS via Nomis)", "https://www.nomisweb.co.uk/sources/census_2021",
@@ -213,8 +213,8 @@ def finish(out_dir: Path, geo: dict, seats: list[dict], metrics: list[dict], val
 def main(argv: list[str] | None = None) -> None:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--out", default="frontend/public/data", type=Path)
-    p.add_argument("--skip", action="append", default=[], choices=["claimants", "police", "elections", "members"],
-                   help="Skip an optional source (repeatable)")
+    p.add_argument("--skip", action="append", default=[], choices=["claimants", "police", "elections", "members", "lsoa"],
+                   help="Skip an optional source (repeatable); 'lsoa' skips the slow LSOA fallback for census tables")
     p.add_argument("--demo", action="store_true", help="Write a SYNTHETIC demo dataset (no network); for UI development only")
     p.add_argument("-v", "--verbose", action="store_true")
     args = p.parse_args(argv)
