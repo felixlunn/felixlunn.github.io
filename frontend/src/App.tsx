@@ -10,11 +10,14 @@ import Dossier from "./components/Dossier";
 import SearchBox from "./components/SearchBox";
 import Legend from "./components/Legend";
 import { PARTY_ID, partyChoropleth } from "./lib/parties";
+import DebatesTab from "./components/DebatesTab";
+import { debateMetrics, flagSeats } from "./lib/debates";
 
 const MapView = lazy(() => import("./components/MapView"));
 
-type Tab = "themes" | "twins" | "index" | "match";
+type Tab = "debates" | "themes" | "twins" | "index" | "match";
 const TABS: { id: Tab; label: string }[] = [
+  { id: "debates", label: "Debates" },
   { id: "themes", label: "Themes" },
   { id: "twins", label: "Twins" },
   { id: "index", label: "Index" },
@@ -30,13 +33,24 @@ export default function App({ data, geo }: { data: DashboardData; geo: GeoJSON.F
   const codeIndex = useMemo(() => new Map(data.seats.map((s, i) => [s.code, i])), [data]);
   const metricIds = useMemo(() => new Set(data.metrics.map((m) => m.id)), [data]);
 
-  const [tab, setTab] = useState<Tab>((TABS.some((t) => t.id === initial.tab) ? initial.tab : "themes") as Tab);
+  const [tab, setTab] = useState<Tab>((TABS.some((t) => t.id === initial.tab) ? initial.tab : "debates") as Tab);
   // The homepage opens on the electoral map (seats in party colours) unless the URL asks for a metric.
   const [metricId, setMetricId] = useState(metricIds.has(initial.metric) ? initial.metric : PARTY_ID);
   const partyMode = metricId === PARTY_ID;
   const metric = data.metrics.find((m) => m.id === metricId) ?? data.metrics.find((m) => m.theme === "politics") ?? data.metrics[0];
   const [theme, setTheme] = useState(partyMode ? "politics" : metric.theme);
   const partyMap = useMemo(() => partyChoropleth(data.seats), [data]);
+
+  // Debates: which debate is open, which of its metrics shades the map, and whose MPs to flag.
+  const [debateParty, setDebateParty] = useState("Lib Dem");
+  const [debateId, setDebateId] = useState<number | null>(null);
+  const [debateMetricId, setDebateMetricId] = useState<string | null>(null);
+  const activeDebate = data.debates?.find((d) => d.id === debateId) ?? null;
+  const openDebate = useCallback((id: number | null) => {
+    setDebateId(id);
+    const d = data.debates?.find((x) => x.id === id);
+    setDebateMetricId(d ? debateMetrics(data, d)[0]?.id ?? null : null);
+  }, [data]);
   const [selected, setSelected] = useState<number | null>(codeIndex.get(initial.seat) ?? null);
   const [focus, setFocus] = useState<{ code: string; n: number } | null>(selected !== null ? { code: data.seats[selected].code, n: 0 } : null);
   const [showSources, setShowSources] = useState(false);
@@ -125,6 +139,18 @@ export default function App({ data, geo }: { data: DashboardData; geo: GeoJSON.F
         invert: true,
       };
     }
+    if (tab === "debates") {
+      const m = activeDebate && debateMetricId ? data.metrics.find((x) => x.id === debateMetricId) : null;
+      if (!activeDebate || !m) return partyMap;
+      const flagged = flagSeats(data, [m], debateParty).map((f) => data.seats[f.seat].code);
+      return {
+        title: m.label + unitSuffix(m),
+        subtitle: activeDebate.title,
+        values: data.values[m.id],
+        format: (v) => fmt(m, v),
+        highlight: flagged,
+      };
+    }
     if (partyMode) return partyMap;
     return {
       title: metric.label + unitSuffix(metric),
@@ -132,7 +158,7 @@ export default function App({ data, geo }: { data: DashboardData; geo: GeoJSON.F
       values: data.values[metric.id],
       format: (v) => fmt(metric, v),
     };
-  }, [tab, twinScores, twinResults, twinIds, twinSettings, selected, indexScores, indexRanking, weights, matchDist, matchResults, targets, metric, data, partyMode, partyMap]);
+  }, [tab, twinScores, twinResults, twinIds, twinSettings, selected, indexScores, indexRanking, weights, matchDist, matchResults, targets, metric, data, partyMode, partyMap, activeDebate, debateMetricId, debateParty]);
 
   const generated = new Date(data.generated_at);
   const failed = data.sources.filter((s) => s.status === "failed");
@@ -171,6 +197,8 @@ export default function App({ data, geo }: { data: DashboardData; geo: GeoJSON.F
         </div>
         {panelOpen && (
           <>
+            {tab === "debates" && <DebatesTab data={data} party={debateParty} setParty={setDebateParty} active={debateId} setActive={openDebate}
+              mapMetric={debateMetricId} setMapMetric={setDebateMetricId} selected={selected} onSelect={(i) => select(i)} />}
             {tab === "themes" && <ThemesTab data={data} theme={theme} setTheme={(t) => { setTheme(t); const first = t === "politics" ? PARTY_ID : data.metrics.find((m) => m.theme === t)?.id; if (first) setMetricId(first); }} metric={metric} partyMode={partyMode} parties={partyMap} setMetric={setMetricId} selected={selected} onSelect={(i) => select(i)} />}
             {tab === "twins" && <TwinsTab data={data} selected={selected} settings={twinSettings} setSettings={setTwinSettings} results={twinResults} metricCount={twinIds.length} onSelect={(i) => select(i)} />}
             {tab === "index" && <IndexTab data={data} weights={weights} setWeights={setWeights} ranking={indexRanking} selected={selected} onSelect={(i) => select(i)} />}

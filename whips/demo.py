@@ -99,4 +99,19 @@ def build_demo(out_dir: Path, n: int = 650, seed: int = 42) -> dict:
         })
     sources = [{"id": "demo", "name": "SYNTHETIC DEMO DATA - not real", "url": "", "status": "ok",
                 "detail": "Randomly generated for UI development", "as_of": None}]
-    return finish(out_dir, geo, seats, metrics, values, sources, demo=True)
+    from datetime import date, timedelta
+
+    from .sources.debates import parse_events
+    day = lambda k: (date.today() + timedelta(days=k)).isoformat() + "T00:00:00"  # noqa: E731
+    lead = lambda i: [{"Name": seats[i]["mp"], "Party": seats[i]["party"], "MemberFrom": seats[i]["name"]}]  # noqa: E731
+    fake = [
+        (1, "13:30", "Main Chamber", "Opposition Day Debate", "Demo opposition day: police numbers and neighbourhood crime", []),
+        (2, "09:30", "Westminster Hall", "Westminster Hall debate", "Demo debate: access to NHS dentistry in rural areas", lead(12)),
+        (2, "14:30", "Westminster Hall", "Westminster Hall debate", "Demo debate: e-petition on the cost of living for renters", lead(40)),
+        (3, "12:30", "Main Chamber", "Oral questions", "Demo Home Office questions (dropped: not a debate)", []),
+        (3, "18:00", "Main Chamber", "Adjournment", "Demo adjournment: bus services in the demo valleys", lead(77)),
+        (6, "11:00", "Main Chamber", "Legislation", "Demo Bill: Second Reading", []),
+    ]
+    debates = parse_events([{"Id": k, "StartDate": day(d), "StartTime": t, "Type": v, "Category": c, "Description": title,
+                             "Members": m} for k, (d, t, v, c, title, m) in enumerate(fake)])
+    return finish(out_dir, geo, seats, metrics, values, sources, demo=True, debates=debates)

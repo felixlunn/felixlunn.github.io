@@ -6,6 +6,7 @@ theme by theme. The homepage opens on the electoral map, with every seat in its 
 
 | Tool | What it answers |
 |---|---|
+| **Debates** (homepage) | Upcoming Commons debates (not questions or statements) from the UK Parliament calendar, tagged by topic. For each debate it lists the MPs of a chosen party (Lib Dem by default) whose seats are in the most extreme tenth of seats on the figures that debate touches, e.g. a policing debate flags seats with unusually high burglary or anti-social behaviour, and shades the map by those figures. |
 | **Themes** (thematic organiser) | How does this seat compare on people, households, housing, economy, jobs & pay, health, education, transport, policing and politics? About 150 metrics in all. Every metric shades the map, shows the seat's rank ("42nd highest of 575"), the national figure, and a distribution strip. Full rankings download as CSV. |
 | **Constituency dossier** | One-click briefing for a seat: MP and party, 2024 majority and turnout, peer group, the metrics where the seat is most unusual, per-theme tables against national and peer-group averages, and its demographic twins. Exports to CSV or prints as a PDF briefing sheet. |
 | **Twins** | Which seats look most like this one? Ranks every seat by similarity across the standardised metrics of whichever themes you tick (closest levels, or same overall shape). Can be restricted to the same nation or region. |
@@ -30,6 +31,7 @@ All data are open, refreshed automatically **every two days** by GitHub Actions,
 | [ONS Claimant Count via Nomis](https://www.nomisweb.co.uk/sources/cc) | Claimant rate (16-64) | UK | Monthly |
 | [police.uk API](https://data.police.uk/docs/) | Crime rates by type, share of crimes closed with no suspect identified, share charged or sent to court | England, Wales, NI | Monthly |
 | [House of Commons Library CBP-10009](https://commonslibrary.parliament.uk/research-briefings/cbp-10009/) | 2024 result, majority, turnout, party vote shares | UK | Static |
+| [UK Parliament What's On](https://whatson.parliament.uk/) | Upcoming Commons debates for the Debates panel (next 3 weeks) | UK | Every run |
 | [UK Parliament Members API](https://members-api.parliament.uk/) | Current MP and party (picks up by-elections and defections) | UK | Every run |
 
 Census 2021 covers England and Wales only (Scotland's census was 2022 and Northern Ireland's is published by
