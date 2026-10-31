@@ -24,10 +24,11 @@ def test_keeps_debates_drops_questions_and_statements():
     assert out[0]["members"] == [{"name": "A MP", "party": "Liberal Democrat", "constituency": "Somewhere"}]
 
 
-def test_only_first_private_members_bills_each_friday_in_order():
-    events = [ev(i, "2026-11-13", "Private Members' Bills", f"Bill {i}", sort=i, time="09:30" if i == 1 else "")
-              for i in range(6, 0, -1)]
-    assert [d["title"] for d in parse_events(events)] == ["Bill 1", "Bill 2", "Bill 3"]
+def test_private_members_bills_excluded_and_day_order_kept():
+    events = [ev(1, "2026-11-13", "Private Members' Bills", "A Bill: Second Reading", sort=1, time="09:30"),
+              ev(3, "2026-11-12", "Adjournment", "Later", sort=9),
+              ev(2, "2026-11-12", "Backbench Business", "Earlier", sort=2)]
+    assert [d["title"] for d in parse_events(events)] == ["Earlier", "Later"]
 
 
 def test_topic_keywords():

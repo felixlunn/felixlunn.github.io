@@ -47,7 +47,7 @@ export default function DebatesTab({ data, party, setParty, active, setActive, m
   return (
     <div className="tab-body">
       <p className="muted small">
-        Upcoming Commons debates (not questions or statements), with the {party} MPs whose seats are in the most extreme tenth of seats on the
+        Upcoming Commons debates (not questions, statements or Private Members' Bills), with the {party} MPs whose seats are in the most extreme tenth of seats on the
         figures each debate touches.
       </p>
       <label className="field">

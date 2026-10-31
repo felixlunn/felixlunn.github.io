@@ -4,8 +4,8 @@ Each debate is tagged with topics by keyword rules, and each topic points at
 dashboard metrics. The dashboard then flags seats that stand out on those
 metrics (e.g. a policing debate flags seats with unusually high crime).
 
-Only debates are kept: oral questions, PMQs, statements and other non-debate
-business are dropped.
+Only debates are kept: oral questions, PMQs, statements, Private Members'
+Bills and other non-debate business are dropped.
 """
 
 from __future__ import annotations
@@ -22,9 +22,8 @@ SOURCE_URL = "https://whatson.parliament.uk/"
 
 DEBATE_CATEGORIES = {
     "Adjournment", "Backbench Business", "Debate", "Legislation", "Opposition Day Debate",
-    "Westminster Hall debate", "Private Members' Bills", "Estimates Day", "Lords Amendments",
-}
-PMB_SHOWN = 3  # Friday Private Members' Bills: only the first few are realistically reached
+    "Westminster Hall debate", "Estimates Day", "Lords Amendments",
+}  # Private Members' Bills are deliberately left out
 
 # topic id -> (label, title regex, metric ids that matter for it). Metric ids missing from the
 # dataset are ignored by the dashboard.
@@ -84,16 +83,11 @@ def _clean(text: str | None) -> str:
 def parse_events(events: list[dict]) -> list[dict]:
     """Keep debates only, tag topics and lead members, sorted by date and time."""
     out = []
-    pmb_seen: dict[str, int] = {}
     for e in sorted(events, key=lambda e: ((e.get("StartDate") or "")[:10], e.get("SortOrder") or 0)):
         category = _clean(e.get("Category"))
         if category not in DEBATE_CATEGORIES or e.get("CancelledDate") or e.get("Type") not in ("Main Chamber", "Westminster Hall"):
             continue
         day = (e.get("StartDate") or "")[:10]
-        if category == "Private Members' Bills":
-            pmb_seen[day] = pmb_seen.get(day, 0) + 1
-            if pmb_seen[day] > PMB_SHOWN:
-                continue
         title = _clean(e.get("Description")) or _clean(e.get("BillName")) or category
         members = [
             {"name": m.get("Name"), "party": m.get("Party"), "constituency": m.get("MemberFrom")}
