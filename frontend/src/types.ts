@@ -60,6 +60,25 @@ export interface DashboardData {
   values: Record<string, (number | null)[]>;
   peer_groups: PeerGroup[];
   sources: Source[];
+  debates?: Debate[];
+  debate_topics?: DebateTopic[];
+}
+
+export interface Debate {
+  id: number;
+  date: string;
+  time: string | null;
+  venue: string;
+  category: string;
+  title: string;
+  members: { name: string; party: string | null; constituency: string | null }[];
+  topics: string[];
+}
+
+export interface DebateTopic {
+  id: string;
+  label: string;
+  metrics: string[];
 }
 
 /** What the map is currently shading. Values are aligned with `data.seats`. */

@@ -31,11 +31,12 @@ from .metrics import (
     CENSUS_METRICS, CLAIMANT_METRICS, ELECTION_METRICS, POLICE_METRICS, THEMES, MetricMeta, census_meta,
 )
 from .sources import boundaries as bsrc
+from .sources import debates as debates_src
 from .sources import nomis, nomis_extra, parliament, police
 
 log = logging.getLogger("whips.build")
 
-SKIPPABLE = ["claimants", "aps", "ashe", "bres", "business", "popest", "police", "elections", "members", "lsoa"]
+SKIPPABLE = ["debates", "claimants", "aps", "ashe", "bres", "business", "popest", "police", "elections", "members", "lsoa"]
 
 COUNTRY_BY_PREFIX = {"E": "England", "W": "Wales", "S": "Scotland", "N": "Northern Ireland"}
 
@@ -184,11 +185,20 @@ def build(out_dir: Path, skip: set[str] | None = None) -> dict:
             "second_party_2024": a.get("second_party"),
             "result_2024": a.get("result"),
         })
-    return finish(out_dir, geo, seats, metrics, values, sources, demo=False)
+    debates: list[dict] = []
+    if "debates" not in skip:
+        try:
+            debates = debates_src.load_debates(s)
+            record("debates", "Upcoming Commons debates (UK Parliament What's On)", debates_src.SOURCE_URL, "ok",
+                   f"{len(debates)} debates in the next 3 weeks", datetime.now(timezone.utc).date().isoformat())
+        except Exception as exc:  # noqa: BLE001
+            log.exception("What's On calendar failed")
+            record("debates", "Upcoming Commons debates (UK Parliament What's On)", debates_src.SOURCE_URL, "failed", str(exc))
+    return finish(out_dir, geo, seats, metrics, values, sources, demo=False, debates=debates)
 
 
 def finish(out_dir: Path, geo: dict, seats: list[dict], metrics: list[dict], values: dict[str, list],
-           sources: list[dict], demo: bool) -> dict:
+           sources: list[dict], demo: bool, debates: list[dict] | None = None) -> dict:
     """Add peer groups and write all output files."""
     ds = engine.Dataset.from_json({"seats": seats, "metrics": metrics, "values": values})
     groups, group_meta = engine.peer_groups(ds)
@@ -204,6 +214,8 @@ def finish(out_dir: Path, geo: dict, seats: list[dict], metrics: list[dict], val
         "values": values,
         "peer_groups": group_meta,
         "sources": sources,
+        "debates": debates or [],
+        "debate_topics": debates_src.topic_catalogue(),
     }
     (out_dir / "data.json").write_text(json.dumps(data, separators=(",", ":"), allow_nan=False))
     (out_dir / "boundaries.geojson").write_text(json.dumps(geo, separators=(",", ":")))
