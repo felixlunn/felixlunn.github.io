@@ -13,7 +13,6 @@ theme by theme. The homepage opens on the electoral map, with every seat in its 
 | **Constituency dossier** | One-click briefing for a seat: MP and party, 2024 majority and turnout, peer group, the metrics where the seat is most unusual, per-theme tables against national and peer-group averages, and its demographic twins. Exports to CSV or prints as a PDF briefing sheet. |
 | **Twins** | Which seats look most like this one? Ranks every seat by similarity across the standardised metrics of whichever themes you tick (closest levels, or same overall shape). Can be restricted to the same nation or region. |
 | **Index** | Build a composite index (e.g. *cost-of-living vulnerability* = private renting + household deprivation + claimant rate + ...) with weight sliders. Weights can be negative. The map re-shades and every seat is re-ranked instantly. Presets are included. |
-| **Match** | Describe a place ("35% private renters, 30% aged 20-34") and find the seats that fit it best. |
 | **Peer groups** | Every seat is clustered (k-means on its census profile) into one of 8 peer groups, so "national average" isn't the only benchmark. |
 
 ## Data
@@ -66,7 +65,7 @@ MapLibre loads in parallel as its own chunk.
 whips/                Python package
   metrics.py          catalogue of themes and metrics (add new census metrics here)
   sources/            one adapter per API: nomis, boundaries, police, parliament
-  engine.py           analytics: ranks, twins, composite index, profile match, k-means peer groups
+  engine.py           analytics: ranks, twins, composite index, k-means peer groups
   build.py            pipeline entry point
   api.py              optional FastAPI REST API over the same data
   demo.py             synthetic offline dataset for UI development
@@ -137,12 +136,12 @@ WHIPS_DATA=frontend/public/data/data.json uvicorn whips.api:app
 ```
 
 Endpoints: `GET /api/v1/constituencies/{code}`, `GET /api/v1/twins/{code}`, `POST /api/v1/index`,
-`POST /api/v1/match`, `GET /api/v1/metrics`. Interactive docs are at `/docs`. A `Dockerfile` is included for
+`GET /api/v1/metrics`. Interactive docs are at `/docs`. A `Dockerfile` is included for
 Render / Fly.io; point `WHIPS_DATA` at the deployed `data.json` URL.
 
 ## Method notes
 
-- **Standardisation**: twins, index and match all work on z-scores (seat value minus the mean across seats,
+- **Standardisation**: twins and index both work on z-scores (seat value minus the mean across seats,
   divided by the standard deviation), so a percentage-point gap in a rare characteristic counts as much as a
   larger gap in a common one.
 - **Twins, Euclidean** = 1 / (1 + RMS distance in SD units); **cosine** = similarity of the pattern of

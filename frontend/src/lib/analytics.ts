@@ -129,15 +129,6 @@ export function compositeIndex(data: DashboardData, weights: Record<string, numb
   return Z.map((row) => (row ? ids.reduce((a, k, j) => a + row[j] * weights[k], 0) / total : null));
 }
 
-/** RMS distance (in SD units) from each seat to a target profile. Lower is closer. */
-export function profileDistance(data: DashboardData, targets: Record<string, number>): (number | null)[] {
-  const ids = Object.keys(targets).filter((k) => data.values[k]);
-  if (!ids.length) return data.seats.map(() => null);
-  const { Z, stats: st } = zMatrix(data, ids);
-  const t = ids.map((k, j) => (targets[k] - st[j].mean) / st[j].sd);
-  return Z.map((row) => (row ? Math.sqrt(ids.reduce((a, _k, j) => a + (row[j] - t[j]) ** 2, 0) / ids.length) : null));
-}
-
 /** Census percentage metrics: the default "demographic DNA" for twins. */
 export function profileMetrics(metrics: Metric[], themes?: string[]): string[] {
   return metrics

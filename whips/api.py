@@ -21,7 +21,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from . import engine
 
 app = FastAPI(title="Whips Dashboard API", version="0.1.0",
-              description="Constituency statistics, rankings, twin seats, custom indices and profile matching.")
+              description="Constituency statistics, rankings, twin seats, and custom indices.")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["GET", "POST"], allow_headers=["*"])
 
 
@@ -75,14 +75,5 @@ def twins(code: str, top_n: int = Query(10, ge=1, le=100), method: str = Query("
 def custom_index(weights: dict[str, float] = Body(..., examples=[{"private_rented": 0.4, "level4_plus": 0.3, "inactive_sick": 0.3}])):
     try:
         return engine.composite_index(dataset(), weights)
-    except (ValueError, KeyError) as exc:
-        raise HTTPException(400, str(exc)) from None
-
-
-@app.post("/api/v1/match")
-def match(targets: dict[str, float] = Body(..., examples=[{"private_rented": 35, "age_20_34": 30}]),
-          top_n: int = Query(10, ge=1, le=100), country: str | None = None, region: str | None = None):
-    try:
-        return engine.match_profile(dataset(), targets, top_n, country, region)
     except (ValueError, KeyError) as exc:
         raise HTTPException(400, str(exc)) from None
