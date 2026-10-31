@@ -80,7 +80,7 @@ export function useColours(ch: Choropleth) {
   return useMemo(() => {
     const colours = ramp();
     const breaks = quantileBreaks(ch.values, colours.length);
-    const palette = ch.invert ? [...colours].reverse() : colours;
+    const palette = colours;
     // With fewer distinct breaks than classes, use the darker end of the ramp evenly.
     const used = palette.slice(0, breaks.length + 1);
     const step = (palette.length - 1) / Math.max(used.length - 1, 1);
