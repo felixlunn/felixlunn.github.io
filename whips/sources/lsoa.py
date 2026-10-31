@@ -102,7 +102,7 @@ def _clean(v, nd=2):
 
 
 def seat_file(seat: str, name: str, lsoas: list[str], vals: pd.DataFrame, pct: pd.DataFrame,
-              wards: dict[str, dict], geoms: dict[str, dict]) -> dict:
+              wards: dict[str, dict], geoms: dict[str, dict], deciles: pd.Series | None = None) -> dict:
     lsoas = sorted(lsoas, key=lambda c: ((wards.get(c) or {}).get("ward") or "", c))
     metrics = [m for m in vals.columns if vals.loc[vals.index.intersection(lsoas), m].notna().any()]
     return {
@@ -113,6 +113,8 @@ def seat_file(seat: str, name: str, lsoas: list[str], vals: pd.DataFrame, pct: p
         "metrics": metrics,
         "values": {m: [_clean(vals.at[c, m]) if c in vals.index else None for c in lsoas] for m in metrics},
         "pct": {m: [None if c not in pct.index or pd.isna(pct.at[c, m]) else int(round(pct.at[c, m])) for c in lsoas] for m in metrics},
+        # IMD 2025 decile (1 = most deprived 10% in England); null in Wales.
+        "imd_decile": [None if deciles is None or c not in deciles.index or pd.isna(deciles[c]) else int(deciles[c]) for c in lsoas],
         "geo": {"type": "FeatureCollection", "features": [
             {"type": "Feature", "properties": {"code": c}, "geometry": geoms[c]} for c in lsoas if c in geoms
         ]},
@@ -120,7 +122,7 @@ def seat_file(seat: str, name: str, lsoas: list[str], vals: pd.DataFrame, pct: p
 
 
 def write_seat_files(s: requests.Session, out_dir: Path, seats: dict[str, str], lookup: dict[str, str],
-                     frames: dict[str, pd.DataFrame]) -> dict:
+                     frames: dict[str, pd.DataFrame], deciles: pd.Series | None = None) -> dict:
     """Write one neighbourhood file per seat in ``seats`` ({code: name}); returns a summary for data.json."""
     by_seat: dict[str, list[str]] = {}
     for lsoa, pcon in lookup.items():
@@ -138,7 +140,7 @@ def write_seat_files(s: requests.Session, out_dir: Path, seats: dict[str, str], 
     for old in folder.glob("*.json"):
         old.unlink()
     for pcon, lsoas in by_seat.items():
-        doc = seat_file(pcon, seats[pcon], lsoas, vals, pct, wards, geoms)
+        doc = seat_file(pcon, seats[pcon], lsoas, vals, pct, wards, geoms, deciles)
         (folder / f"{pcon}.json").write_text(json.dumps(doc, separators=(",", ":"), allow_nan=False))
     log.info("Neighbourhoods: %d seats, %d LSOAs, %d metrics", len(by_seat), len(wanted), vals.shape[1])
     return {"seats": sorted(by_seat), "lsoas": len(wanted), "metrics": int(vals.shape[1])}

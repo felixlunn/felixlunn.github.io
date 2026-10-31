@@ -33,6 +33,7 @@ from .metrics import (
 )
 from .sources import boundaries as bsrc
 from .sources import debates as debates_src
+from .sources import imd as imd_src
 from .sources import lsoa as lsoa_src
 from .sources import nomis, nomis_extra, parliament, police
 
@@ -41,7 +42,7 @@ log = logging.getLogger("whips.build")
 # Neighbourhood (LSOA) profiles are published for seats held by this party.
 NEIGHBOURHOOD_PARTY = re.compile(r"^(liberal democrats?|lib ?dems?|ld)$", re.I)
 
-SKIPPABLE = ["neighbourhoods", "debates", "claimants", "aps", "ashe", "bres", "business", "popest", "police", "elections", "members", "lsoa"]
+SKIPPABLE = ["imd", "neighbourhoods", "debates", "claimants", "aps", "ashe", "bres", "business", "popest", "police", "elections", "members", "lsoa"]
 
 COUNTRY_BY_PREFIX = {"E": "England", "W": "Wales", "S": "Scotland", "N": "Northern Ireland"}
 
@@ -120,6 +121,21 @@ def build(out_dir: Path, skip: set[str] | None = None) -> dict:
     population = census["population"]["num"]
 
     # 3. Optional sources
+    imd_deciles = None
+    if "imd" not in skip:
+        try:
+            imd = imd_src.load_imd(s)
+            frames.update(imd_src.seat_frames(imd, lsoa_lookup()))
+            metas += imd_src.IMD_METRICS
+            if lsoa_frames is not None:
+                lsoa_frames.update(imd_src.lsoa_frames(imd))
+                imd_deciles = imd["decile"]
+            record("imd", "English Indices of Deprivation 2025 (MHCLG)", imd_src.PAGE_URL, "ok",
+                   f"{len(imd)} LSOAs; England only; best-fit to constituencies, population-weighted", "2025")
+        except Exception as exc:  # noqa: BLE001
+            log.exception("IMD failed")
+            record("imd", "English Indices of Deprivation 2025 (MHCLG)", imd_src.PAGE_URL, "failed", str(exc))
+
     if "claimants" not in skip:
         try:
             cf, period = nomis.load_claimants(s)
@@ -201,7 +217,7 @@ def build(out_dir: Path, skip: set[str] | None = None) -> dict:
     if lsoa_frames:
         try:
             chosen = {st["code"]: st["name"] for st in seats if st.get("party") and NEIGHBOURHOOD_PARTY.match(st["party"].strip())}
-            neighbourhoods = lsoa_src.write_seat_files(s, out_dir, chosen, lsoa_lookup(), lsoa_frames)
+            neighbourhoods = lsoa_src.write_seat_files(s, out_dir, chosen, lsoa_lookup(), lsoa_frames, imd_deciles)
             record("neighbourhoods", "Neighbourhood (LSOA) census profiles", "https://geoportal.statistics.gov.uk/", "ok",
                    f"{len(neighbourhoods['seats'])} Lib Dem seats in England & Wales; {neighbourhoods['lsoas']} LSOAs", "March 2021")
         except Exception as exc:  # noqa: BLE001

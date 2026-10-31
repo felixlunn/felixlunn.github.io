@@ -106,5 +106,7 @@ export interface NeighbourhoodFile {
   values: Record<string, (number | null)[]>;
   /** Percentile (0-100) among all LSOAs in England & Wales. */
   pct: Record<string, (number | null)[]>;
+  /** IMD 2025 decile, 1 = most deprived 10% of neighbourhoods in England; null in Wales. */
+  imd_decile?: (number | null)[];
   geo: GeoJSON.FeatureCollection;
 }

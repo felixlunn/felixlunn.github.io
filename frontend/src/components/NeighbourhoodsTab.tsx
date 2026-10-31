@@ -33,7 +33,7 @@ export default function NeighbourhoodsTab({ data, seat, file, status, metricId, 
   const rows = useMemo(() => {
     if (!file || !metric) return [];
     const v = file.values[metric.id], p = file.pct[metric.id];
-    return file.lsoas.map((l, k) => ({ l, v: v[k], p: p[k] })).sort((a, b) => (b.v ?? -Infinity) - (a.v ?? -Infinity));
+    return file.lsoas.map((l, k) => ({ l, v: v[k], p: p[k], d: file.imd_decile?.[k] ?? null })).sort((a, b) => (b.v ?? -Infinity) - (a.v ?? -Infinity));
   }, [file, metric]);
 
   if (seat === null) {
@@ -57,8 +57,9 @@ export default function NeighbourhoodsTab({ data, seat, file, status, metricId, 
   const byTheme = [...new Set(metrics.map((m) => m.theme))];
 
   const exportCsv = () => download(`${slug(file.name)}-neighbourhoods.csv`, csv([
-    ["lsoa_code", "lsoa_name", "ward", "council", ...metrics.flatMap((m) => [m.label, `${m.label} (E&W percentile)`])],
-    ...file.lsoas.map((l, k) => [l.code, l.name, l.ward, l.council, ...metrics.flatMap((m) => [file.values[m.id][k], file.pct[m.id][k]])]),
+    ["lsoa_code", "lsoa_name", "ward", "council", "imd_2025_decile", ...metrics.flatMap((m) => [m.label, `${m.label} (national percentile)`])],
+    ...file.lsoas.map((l, k) => [l.code, l.name, l.ward, l.council, file.imd_decile?.[k] ?? null,
+      ...metrics.flatMap((m) => [file.values[m.id][k], file.pct[m.id][k]])]),
   ]));
 
   return (
@@ -80,7 +81,10 @@ export default function NeighbourhoodsTab({ data, seat, file, status, metricId, 
             <h3>{metric.label}</h3>
             <button className="link small" onClick={exportCsv}>Download all (CSV)</button>
           </div>
-          <p className="tiny muted">Highest first. Badges compare each neighbourhood with all 35,672 in England and Wales.</p>
+          <p className="tiny muted">
+            Highest first. Top/Bottom badges compare each neighbourhood with all others nationally (England and Wales; England only for
+            deprivation). "IMD 1" means among the 10% most deprived neighbourhoods in England.
+          </p>
           <ol className="rank-list nb">
             {rows.map((r, k) => {
               const badge = pctLabel(r.p);
@@ -91,6 +95,7 @@ export default function NeighbourhoodsTab({ data, seat, file, status, metricId, 
                     <span className="nb-ward">{r.l.ward ?? r.l.name}</span>
                     <span className="tiny muted"> {r.l.name}</span>
                   </span>
+                  {r.d !== null && <span className={`imd-chip d${r.d}`} title={`IMD 2025 decile ${r.d} (1 = most deprived 10% in England)`}>IMD {r.d}</span>}
                   {badge && <span className={`nb-badge ${r.p! >= 90 ? "hi" : "lo"}`}>{badge}</span>}
                   <span className="num">{fmt(metric, r.v)}</span>
                 </li>

@@ -22,6 +22,7 @@ THEMES: list[dict[str, str]] = [
     {"id": "housing", "label": "Housing", "description": "Tenure, overcrowding, heating and household deprivation (Census 2021)."},
     {"id": "economy", "label": "Economy & work", "description": "Employment, inactivity, occupations and the monthly claimant count."},
     {"id": "jobs", "label": "Jobs & pay", "description": "Earnings (ASHE), local jobs by industry (BRES), business counts and labour market rates (APS)."},
+    {"id": "deprivation", "label": "Deprivation", "description": "English Indices of Deprivation 2025 (MHCLG): neighbourhood scores combined by population. England only."},
     {"id": "health", "label": "Health & care", "description": "Self-reported health, disability and unpaid care (Census 2021)."},
     {"id": "education", "label": "Education & skills", "description": "Adult qualification levels and students (Census 2021)."},
     {"id": "transport", "label": "Transport", "description": "How and how far people travel to work, and car access (Census 2021)."},

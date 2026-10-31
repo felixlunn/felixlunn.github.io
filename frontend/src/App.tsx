@@ -117,9 +117,9 @@ export default function App({ data, geo }: { data: DashboardData; geo: GeoJSON.F
     return {
       key: f.seat, geo: f.geo, colours,
       label: (code) => {
-        const k = at.get(code)!, l = f.lsoas[k], badge = pctLabel(f.pct[m.id][k]);
-        return { name: l.ward ?? l.name, sub: [l.name, l.council].filter(Boolean).join(" · "),
-          value: `${m.label}: ${fmt(m, f.values[m.id][k])}${badge ? ` (${badge} in E&W)` : ""}` };
+        const k = at.get(code)!, l = f.lsoas[k], badge = pctLabel(f.pct[m.id][k]), dec = f.imd_decile?.[k];
+        return { name: l.ward ?? l.name, sub: [l.name, l.council, dec ? `IMD decile ${dec}` : null].filter(Boolean).join(" · "),
+          value: `${m.label}: ${fmt(m, f.values[m.id][k])}${badge ? ` (${badge} nationally)` : ""}` };
       },
     };
   }, [nbActive, nbChoropleth, nbFile, nbMetric, nbColours]);
