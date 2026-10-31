@@ -2,11 +2,11 @@
 
 Constituency analytics for MPs' offices, researchers and political consultancies. Open the map, pick a seat
 (click it, or search by name, MP or postcode) and see how it compares with every other seat in the country,
-theme by theme.
+theme by theme. The homepage opens on the electoral map, with every seat in its MP's party colour.
 
 | Tool | What it answers |
 |---|---|
-| **Themes** (thematic organiser) | How does this seat compare on housing, policing, transport, health, economy, education, people and politics? Every metric shades the map, shows the seat's rank ("42nd highest of 575"), the national figure, and a distribution strip. Full rankings download as CSV. |
+| **Themes** (thematic organiser) | How does this seat compare on people, households, housing, economy, jobs & pay, health, education, transport, policing and politics? About 150 metrics in all. Every metric shades the map, shows the seat's rank ("42nd highest of 575"), the national figure, and a distribution strip. Full rankings download as CSV. |
 | **Constituency dossier** | One-click briefing for a seat: MP and party, 2024 majority and turnout, peer group, the metrics where the seat is most unusual, per-theme tables against national and peer-group averages, and its demographic twins. Exports to CSV or prints as a PDF briefing sheet. |
 | **Twins** | Which seats look most like this one? Ranks every seat by similarity across the standardised metrics of whichever themes you tick (closest levels, or same overall shape). Can be restricted to the same nation or region. |
 | **Index** | Build a composite index (e.g. *cost-of-living vulnerability* = private renting + household deprivation + claimant rate + ...) with weight sliders. Weights can be negative. The map re-shades and every seat is re-ranked instantly. Presets are included. |
@@ -21,7 +21,12 @@ All data are open, refreshed automatically **every two days** by GitHub Actions,
 | Source | Used for | Coverage | Refresh |
 |---|---|---|---|
 | [ONS Open Geography Portal](https://geoportal.statistics.gov.uk/) | Constituency boundaries (ultra-generalised, web-optimised) | UK | Static |
-| [Census 2021 via Nomis](https://www.nomisweb.co.uk/) | ~38 metrics across people, housing, economy, health, education, transport | England & Wales | Static (2021) |
+| [Census 2021 via Nomis](https://www.nomisweb.co.uk/) | ~100 metrics across people, households, housing, economy, health, education, transport | England & Wales | Static (2021) |
+| [ONS ASHE via Nomis](https://www.nomisweb.co.uk/sources/ashe) | Median pay of residents and of jobs based in the seat | Great Britain | Annual |
+| [ONS Annual Population Survey via Nomis](https://www.nomisweb.co.uk/sources/aps) | Employment and inactivity rates, share in managerial/professional jobs | Great Britain | Quarterly (12-month) |
+| [ONS BRES via Nomis](https://www.nomisweb.co.uk/sources/bres) | Jobs located in the seat by industry; jobs per working-age resident | Great Britain | Annual |
+| [ONS UK Business Counts via Nomis](https://www.nomisweb.co.uk/sources/ukbc) | Business sites per resident, micro-business share | UK | Annual |
+| [ONS small-area population estimates via Nomis](https://www.nomisweb.co.uk/sources/pest) | Population change since 2021 | England & Wales | Annual |
 | [ONS Claimant Count via Nomis](https://www.nomisweb.co.uk/sources/cc) | Claimant rate (16-64) | UK | Monthly |
 | [police.uk API](https://data.police.uk/docs/) | Crime rates by type, share of crimes closed with no suspect identified, share charged or sent to court | England, Wales, NI | Monthly |
 | [House of Commons Library CBP-10009](https://commonslibrary.parliament.uk/research-briefings/cbp-10009/) | 2024 result, majority, turnout, party vote shares | UK | Static |

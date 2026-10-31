@@ -15,6 +15,7 @@ import pandas as pd
 
 from .build import assemble, finish
 from .metrics import CENSUS_METRICS, CLAIMANT_METRICS, ELECTION_METRICS, POLICE_METRICS, census_meta
+from .sources.nomis_extra import APS_METRICS, ASHE_METRICS, BRES_METRICS, BUSINESS_METRICS, POPEST_METRICS
 
 
 def _hex(cx: float, cy: float, r: float) -> list[list[float]]:
@@ -70,12 +71,18 @@ def build_demo(out_dir: Path, n: int = 650, seed: int = 42) -> dict:
         base = 40 if m.unit == "per 1,000" else 20
         val = np.clip(base * np.exp(0.3 * (depriv + 0.5 * urban) + rng.normal(scale=0.4, size=n)), 0.1, 99)
         frames[m.id] = pd.DataFrame({"num": val, "den": 1.0}, index=codes)
-    # Census and police.uk don't cover Scotland: mirror that gap.
+    extra = APS_METRICS + ASHE_METRICS + BRES_METRICS + BUSINESS_METRICS + POPEST_METRICS
+    for m in extra:
+        base = {"£": 30000 if "annual" in m.id else 750, "ratio": 0.8, "per 1,000": 75}.get(m.unit, 3 if m.id == "pop_change" else 15)
+        val = base * np.exp(0.15 * (urban - depriv) + rng.normal(scale=0.15, size=n))
+        frames[m.id] = pd.DataFrame({"num": val, "den": 1.0}, index=codes)
+    # Census and police.uk don't cover Scotland: mirror that gap (the GB-wide Nomis series do).
+    gb_wide = {m.id for m in extra if m.id != "pop_change"}
     for mid, f in frames.items():
-        if mid.startswith(("vote_", "majority", "turnout")):
+        if mid.startswith(("vote_", "majority", "turnout")) or mid in gb_wide:
             continue
         f.loc[[c for c, ctry in zip(codes, countries) if ctry == "Scotland"], ["num"]] = np.nan
-    metas = [census_meta(m) for m in CENSUS_METRICS] + CLAIMANT_METRICS + POLICE_METRICS + ELECTION_METRICS
+    metas = [census_meta(m) for m in CENSUS_METRICS] + CLAIMANT_METRICS + extra + POLICE_METRICS + ELECTION_METRICS
     metrics, values = assemble(codes, frames, metas)
     parties = ["Labour", "Conservative", "Liberal Democrat", "Reform UK", "Green Party", "Scottish National Party", "Plaid Cymru"]
     colours = {"Labour": "#E4003B", "Conservative": "#0087DC", "Liberal Democrat": "#FAA61A", "Reform UK": "#12B6CF",

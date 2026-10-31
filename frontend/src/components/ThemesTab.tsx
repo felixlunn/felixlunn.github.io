@@ -113,7 +113,7 @@ export default function ThemesTab({ data, theme, setTheme, metric, partyMode, pa
         <p className="small">{metric.description}</p>
         <p className="small muted">
           Source: {metric.source} · {metric.coverage} seats with data · national {fmt(metric, metric.national)}
-          {metric.unit !== "%" && metric.unit !== "people" ? ` ${metric.unit}` : ""}
+          {!["%", "people", "£", "ratio"].includes(metric.unit) ? ` ${metric.unit}` : ""}
         </p>
         <div className="rank-head">
           <h4>Highest</h4>
