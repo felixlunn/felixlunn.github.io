@@ -226,8 +226,19 @@ select, input { font: inherit; color: var(--text-1); background: var(--surface-1
 .flag-list { list-style: none; margin: 8px 0 0; padding: 0; }
 .flag-list > li { padding: 6px 0; border-bottom: 1px solid var(--surface-3); }
 .flag-list > li.sel { background: color-mix(in srgb, var(--accent-2) 16%, transparent); }
-.my-seat-btn { border: 1px solid var(--border); background: var(--surface-1); border-radius: 999px; padding: 5px 12px; cursor: pointer; white-space: nowrap; max-width: 220px; overflow: hidden; text-overflow: ellipsis; color: var(--text-1); }
-.my-seat-btn span { color: var(--accent); }
+.office { position: relative; flex: none; }
+.office-set { display: flex; align-items: stretch; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-1); }
+.office-btn { display: flex; align-items: center; gap: 8px; border: 0; background: none; padding: 4px 10px; cursor: pointer; color: var(--text-1); font: inherit; text-align: left; max-width: 240px; }
+.office-btn.unset { border: 1px dashed var(--accent); border-radius: 10px; padding: 7px 12px; color: var(--accent); font-weight: 600; font-size: 13px; }
+.office-dot { width: 10px; height: 10px; border-radius: 50%; flex: none; }
+.office-text { display: flex; flex-direction: column; line-height: 1.15; min-width: 0; }
+.office-name { font-weight: 600; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.office-change { border-left: 1px solid var(--border); border-radius: 0 10px 10px 0; padding: 0 8px; }
+.office-pop { position: absolute; right: 0; top: calc(100% + 6px); width: 320px; background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px;
+  box-shadow: 0 10px 28px rgb(0 0 0 / 0.18); padding: 12px; z-index: 20; }
+.office-pop p { margin: 0 0 6px; }
+.office-search { max-width: none; margin: 6px 0; }
+.office-actions { display: flex; justify-content: space-between; margin: 6px 0; }
 .debate.is-mine { box-shadow: inset 0 0 0 2px var(--accent); }
 .debate-mine { font-size: 12px; margin-top: 6px; color: var(--text-2); }
 .debate-mine.on { color: var(--accent); font-weight: 600; }
@@ -280,6 +291,7 @@ select, input { font: inherit; color: var(--text-1); background: var(--surface-1
   .app { grid-template-columns: 1fr; grid-template-rows: auto auto 52vh auto; grid-template-areas: "top" "banner" "main" "side"; height: auto; min-height: 100%; }
   .topbar { flex-wrap: wrap; padding: 8px 16px; gap: 8px; }
   .search { max-width: none; flex-basis: 100%; order: 3; }
+  .office-pop { right: auto; left: 0; width: min(320px, calc(100vw - 32px)); }
   .sidebar { border-right: 0; overflow: visible; }
   .panel-toggle { display: none; }
   .app.panel-closed { --sidebar-w: auto; }

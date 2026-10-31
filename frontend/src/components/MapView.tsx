@@ -9,6 +9,8 @@ interface Props {
   seats: Seat[];
   choropleth: Choropleth;
   selected: string | null;
+  /** The user's own seat (office), always outlined. */
+  mine?: string | null;
   focus: { code: string; n: number } | null;
   onSelect: (code: string) => void;
 }
@@ -45,7 +47,7 @@ export function useColours(ch: Choropleth) {
   }, [ch]);
 }
 
-export default function MapView({ geo, seats, choropleth, selected, focus, onSelect }: Props) {
+export default function MapView({ geo, seats, choropleth, selected, mine = null, focus, onSelect }: Props) {
   const el = useRef<HTMLDivElement>(null);
   const map = useRef<MLMap | null>(null);
   const [ready, setReady] = useState(false);
@@ -76,6 +78,7 @@ export default function MapView({ geo, seats, choropleth, selected, focus, onSel
       m.addLayer({ id: "fill", type: "fill", source: "pcon", paint: { "fill-color": cssVar("--map-nodata"), "fill-opacity": ["case", ["boolean", ["feature-state", "hover"], false], 0.75, 1] } });
       m.addLayer({ id: "line", type: "line", source: "pcon", paint: { "line-color": cssVar("--map-line"), "line-width": ["interpolate", ["linear"], ["zoom"], 4, 0.2, 9, 1.2] } });
       m.addLayer({ id: "highlight", type: "line", source: "pcon", filter: ["in", ["get", "code"], ["literal", []]], paint: { "line-color": cssVar("--accent-2"), "line-width": 2.2 } });
+      m.addLayer({ id: "mine", type: "line", source: "pcon", filter: ["==", ["get", "code"], ""], paint: { "line-color": cssVar("--accent"), "line-width": 3, "line-dasharray": [2, 1] } });
       m.addLayer({ id: "selected", type: "line", source: "pcon", filter: ["==", ["get", "code"], ""], paint: { "line-color": cssVar("--text-1"), "line-width": 3 } });
       // Fit to the data itself (covers the UK for real boundaries).
       const all: [number, number, number, number] = [Infinity, Infinity, -Infinity, -Infinity];
@@ -142,6 +145,10 @@ export default function MapView({ geo, seats, choropleth, selected, focus, onSel
   useEffect(() => {
     if (ready) map.current?.setFilter("selected", ["==", ["get", "code"], selected ?? ""]);
   }, [selected, ready]);
+
+  useEffect(() => {
+    if (ready) map.current?.setFilter("mine", ["==", ["get", "code"], mine ?? ""]);
+  }, [mine, ready]);
 
   useEffect(() => {
     const m = map.current;

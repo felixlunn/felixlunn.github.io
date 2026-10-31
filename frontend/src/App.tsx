@@ -11,7 +11,8 @@ import SearchBox from "./components/SearchBox";
 import Legend from "./components/Legend";
 import { PARTY_ID, partyChoropleth } from "./lib/parties";
 import DebatesTab from "./components/DebatesTab";
-import { debateMetrics, flagSeats } from "./lib/debates";
+import OfficePicker from "./components/OfficePicker";
+import { debateMetrics, flagSeats, partyOf } from "./lib/debates";
 
 const MapView = lazy(() => import("./components/MapView"));
 
@@ -33,6 +34,17 @@ export default function App({ data, geo }: { data: DashboardData; geo: GeoJSON.F
   const codeIndex = useMemo(() => new Map(data.seats.map((s, i) => [s.code, i])), [data]);
   const metricIds = useMemo(() => new Set(data.metrics.map((m) => m.id)), [data]);
 
+  // The MP's office using the dashboard: from a shared link (#office=CODE) or remembered in this browser.
+  const stored = (k: string) => { try { return localStorage.getItem(k); } catch { return null; } };
+  const store = (k: string, v: string | null) => {
+    try { if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch { /* keep for this visit only */ }
+  };
+  const [mySeat, setMySeatState] = useState<number | null>(() => {
+    const fromLink = codeIndex.get(initial.office ?? "");
+    if (fromLink !== undefined) { store("whips.mySeat", initial.office); return fromLink; }
+    return codeIndex.get(stored("whips.mySeat") ?? "") ?? null;
+  });
+
   const [tab, setTab] = useState<Tab>((TABS.some((t) => t.id === initial.tab) ? initial.tab : "debates") as Tab);
   // The homepage opens on the electoral map (seats in party colours) unless the URL asks for a metric.
   const [metricId, setMetricId] = useState(metricIds.has(initial.metric) ? initial.metric : PARTY_ID);
@@ -42,18 +54,15 @@ export default function App({ data, geo }: { data: DashboardData; geo: GeoJSON.F
   const partyMap = useMemo(() => partyChoropleth(data.seats), [data]);
 
   // Debates: which debate is open, which of its metrics shades the map, and whose MPs to flag.
-  // The user's party and own MP, remembered per browser (storage can be unavailable, e.g. private windows).
-  const stored = (k: string) => { try { return localStorage.getItem(k); } catch { return null; } };
-  const store = (k: string, v: string | null) => {
-    try { if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch { /* keep for this visit only */ }
-  };
-  const [debateParty, setDebatePartyState] = useState(() => stored("whips.party") || "Lib Dem");
+  const [debateParty, setDebatePartyState] = useState(() => stored("whips.party") || (mySeat !== null && partyOf(data, mySeat)) || "Lib Dem");
   const setDebateParty = useCallback((p: string) => { setDebatePartyState(p); store("whips.party", p); }, []);
-  const [mySeat, setMySeatState] = useState<number | null>(() => codeIndex.get(stored("whips.mySeat") ?? "") ?? null);
   const setMySeat = useCallback((i: number | null) => {
     setMySeatState(i);
     store("whips.mySeat", i === null ? null : data.seats[i].code);
-  }, [data]);
+    const p = i === null ? null : partyOf(data, i);
+    if (p) setDebateParty(p); // an office flags its own party's MPs by default
+    if (i !== null) setFocus((f) => ({ code: data.seats[i].code, n: (f?.n ?? 0) + 1 }));
+  }, [data, setDebateParty]);
   const [debateId, setDebateId] = useState<number | null>(null);
   const [debateMetricId, setDebateMetricId] = useState<string | null>(null);
   const activeDebate = data.debates?.find((d) => d.id === debateId) ?? null;
@@ -63,7 +72,10 @@ export default function App({ data, geo }: { data: DashboardData; geo: GeoJSON.F
     setDebateMetricId(d ? debateMetrics(data, d)[0]?.id ?? null : null);
   }, [data]);
   const [selected, setSelected] = useState<number | null>(codeIndex.get(initial.seat) ?? null);
-  const [focus, setFocus] = useState<{ code: string; n: number } | null>(selected !== null ? { code: data.seats[selected].code, n: 0 } : null);
+  const focusOn = selected ?? mySeat;
+  const [focus, setFocus] = useState<{ code: string; n: number } | null>(focusOn !== null ? { code: data.seats[focusOn].code, n: 0 } : null);
+  // Seat the tools start from when nothing else is selected.
+  const baseSeat = selected ?? mySeat;
   const [showSources, setShowSources] = useState(false);
   const [panelOpen, setPanelOpen] = useState(true);
 
@@ -105,15 +117,15 @@ export default function App({ data, geo }: { data: DashboardData; geo: GeoJSON.F
   // --- analytics for each tool (recomputed instantly; ~650 rows) ---
   const twinIds = useMemo(() => profileMetrics(data.metrics, twinSettings.themes), [data, twinSettings.themes]);
   const twinScores = useMemo(
-    () => (tab === "twins" && selected !== null && twinIds.length ? similarity(data, selected, twinIds, twinSettings.method) : null),
-    [tab, data, selected, twinIds, twinSettings.method],
+    () => (tab === "twins" && baseSeat !== null && twinIds.length ? similarity(data, baseSeat, twinIds, twinSettings.method) : null),
+    [tab, data, baseSeat, twinIds, twinSettings.method],
   );
   const twinResults: Scored[] = useMemo(() => {
-    if (!twinScores || selected === null) return [];
-    const s = data.seats[selected];
+    if (!twinScores || baseSeat === null) return [];
+    const s = data.seats[baseSeat];
     const filter = twinSettings.scope === "country" ? { country: s.country } : twinSettings.scope === "region" ? { region: s.region } : {};
-    return topN(data, twinScores, twinSettings.n, { exclude: selected, filter });
-  }, [twinScores, data, selected, twinSettings]);
+    return topN(data, twinScores, twinSettings.n, { exclude: baseSeat, filter });
+  }, [twinScores, data, baseSeat, twinSettings]);
 
   const indexScores = useMemo(() => (tab === "index" ? compositeIndex(data, weights) : null), [tab, data, weights]);
   const indexRanking = useMemo(() => (indexScores ? topN(data, indexScores, data.seats.length) : []), [indexScores, data]);
@@ -122,9 +134,9 @@ export default function App({ data, geo }: { data: DashboardData; geo: GeoJSON.F
   const matchResults = useMemo(() => (matchDist ? topN(data, matchDist, 50, { ascending: true }) : []), [matchDist, data]);
 
   const choropleth: Choropleth = useMemo(() => {
-    if (tab === "twins" && twinScores && selected !== null) {
+    if (tab === "twins" && twinScores && baseSeat !== null) {
       return {
-        title: `Similarity to ${data.seats[selected].name}`,
+        title: `Similarity to ${data.seats[baseSeat].name}`,
         subtitle: `${twinIds.length} metrics · ${twinSettings.method === "euclidean" ? "closest levels" : "same shape"}`,
         values: twinScores, // the seat itself scores 100%
         format: (v) => `${(v * 100).toFixed(0)}%`,
@@ -169,7 +181,7 @@ export default function App({ data, geo }: { data: DashboardData; geo: GeoJSON.F
       values: data.values[metric.id],
       format: (v) => fmt(metric, v),
     };
-  }, [tab, twinScores, twinResults, twinIds, twinSettings, selected, indexScores, indexRanking, weights, matchDist, matchResults, targets, metric, data, partyMode, partyMap, activeDebate, debateMetricId, debateParty]);
+  }, [tab, twinScores, twinResults, twinIds, twinSettings, baseSeat, indexScores, indexRanking, weights, matchDist, matchResults, targets, metric, data, partyMode, partyMap, activeDebate, debateMetricId, debateParty]);
 
   const generated = new Date(data.generated_at);
   const failed = data.sources.filter((s) => s.status === "failed");
@@ -185,11 +197,7 @@ export default function App({ data, geo }: { data: DashboardData; geo: GeoJSON.F
           </div>
         </div>
         <SearchBox seats={data.seats} onPick={(i) => select(i)} />
-        {mySeat !== null && (
-          <button className="my-seat-btn small" onClick={() => select(mySeat)} title="Open your seat's briefing">
-            <span aria-hidden="true">★</span> {data.seats[mySeat].name}
-          </button>
-        )}
+        <OfficePicker seats={data.seats} office={mySeat} setOffice={setMySeat} onOpen={(i) => select(i)} />
         <button className="link small" onClick={() => setShowSources(true)}>
           Data updated {generated.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
           {failed.length > 0 && <span className="warn-dot" title={`${failed.length} source(s) failed to update`}> ⚠</span>}
@@ -213,10 +221,10 @@ export default function App({ data, geo }: { data: DashboardData; geo: GeoJSON.F
         </div>
         {panelOpen && (
           <>
-            {tab === "debates" && <DebatesTab data={data} party={debateParty} setParty={setDebateParty} mySeat={mySeat} setMySeat={setMySeat} active={debateId} setActive={openDebate}
+            {tab === "debates" && <DebatesTab data={data} party={debateParty} setParty={setDebateParty} mySeat={mySeat} active={debateId} setActive={openDebate}
               mapMetric={debateMetricId} setMapMetric={setDebateMetricId} selected={selected} onSelect={(i) => select(i)} />}
-            {tab === "themes" && <ThemesTab data={data} theme={theme} setTheme={(t) => { setTheme(t); const first = t === "politics" ? PARTY_ID : data.metrics.find((m) => m.theme === t)?.id; if (first) setMetricId(first); }} metric={metric} partyMode={partyMode} parties={partyMap} setMetric={setMetricId} selected={selected} onSelect={(i) => select(i)} />}
-            {tab === "twins" && <TwinsTab data={data} selected={selected} settings={twinSettings} setSettings={setTwinSettings} results={twinResults} metricCount={twinIds.length} onSelect={(i) => select(i)} />}
+            {tab === "themes" && <ThemesTab data={data} theme={theme} setTheme={(t) => { setTheme(t); const first = t === "politics" ? PARTY_ID : data.metrics.find((m) => m.theme === t)?.id; if (first) setMetricId(first); }} metric={metric} partyMode={partyMode} parties={partyMap} setMetric={setMetricId} selected={baseSeat} onSelect={(i) => select(i)} />}
+            {tab === "twins" && <TwinsTab data={data} selected={baseSeat} settings={twinSettings} setSettings={setTwinSettings} results={twinResults} metricCount={twinIds.length} onSelect={(i) => select(i)} />}
             {tab === "index" && <IndexTab data={data} weights={weights} setWeights={setWeights} ranking={indexRanking} selected={selected} onSelect={(i) => select(i)} />}
             {tab === "match" && <MatchTab data={data} targets={targets} setTargets={setTargets} results={matchResults} selected={selected} onSelect={(i) => select(i)} />}
           </>
@@ -225,7 +233,7 @@ export default function App({ data, geo }: { data: DashboardData; geo: GeoJSON.F
 
       <main className="main">
         <Suspense fallback={<div className="map-loading">Loading map…</div>}>
-          <MapView geo={geo} seats={data.seats} choropleth={choropleth} selected={selected !== null ? data.seats[selected].code : null}
+          <MapView geo={geo} seats={data.seats} choropleth={choropleth} selected={selected !== null ? data.seats[selected].code : null} mine={mySeat !== null ? data.seats[mySeat].code : null}
             focus={focus} onSelect={(code) => { const i = codeIndex.get(code); if (i !== undefined) select(i, false); }} />
         </Suspense>
         <Legend ch={choropleth} />

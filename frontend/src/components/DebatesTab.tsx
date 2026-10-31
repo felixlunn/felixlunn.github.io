@@ -11,7 +11,6 @@ interface Props {
   setParty: (p: string) => void;
   /** The user's own seat (index), if they've chosen one. */
   mySeat: number | null;
-  setMySeat: (i: number | null) => void;
   active: number | null;
   setActive: (id: number | null) => void;
   mapMetric: string | null;
@@ -23,10 +22,12 @@ interface Props {
 const dayFmt = new Intl.DateTimeFormat("en-GB", { weekday: "long", day: "numeric", month: "long" });
 
 function rankPhrase(h: Hit): string {
-  return `${ordinal(h.rank)} ${h.end === "high" ? "highest" : "lowest"} of ${h.of}`;
+  // Count from whichever end is nearer, so a low-ranked seat reads "115th lowest", not "461st highest".
+  const [hi, lo] = h.end === "high" ? ["highest", "lowest"] : ["lowest", "highest"];
+  return h.rank <= h.of / 2 ? `${ordinal(h.rank)} ${hi} of ${h.of}` : `${ordinal(h.of - h.rank + 1)} ${lo} of ${h.of}`;
 }
 
-export default function DebatesTab({ data, party, setParty, mySeat, setMySeat, active, setActive, mapMetric, setMapMetric, selected, onSelect }: Props) {
+export default function DebatesTab({ data, party, setParty, mySeat, active, setActive, mapMetric, setMapMetric, selected, onSelect }: Props) {
   const [onlyMine, setOnlyMine] = useState(false);
   const debates = data.debates ?? [];
   const parties = useMemo(() => {
@@ -34,11 +35,6 @@ export default function DebatesTab({ data, party, setParty, mySeat, setMySeat, a
     data.seats.forEach((_, i) => { const p = partyOf(data, i); if (p) n.set(p, (n.get(p) ?? 0) + 1); });
     return [...n.entries()].sort((a, b) => b[1] - a[1]).map(([p]) => p);
   }, [data]);
-
-  // MPs of the chosen party, by surname, for the "your MP" picker.
-  const mps = useMemo(() => data.seats.map((s, i) => ({ i, s }))
-    .filter(({ i, s }) => s.mp && partyOf(data, i) === party)
-    .sort((a, b) => surname(a.s.mp!).localeCompare(surname(b.s.mp!))), [data, party]);
 
   const rows = useMemo(() => debates.map((d) => {
     const metrics = debateMetrics(data, d);
@@ -69,14 +65,7 @@ export default function DebatesTab({ data, party, setParty, mySeat, setMySeat, a
           {parties.map((p) => <option key={p}>{p}</option>)}
         </select>
       </label>
-      <label className="field">
-        <span>Your MP</span>
-        <select value={mySeat ?? ""} onChange={(e) => setMySeat(e.target.value === "" ? null : Number(e.target.value))}>
-          <option value="">Not set</option>
-          {mySeat !== null && !mps.some((m) => m.i === mySeat) && <option value={mySeat}>{data.seats[mySeat].mp} ({data.seats[mySeat].name})</option>}
-          {mps.map(({ i, s }) => <option key={s.code} value={i}>{s.mp} ({s.name})</option>)}
-        </select>
-      </label>
+      {mySeat === null && <p className="tiny muted">Set your office in the header to see how your MP's seat ranks on each debate.</p>}
       {mySeat !== null && (
         <label className="check small">
           <input type="checkbox" checked={onlyMine} onChange={(e) => setOnlyMine(e.target.checked)} />
@@ -101,11 +90,6 @@ export default function DebatesTab({ data, party, setParty, mySeat, setMySeat, a
       {status?.as_of && <p className="tiny muted">Calendar checked {status.as_of}. Source: UK Parliament What's On.</p>}
     </div>
   );
-}
-
-function surname(name: string): string {
-  const parts = name.replace(/^(sir|dame|dr|mr|mrs|ms|miss|lord|lady)\s+/i, "").trim().split(/\s+/);
-  return parts[parts.length - 1] ?? name;
 }
 
 function DebateCard({ d, metrics, flags, lead, data, party, mySeat, mine, open, onToggle, mapMetric, setMapMetric, selected, onSelect }: {

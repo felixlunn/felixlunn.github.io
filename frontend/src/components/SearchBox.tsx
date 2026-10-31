@@ -7,7 +7,9 @@ function norm(s: string) {
   return s.toLowerCase().normalize("NFKD").replace(/[̀-ͯ]/g, "").replace(/&/g, "and").replace(/[^a-z0-9 ]/g, " ").replace(/\s+/g, " ").trim();
 }
 
-export default function SearchBox({ seats, onPick }: { seats: Seat[]; onPick: (i: number) => void }) {
+export default function SearchBox({ seats, onPick, placeholder = "Constituency, MP or postcode", autoFocus = false, className = "" }: {
+  seats: Seat[]; onPick: (i: number) => void; placeholder?: string; autoFocus?: boolean; className?: string;
+}) {
   const [q, setQ] = useState("");
   const [open, setOpen] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
@@ -52,10 +54,11 @@ export default function SearchBox({ seats, onPick }: { seats: Seat[]; onPick: (i
   };
 
   return (
-    <div className="search" role="search">
+    <div className={`search ${className}`} role="search">
       <input
         type="search"
-        placeholder="Constituency, MP or postcode"
+        autoFocus={autoFocus}
+        placeholder={placeholder}
         aria-label="Search by constituency, MP or postcode"
         value={q}
         onChange={(e) => {
