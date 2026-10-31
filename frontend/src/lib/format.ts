@@ -7,11 +7,12 @@ export function fmt(m: Pick<Metric, "unit" | "decimals">, v: number | null | und
   const d = m.decimals ?? 1;
   const n = new Intl.NumberFormat("en-GB", { minimumFractionDigits: d, maximumFractionDigits: d }).format(v);
   if (m.unit === "%") return `${n}%`;
+  if (m.unit === "£") return `£${n}`;
   return n;
 }
 
 export function unitSuffix(m: Metric): string {
-  if (m.unit === "%") return "";
+  if (m.unit === "%" || m.unit === "£" || m.unit === "ratio") return "";
   if (m.unit === "people" || m.label.includes(m.unit)) return "";
   return ` ${m.unit}`;
 }

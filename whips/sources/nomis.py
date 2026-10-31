@@ -12,12 +12,14 @@ Nomis renumbers things.
 from __future__ import annotations
 
 import io
+import json
 import logging
 import os
 import re
 import time
 from collections.abc import Iterable
 from dataclasses import replace
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -248,6 +250,75 @@ def aggregate_lsoa(tidy: pd.DataFrame, lookup: dict[str, str]) -> pd.DataFrame:
     return out[["code", "name", "cat", "label", "value"]]
 
 
+ENGLAND_AND_WALES = "2092957703"  # Nomis geography id
+
+
+def needed_categories(tidy: pd.DataFrame, includes: Iterable[tuple[str, ...]]) -> list[int]:
+    """Category codes a set of metrics needs from one table: every total row plus each metric's matches."""
+    cats = {int(c) for c, lab in zip(tidy["cat"], tidy["label"]) if pd.notna(c) and is_total(c, lab)}
+    labels = tidy.drop_duplicates("label").set_index("label")["cat"]
+    for inc in includes:
+        if inc:
+            cats.update(int(labels[lab]) for lab in select_categories(labels.index, inc))
+    return sorted(cats)
+
+
+def fetch_lsoa_table(s: requests.Session, ds: str, includes: list[tuple[str, ...]]) -> pd.DataFrame:
+    """Fetch a census table for every LSOA, limited to the categories and columns the metrics use.
+
+    Small-area tables run to millions of rows; asking only for the needed
+    categories (worked out from the England & Wales totals) and columns cuts
+    the download by an order of magnitude.
+    """
+    raw = fetch_csv(s, ds, {"geography": ENGLAND_AND_WALES, "measures": "20100"})
+    if "MEASURES" in raw.columns:
+        raw = raw[raw["MEASURES"] == 20100]
+    code_col, label_col = category_columns(raw)
+    cats = needed_categories(tidy_census(raw), includes)
+    params = {
+        "geography": find_lsoa_type(s, ds), "measures": "20100", code_col.lower(): ",".join(map(str, cats)),
+        "select": ",".join(["geography_code", "geography_name", code_col, label_col, "measures", "obs_value"]).lower(),
+    }
+    return tidy_census(fetch_csv(s, ds, params))
+
+
+def _cache_dir():
+    d = os.environ.get("WHIPS_CENSUS_CACHE")
+    return Path(d) if d else None
+
+
+def cached_table(code: str, includes: list[tuple[str, ...]]) -> pd.DataFrame | None:
+    """A previously fetched census table (Census 2021 never changes), if it covers every metric's patterns.
+
+    A table fetched whole covers anything; one fetched for selected categories
+    only covers the patterns it was fetched for.
+    """
+    d = _cache_dir()
+    if not d or not (d / f"{code}.csv.gz").exists() or not (d / f"{code}.json").exists():
+        return None
+    try:
+        meta = json.loads((d / f"{code}.json").read_text())
+        if not meta.get("full"):
+            have = {tuple(p) for p in meta.get("includes", [])}
+            if not all(tuple(inc) in have for inc in includes if inc):
+                return None
+        return pd.read_csv(d / f"{code}.csv.gz", dtype={"code": str, "name": str, "label": str})
+    except (OSError, ValueError) as exc:
+        log.warning("Ignoring unreadable census cache for %s: %s", code, exc)
+        return None
+
+
+def store_table(code: str, tidy: pd.DataFrame, includes: list[tuple[str, ...]] | None) -> None:
+    """Cache a table; ``includes`` None means the whole table was fetched."""
+    d = _cache_dir()
+    if not d:
+        return
+    d.mkdir(parents=True, exist_ok=True)
+    tidy.to_csv(d / f"{code}.csv.gz", index=False)
+    meta = {"full": includes is None, "includes": [list(i) for i in includes or []]}
+    (d / f"{code}.json").write_text(json.dumps(meta))
+
+
 def load_census(s: requests.Session, metrics: list[CensusMetric],
                 lsoa_lookup=None) -> tuple[dict[str, pd.DataFrame], dict[str, str], dict]:
     """Fetch all census tables needed by ``metrics``.
@@ -268,30 +339,46 @@ def load_census(s: requests.Session, metrics: list[CensusMetric],
     names: dict[str, str] = {}
     provenance: dict = {"tables": {}, "failed": {}}
     cache: dict[str, pd.DataFrame | None] = {}
+    includes: dict[str, list[tuple[str, ...]]] = {}
+    for m in metrics:
+        includes.setdefault(m.table, []).append(m.include)
+        if m.fallback:
+            includes.setdefault(m.fallback[0], []).append(m.fallback[1])
 
     def table(code: str) -> pd.DataFrame | None:
         nonlocal geo_type
         if code in cache:
             return cache[code]
         try:
+            hit = cached_table(code, includes.get(code, []))
+            if hit is not None:
+                log.info("%s: from cache", code)
+                provenance["tables"][code] = "cache"
+                names.update(dict(zip(hit["code"], hit["name"])))
+                cache[code] = hit
+                return hit
             ds = find_dataset(s, code)
             if geo_type is None:
                 geo_type = find_pcon_type(s, ds)
                 provenance["geography_type"] = geo_type
                 log.info("Nomis 2024 constituency geography type: %s", geo_type)
             log.info("Fetching %s (%s)", code, ds)
+            fetched_for = None  # whole table
             try:
                 tidy = tidy_census(fetch_csv(s, ds, {"geography": geo_type, "measures": "20100"}))
             except EmptyResponse:
                 if lsoa_lookup is None:
                     raise
                 log.info("%s not published for 2024 constituencies; aggregating from LSOAs", code)
-                lsoa = tidy_census(fetch_csv(s, ds, {"geography": find_lsoa_type(s, ds), "measures": "20100"}))
-                tidy = aggregate_lsoa(lsoa, lsoa_lookup())
+                t0 = time.time()
+                fetched_for = includes.get(code, [])
+                tidy = aggregate_lsoa(fetch_lsoa_table(s, ds, fetched_for), lsoa_lookup())
+                log.info("%s: summed from LSOAs in %.0fs", code, time.time() - t0)
                 provenance.setdefault("aggregated_from_lsoa", []).append(code)
             if tidy.empty:
                 raise ValueError("no rows")
             provenance["tables"][code] = ds
+            store_table(code, tidy, fetched_for)
             names.update(dict(zip(tidy["code"], tidy["name"])))
             cache[code] = tidy
         except (requests.RequestException, ValueError, LookupError, KeyError, RuntimeError) as exc:

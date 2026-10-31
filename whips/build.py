@@ -31,9 +31,11 @@ from .metrics import (
     CENSUS_METRICS, CLAIMANT_METRICS, ELECTION_METRICS, POLICE_METRICS, THEMES, MetricMeta, census_meta,
 )
 from .sources import boundaries as bsrc
-from .sources import nomis, parliament, police
+from .sources import nomis, nomis_extra, parliament, police
 
 log = logging.getLogger("whips.build")
+
+SKIPPABLE = ["claimants", "aps", "ashe", "bres", "business", "popest", "police", "elections", "members", "lsoa"]
 
 COUNTRY_BY_PREFIX = {"E": "England", "W": "Wales", "S": "Scotland", "N": "Northern Ireland"}
 
@@ -51,13 +53,14 @@ def assemble(codes: list[str], frames: dict[str, pd.DataFrame], metas: list[Metr
         f = frames.get(meta.id)
         if f is None:
             continue
+        official = f.attrs.get("national")  # e.g. a UK median, which can't be built from seat medians
         f = f.reindex(codes)
         num, den = f["num"].astype(float), f["den"].astype(float)
         val = (num / den).replace([np.inf, -np.inf], np.nan)
         ok = val.notna()
         if not ok.any():
             continue
-        national = float(num[ok].sum() / den[ok].sum()) if den[ok].sum() else None
+        national = official if official is not None else float(num[ok].sum() / den[ok].sum()) if den[ok].sum() else None
         metrics.append({
             "id": meta.id, "label": meta.label, "theme": meta.theme, "unit": meta.unit,
             "description": meta.description, "source": meta.source, "polarity": meta.polarity,
@@ -118,6 +121,10 @@ def build(out_dir: Path, skip: set[str] | None = None) -> dict:
         except Exception as exc:  # noqa: BLE001 - optional source
             log.exception("Claimant count failed")
             record("claimants", "ONS Claimant Count (Nomis)", "https://www.nomisweb.co.uk/sources/cc", "failed", str(exc))
+
+    extra_frames, extra_metas = nomis_extra.load_all(s, skip, record)
+    frames.update(extra_frames)
+    metas += extra_metas
 
     if "police" not in skip:
         try:
@@ -213,7 +220,7 @@ def finish(out_dir: Path, geo: dict, seats: list[dict], metrics: list[dict], val
 def main(argv: list[str] | None = None) -> None:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--out", default="frontend/public/data", type=Path)
-    p.add_argument("--skip", action="append", default=[], choices=["claimants", "police", "elections", "members", "lsoa"],
+    p.add_argument("--skip", action="append", default=[], choices=SKIPPABLE,
                    help="Skip an optional source (repeatable); 'lsoa' skips the slow LSOA fallback for census tables")
     p.add_argument("--demo", action="store_true", help="Write a SYNTHETIC demo dataset (no network); for UI development only")
     p.add_argument("-v", "--verbose", action="store_true")

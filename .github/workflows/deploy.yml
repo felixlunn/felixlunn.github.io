@@ -10,7 +10,7 @@ on:
   workflow_dispatch:
     inputs:
       skip:
-        description: "Optional sources to skip, space-separated (claimants police elections members lsoa)"
+        description: "Optional sources to skip, space-separated (claimants aps ashe bres business popest police elections members lsoa)"
         required: false
         default: ""
 
@@ -35,14 +35,24 @@ jobs:
           cache: pip
       - run: pip install -e .
 
+      # Census 2021 never changes: keep fetched tables between runs (each run saves a fresh
+      # copy; tables are refetched only when a metric needs categories the cache lacks).
+      - name: Restore census cache
+        uses: actions/cache@v4
+        with:
+          path: .cache/census
+          key: census-v1-${{ github.run_id }}
+          restore-keys: census-v1-
+
       - name: Fetch data and compute metrics
         env:
+          WHIPS_CENSUS_CACHE: .cache/census
           NOMIS_UID: ${{ secrets.NOMIS_UID }} # optional Nomis API key (higher limits)
           SKIP_INPUT: ${{ github.event.inputs.skip }}
         run: |
           SKIP=""
           for s in $SKIP_INPUT; do
-            case "$s" in claimants|police|elections|members|lsoa) SKIP="$SKIP --skip $s" ;; *) echo "ignoring '$s'" ;; esac
+            case "$s" in claimants|aps|ashe|bres|business|popest|police|elections|members|lsoa) SKIP="$SKIP --skip $s" ;; *) echo "ignoring '$s'" ;; esac
           done
           python -m whips.build --out frontend/public/data $SKIP
 

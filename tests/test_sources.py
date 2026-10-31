@@ -68,6 +68,47 @@ def test_tenure_without_aggregates():
     assert (out["num"] / out["den"]).iloc[0] == pytest.approx(23.0)
 
 
+def test_tenure_ignores_combined_subtotals():
+    # Real TS054 also carries derived subtotals that would double count.
+    rows = TENURE_LABELS + [(9996, "Owns with a mortgage or loan or shared ownership", 26),
+                            (9997, "Private rented or lives rent free", 24)]
+    tidy = nomis.tidy_census(nomis_csv(rows))
+    out = nomis.compute_census_metric(tidy, metric("private_rented"))
+    assert (out["num"] / out["den"]).iloc[0] == pytest.approx(23.0)
+    out = nomis.compute_census_metric(tidy, metric("mortgage"))
+    assert (out["num"] / out["den"]).iloc[0] == pytest.approx(25.0)
+
+
+def test_economic_activity_real_label_spacing():
+    # Nomis writes TS066 aggregates without a space after the colon ("...students):In employment").
+    labels = [
+        "Total: All usual residents aged 16 years and over",
+        "Economically active (excluding full-time students)",
+        "Economically active (excluding full-time students):In employment",
+        "Economically active (excluding full-time students):In employment:Employee",
+        "Economically active (excluding full-time students): In employment: Employee: Part-time",
+        "Economically active (excluding full-time students):In employment:Self-employed with employees",
+        "Economically active (excluding full-time students): In employment: Self-employed with employees: Full-time",
+        "Economically active (excluding full-time students):In employment:Self-employed without employees",
+        "Economically active and a full-time student:In employment",
+        "Economically active and a full-time student:In employment:Self-employed without employees",
+        "Economically active and a full-time student: In employment: Self-employed without employees: Part-time",
+    ]
+    assert nomis.select_categories(labels, metric("in_employment").include) == [labels[2], labels[8]]
+    assert nomis.select_categories(labels, metric("self_employed").include) == [labels[5], labels[7], labels[9]]
+
+
+def test_flats_and_renewable_heating_labels():
+    acc = ["Total", "Detached", "Semi-detached", "Terraced", "In a purpose-built block of flats or tenement",
+           "Part of a converted or shared house, including bedsits", "Part of another converted building, for example, former school, church or warehouse",
+           "In a commercial building, for example, in an office building, hotel or over a shop", "A caravan or other mobile or temporary structure"]
+    assert nomis.select_categories(acc, metric("flats").include) == acc[4:8]
+    heat = ["Total: All households", "Mains gas only", "Renewable energy only",
+            "Two or more types of central heating (not including renewable energy)",
+            "Two or more types of central heating (including renewable energy)"]
+    assert nomis.select_categories(heat, metric("heat_renewable").include) == [heat[2], heat[4]]
+
+
 def test_complement_metric():
     rows = [(0, "Total: All usual residents", 200), (1, "White: English, Welsh, Scottish, Northern Irish or British", 150),
             (2, "White: Irish", 10), (3, "Asian, Asian British or Asian Welsh: Indian", 40)]
@@ -278,3 +319,33 @@ def test_fetch_csv_retries_empty_then_raises(monkeypatch):
     with pytest.raises(nomis.EmptyResponse):
         nomis.fetch_csv(S(), "NM_1_1", {})
     assert n["calls"] == 3
+
+
+def test_bres_industry_shares_and_density():
+    from whips.sources import nomis_extra
+    rows = []
+    for code, total, manuf, health in [("E1", 1000, 100, 200), ("E2", 500, None, 50)]:
+        rows += [{"GEOGRAPHY_CODE": code, "INDUSTRY": 37748736, "value": total},
+                 {"GEOGRAPHY_CODE": code, "INDUSTRY": 910, "value": manuf},
+                 {"GEOGRAPHY_CODE": code, "INDUSTRY": 911, "value": 0},
+                 {"GEOGRAPHY_CODE": code, "INDUSTRY": 986, "value": health}]
+    df = pd.DataFrame(rows)
+    out = nomis_extra.bres_frames(df, {10: "910", 11: "911", 86: "986"}, pd.Series({"E1": 2000.0, "E2": 250.0}))
+    m = out["jobs_manufacturing"]
+    assert (m["num"] / m["den"]).to_dict() == pytest.approx({"E1": 10.0, "E2": 0.0})
+    h = out["jobs_health"]
+    assert (h["num"] / h["den"]).to_dict() == pytest.approx({"E1": 20.0, "E2": 10.0})
+    d = out["jobs_density"]
+    assert (d["num"] / d["den"]).to_dict() == pytest.approx({"E1": 0.5, "E2": 2.0})
+    assert "jobs_ict" not in out  # no divisions known for that group
+
+
+def test_census_cache_only_reused_for_covered_patterns(tmp_path, monkeypatch):
+    monkeypatch.setenv("WHIPS_CENSUS_CACHE", str(tmp_path))
+    tidy = nomis.tidy_census(nomis_csv(TENURE_LABELS))
+    nomis.store_table("TS054", tidy, [("^owned",)])
+    assert nomis.cached_table("TS054", [("^owned",)]) is not None
+    assert nomis.cached_table("TS054", [("^owned",), ("^social rented",)]) is None  # new pattern: refetch
+    nomis.store_table("TS054", tidy, None)  # whole table covers anything
+    got = nomis.cached_table("TS054", [("^social rented",)])
+    assert got is not None and got["code"].iloc[0] == "E14001063" and len(got) == len(tidy)
