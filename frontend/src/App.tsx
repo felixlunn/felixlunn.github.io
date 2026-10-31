@@ -1,5 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
-import type { Choropleth, DashboardData } from "./types";
+import type { Choropleth, DashboardData, NeighbourhoodFile } from "./types";
 import { compositeIndex, profileDistance, profileMetrics, similarity, topN, type Scored } from "./lib/analytics";
 import { fmt, unitSuffix } from "./lib/format";
 import ThemesTab from "./components/ThemesTab";
@@ -12,13 +12,17 @@ import Legend from "./components/Legend";
 import { PARTY_ID, partyChoropleth } from "./lib/parties";
 import DebatesTab from "./components/DebatesTab";
 import OfficePicker from "./components/OfficePicker";
+import NeighbourhoodsTab, { pctLabel } from "./components/NeighbourhoodsTab";
+import { useColours, type Overlay } from "./components/MapView";
+import { classify } from "./lib/colors";
 import { debateMetrics, flagSeats, partyOf } from "./lib/debates";
 
 const MapView = lazy(() => import("./components/MapView"));
 
-type Tab = "debates" | "themes" | "twins" | "index" | "match";
+type Tab = "debates" | "neighbourhoods" | "themes" | "twins" | "index" | "match";
 const TABS: { id: Tab; label: string }[] = [
   { id: "debates", label: "Debates" },
+  { id: "neighbourhoods", label: "Neighbourhoods" },
   { id: "themes", label: "Themes" },
   { id: "twins", label: "Twins" },
   { id: "index", label: "Index" },
@@ -76,6 +80,49 @@ export default function App({ data, geo }: { data: DashboardData; geo: GeoJSON.F
   const [focus, setFocus] = useState<{ code: string; n: number } | null>(focusOn !== null ? { code: data.seats[focusOn].code, n: 0 } : null);
   // Seat the tools start from when nothing else is selected.
   const baseSeat = selected ?? mySeat;
+  // Neighbourhoods: one small file per seat, loaded when the tab is open.
+  const [nbFile, setNbFile] = useState<NeighbourhoodFile | null>(null);
+  const [nbStatus, setNbStatus] = useState<"idle" | "loading" | "error">("idle");
+  const [nbMetricId, setNbMetricId] = useState<string | null>(null);
+  const nbSeatCode = baseSeat !== null && data.neighbourhoods?.seats.includes(data.seats[baseSeat].code) ? data.seats[baseSeat].code : null;
+  useEffect(() => {
+    if (tab !== "neighbourhoods" || !nbSeatCode || nbFile?.seat === nbSeatCode) return;
+    let live = true;
+    setNbFile(null);
+    setNbStatus("loading");
+    fetch(`./data/lsoa/${nbSeatCode}.json`)
+      .then((r) => { if (!r.ok) throw new Error(String(r.status)); return r.json() as Promise<NeighbourhoodFile>; })
+      .then((f) => { if (live) { setNbFile(f); setNbStatus("idle"); } })
+      .catch(() => { if (live) setNbStatus("error"); });
+    return () => { live = false; };
+  }, [tab, nbSeatCode, nbFile?.seat]);
+  const nbMetric = nbFile ? (data.metrics.find((m) => m.id === nbMetricId && nbFile.metrics.includes(m.id))
+    ?? data.metrics.find((m) => m.id === metricId && nbFile.metrics.includes(m.id))
+    ?? data.metrics.find((m) => m.id === "private_rented" && nbFile.metrics.includes(m.id))
+    ?? data.metrics.find((m) => nbFile.metrics.includes(m.id)) ?? null) : null;
+  const nbActive = tab === "neighbourhoods" && nbFile !== null && nbFile.seat === nbSeatCode && nbMetric !== null;
+  const nbChoropleth: Choropleth | null = useMemo(() => nbActive ? {
+    title: nbMetric!.label + unitSuffix(nbMetric!),
+    subtitle: `${nbFile!.name}: neighbourhoods (LSOAs)`,
+    values: nbFile!.values[nbMetric!.id],
+    format: (v) => fmt(nbMetric!, v),
+  } : null, [nbActive, nbFile, nbMetric]);
+  const nbColours = useColours(nbChoropleth ?? { title: "", values: [], format: String });
+  const overlay: Overlay | null = useMemo(() => {
+    if (!nbActive || !nbChoropleth) return null;
+    const f = nbFile!, m = nbMetric!;
+    const colours: Record<string, string> = {};
+    f.lsoas.forEach((l, k) => { const v = f.values[m.id][k]; if (v !== null) colours[l.code] = nbColours.pick(classify(v, nbColours.breaks)); });
+    const at = new Map(f.lsoas.map((l, k) => [l.code, k]));
+    return {
+      key: f.seat, geo: f.geo, colours,
+      label: (code) => {
+        const k = at.get(code)!, l = f.lsoas[k], badge = pctLabel(f.pct[m.id][k]);
+        return { name: l.ward ?? l.name, sub: [l.name, l.council].filter(Boolean).join(" · "),
+          value: `${m.label}: ${fmt(m, f.values[m.id][k])}${badge ? ` (${badge} in E&W)` : ""}` };
+      },
+    };
+  }, [nbActive, nbChoropleth, nbFile, nbMetric, nbColours]);
   const [showSources, setShowSources] = useState(false);
   const [panelOpen, setPanelOpen] = useState(true);
 
@@ -162,6 +209,10 @@ export default function App({ data, geo }: { data: DashboardData; geo: GeoJSON.F
         invert: true,
       };
     }
+    if (tab === "neighbourhoods" && nbActive) {
+      // Constituencies stay grey behind the seat's neighbourhoods.
+      return { title: "", values: data.seats.map(() => null), format: String };
+    }
     if (tab === "debates") {
       const m = activeDebate && debateMetricId ? data.metrics.find((x) => x.id === debateMetricId) : null;
       if (!activeDebate || !m) return partyMap;
@@ -181,7 +232,7 @@ export default function App({ data, geo }: { data: DashboardData; geo: GeoJSON.F
       values: data.values[metric.id],
       format: (v) => fmt(metric, v),
     };
-  }, [tab, twinScores, twinResults, twinIds, twinSettings, baseSeat, indexScores, indexRanking, weights, matchDist, matchResults, targets, metric, data, partyMode, partyMap, activeDebate, debateMetricId, debateParty]);
+  }, [tab, twinScores, twinResults, twinIds, twinSettings, baseSeat, indexScores, indexRanking, weights, matchDist, matchResults, targets, metric, data, partyMode, partyMap, nbActive, activeDebate, debateMetricId, debateParty]);
 
   const generated = new Date(data.generated_at);
   const failed = data.sources.filter((s) => s.status === "failed");
@@ -223,6 +274,8 @@ export default function App({ data, geo }: { data: DashboardData; geo: GeoJSON.F
           <>
             {tab === "debates" && <DebatesTab data={data} party={debateParty} setParty={setDebateParty} mySeat={mySeat} active={debateId} setActive={openDebate}
               mapMetric={debateMetricId} setMapMetric={setDebateMetricId} selected={selected} onSelect={(i) => select(i)} />}
+            {tab === "neighbourhoods" && <NeighbourhoodsTab data={data} seat={baseSeat} file={nbFile?.seat === nbSeatCode ? nbFile : null} status={nbStatus}
+              metricId={nbMetric?.id ?? null} setMetricId={setNbMetricId} />}
             {tab === "themes" && <ThemesTab data={data} theme={theme} setTheme={(t) => { setTheme(t); const first = t === "politics" ? PARTY_ID : data.metrics.find((m) => m.theme === t)?.id; if (first) setMetricId(first); }} metric={metric} partyMode={partyMode} parties={partyMap} setMetric={setMetricId} selected={baseSeat} onSelect={(i) => select(i)} />}
             {tab === "twins" && <TwinsTab data={data} selected={baseSeat} settings={twinSettings} setSettings={setTwinSettings} results={twinResults} metricCount={twinIds.length} onSelect={(i) => select(i)} />}
             {tab === "index" && <IndexTab data={data} weights={weights} setWeights={setWeights} ranking={indexRanking} selected={selected} onSelect={(i) => select(i)} />}
@@ -233,10 +286,10 @@ export default function App({ data, geo }: { data: DashboardData; geo: GeoJSON.F
 
       <main className="main">
         <Suspense fallback={<div className="map-loading">Loading map…</div>}>
-          <MapView geo={geo} seats={data.seats} choropleth={choropleth} selected={selected !== null ? data.seats[selected].code : null} mine={mySeat !== null ? data.seats[mySeat].code : null}
+          <MapView geo={geo} seats={data.seats} choropleth={choropleth} selected={selected !== null ? data.seats[selected].code : null} mine={mySeat !== null ? data.seats[mySeat].code : null} overlay={overlay}
             focus={focus} onSelect={(code) => { const i = codeIndex.get(code); if (i !== undefined) select(i, false); }} />
         </Suspense>
-        <Legend ch={choropleth} />
+        <Legend ch={nbChoropleth ?? choropleth} />
       </main>
 
       {selected !== null && (
