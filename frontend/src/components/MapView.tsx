@@ -27,6 +27,36 @@ interface Props {
   onSelect: (code: string) => void;
 }
 
+/**
+ * Ordnance Survey base map (OS Maps API, "Light" style, OpenData tiles). Needs a free OS Data Hub API key,
+ * supplied at build time as VITE_OS_API_KEY; without one the map keeps its plain background.
+ * The API serves Web Mercator tiles from zoom 7 (Great Britain only); at whole-UK zoom the seats cover the land anyway.
+ */
+const OS_KEY = (import.meta.env.VITE_OS_API_KEY as string | undefined)?.trim();
+const OS_ATTRIBUTION = `Contains OS data © Crown copyright and database rights ${new Date().getFullYear()}`;
+
+function baseStyle(): maplibregl.StyleSpecification {
+  const bg: maplibregl.LayerSpecification = { id: "bg", type: "background", paint: { "background-color": cssVar("--map-sea") } };
+  if (!OS_KEY) return { version: 8, sources: {}, layers: [bg] };
+  return {
+    version: 8,
+    sources: {
+      os: {
+        type: "raster", tileSize: 256, minzoom: 7, maxzoom: 16, attribution: OS_ATTRIBUTION,
+        tiles: [`https://api.os.uk/maps/raster/v1/zxy/Light_3857/{z}/{x}/{y}.png?key=${encodeURIComponent(OS_KEY)}`],
+      },
+    },
+    layers: [bg, { id: "os", type: "raster", source: "os", paint: { "raster-opacity": isDark() ? 0.55 : 1 } }],
+  };
+}
+
+/** Fill opacity that lets the base map show through as you zoom in (fully opaque without one). */
+function fillOpacity(hover: number, solid: number, zoomed: number): maplibregl.DataDrivenPropertyValueSpecification<number> {
+  const h = ["boolean", ["feature-state", "hover"], false];
+  if (!OS_KEY) return ["case", h, hover, solid] as never;
+  return ["interpolate", ["linear"], ["zoom"], 7, ["case", h, hover, solid], 11, ["case", h, zoomed - 0.2, zoomed]] as never;
+}
+
 const UK_BOUNDS: [number, number, number, number] = [-8.6, 49.85, 1.8, 60.9];
 
 function cssVar(name: string): string {
@@ -74,7 +104,7 @@ export default function MapView({ geo, seats, choropleth, selected, mine = null,
     if (!el.current) return;
     const m = new maplibregl.Map({
       container: el.current,
-      style: { version: 8, sources: {}, layers: [{ id: "bg", type: "background", paint: { "background-color": cssVar("--map-sea") } }] },
+      style: baseStyle(),
       bounds: UK_BOUNDS,
       fitBoundsOptions: { padding: 20 },
       attributionControl: false,
@@ -85,13 +115,13 @@ export default function MapView({ geo, seats, choropleth, selected, mine = null,
     });
     m.touchZoomRotate.disableRotation();
     m.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");
-    m.addControl(new maplibregl.AttributionControl({ compact: true, customAttribution: "Boundaries: ONS (OGL), Contains OS data © Crown copyright" }));
+    m.addControl(new maplibregl.AttributionControl({ compact: true, customAttribution: OS_KEY ? "Boundaries: ONS (OGL)" : "Boundaries: ONS (OGL), Contains OS data © Crown copyright" }));
     m.on("load", () => {
       m.addSource("pcon", { type: "geojson", data: geo, promoteId: "code" });
-      m.addLayer({ id: "fill", type: "fill", source: "pcon", paint: { "fill-color": cssVar("--map-nodata"), "fill-opacity": ["case", ["boolean", ["feature-state", "hover"], false], 0.75, 1] } });
+      m.addLayer({ id: "fill", type: "fill", source: "pcon", paint: { "fill-color": cssVar("--map-nodata"), "fill-opacity": fillOpacity(0.75, 1, 0.6) } });
       m.addLayer({ id: "line", type: "line", source: "pcon", paint: { "line-color": cssVar("--map-line"), "line-width": ["interpolate", ["linear"], ["zoom"], 4, 0.2, 9, 1.2] } });
       m.addSource("sub", { type: "geojson", data: EMPTY, promoteId: "code" });
-      m.addLayer({ id: "sub-fill", type: "fill", source: "sub", paint: { "fill-color": cssVar("--map-nodata"), "fill-opacity": ["case", ["boolean", ["feature-state", "hover"], false], 0.7, 0.95] } });
+      m.addLayer({ id: "sub-fill", type: "fill", source: "sub", paint: { "fill-color": cssVar("--map-nodata"), "fill-opacity": fillOpacity(0.7, 0.95, 0.65) } });
       m.addLayer({ id: "sub-line", type: "line", source: "sub", paint: { "line-color": cssVar("--map-line"), "line-width": 0.6 } });
       m.addLayer({ id: "highlight", type: "line", source: "pcon", filter: ["in", ["get", "code"], ["literal", []]], paint: { "line-color": cssVar("--accent-2"), "line-width": 2.2 } });
       m.addLayer({ id: "mine", type: "line", source: "pcon", filter: ["==", ["get", "code"], ""], paint: { "line-color": cssVar("--accent"), "line-width": 3, "line-dasharray": [2, 1] } });
