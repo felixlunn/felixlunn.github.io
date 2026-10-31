@@ -136,3 +136,69 @@ def match_members(members: list[dict], names: dict[str, str]) -> dict[str, dict]
     if missing:
         log.info("Members API: %d constituencies without a matched current MP (vacant or name mismatch)", missing)
     return out
+
+
+GE2024_ELECTION_ID = 422  # Members API id of the 4 July 2024 general election
+
+
+def parse_api_results(results: dict[str, dict]) -> tuple[dict[str, pd.DataFrame], pd.DataFrame]:
+    """Turn Members API election results ({PCON code: result}) into the same shape as ``parse_results``."""
+    rows, shares = {}, {}
+    for code, r in results.items():
+        cands = sorted(r.get("candidates") or [], key=lambda c: c.get("rankOrder") or 99)
+        abbr = lambda c: ((c.get("party") or {}).get("abbreviation") or "").strip()  # noqa: E731
+        valid = sum(c.get("votes") or 0 for c in cands) or r.get("turnout")
+        rows[code] = {
+            "valid": valid, "electorate": r.get("electorate"), "majority": r.get("majority"),
+            "first_party": abbr(cands[0]) if cands else None,
+            "second_party": abbr(cands[1]) if len(cands) > 1 else None,
+            "result": r.get("result"),
+        }
+        votes: dict[str, float] = {}
+        for c in cands:
+            a = abbr(c)
+            key = "Lab" if a.startswith("Lab") else a  # Labour and Labour Co-op count together
+            votes[key] = votes.get(key, 0) + (c.get("votes") or 0)
+        shares[code] = votes
+    df = pd.DataFrame.from_dict(rows, orient="index")
+    valid = pd.to_numeric(df["valid"], errors="coerce")
+    metrics = {
+        "majority_pct": pd.DataFrame({"num": pd.to_numeric(df["majority"], errors="coerce") * 100, "den": valid}),
+        "turnout": pd.DataFrame({"num": valid * 100, "den": pd.to_numeric(df["electorate"], errors="coerce")}),
+    }
+    for col, (mid, _label) in ELECTION_PARTIES.items():
+        num = pd.Series({code: v.get(col, 0) for code, v in shares.items()}, dtype=float)
+        metrics[mid] = pd.DataFrame({"num": num.reindex(df.index).fillna(0) * 100, "den": valid})
+    attrs = df[["first_party", "second_party", "result"]].copy()
+    return metrics, attrs
+
+
+def load_results_api(s: requests.Session, names: dict[str, str], workers: int = 8) -> tuple[dict[str, pd.DataFrame], pd.DataFrame]:
+    """2024 results from the UK Parliament Members API (fallback when the Commons Library file is unavailable)."""
+    from concurrent.futures import ThreadPoolExecutor
+
+    items, skip = [], 0
+    while True:
+        data = get_json(s, f"{MEMBERS_API}/Location/Constituency/Search", params={"skip": skip, "take": 20})
+        batch = data.get("items", [])
+        items.extend(it.get("value", it) for it in batch)
+        skip += len(batch)
+        if not batch or skip >= data.get("totalResults", 0):
+            break
+    by_name = {norm_name(n): code for code, n in names.items()}
+    ids = {by_name[norm_name(c["name"])]: c["id"] for c in items if not c.get("endDate") and norm_name(c.get("name", "")) in by_name}
+
+    def one(item):
+        code, cid = item
+        try:
+            d = get_json(s, f"{MEMBERS_API}/Location/Constituency/{cid}/ElectionResult/{GE2024_ELECTION_ID}")
+            return code, d.get("value", d)
+        except requests.RequestException as exc:
+            log.warning("No 2024 result for %s: %s", code, exc)
+            return code, None
+
+    with ThreadPoolExecutor(workers) as pool:
+        results = {code: r for code, r in pool.map(one, ids.items()) if r}
+    if len(results) < 600:
+        raise ValueError(f"Members API returned 2024 results for only {len(results)} constituencies")
+    return parse_api_results(results)

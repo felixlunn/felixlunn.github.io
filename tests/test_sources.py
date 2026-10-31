@@ -349,3 +349,23 @@ def test_census_cache_only_reused_for_covered_patterns(tmp_path, monkeypatch):
     nomis.store_table("TS054", tidy, None)  # whole table covers anything
     got = nomis.cached_table("TS054", [("^social rented",)])
     assert got is not None and got["code"].iloc[0] == "E14001063" and len(got) == len(tidy)
+
+
+def test_parse_api_results_matches_csv_shape():
+    party = lambda a: {"abbreviation": a}  # noqa: E731
+    results = {
+        "E1": {"electorate": 1000, "majority": 100, "result": "LD Gain", "candidates": [
+            {"party": party("LD"), "votes": 300, "rankOrder": 1},
+            {"party": party("Con"), "votes": 200, "rankOrder": 2},
+            {"party": party("Lab Co-op"), "votes": 60, "rankOrder": 3},
+            {"party": party("Lab"), "votes": 40, "rankOrder": 4},
+        ]},
+    }
+    metrics, attrs = parliament.parse_api_results(results)
+    val = lambda mid: metrics[mid].loc["E1", "num"] / metrics[mid].loc["E1", "den"]  # noqa: E731
+    assert val("majority_pct") == pytest.approx(100 / 600 * 100)
+    assert val("turnout") == pytest.approx(60.0)
+    assert val("vote_ld") == pytest.approx(50.0)
+    assert val("vote_lab") == pytest.approx(100 / 600 * 100)  # Labour and Labour Co-op combined
+    assert val("vote_snp") == 0
+    assert attrs.loc["E1"].to_dict() == {"first_party": "LD", "second_party": "Con", "result": "LD Gain"}
