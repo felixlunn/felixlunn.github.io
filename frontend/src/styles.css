@@ -226,6 +226,14 @@ select, input { font: inherit; color: var(--text-1); background: var(--surface-1
 .flag-list { list-style: none; margin: 8px 0 0; padding: 0; }
 .flag-list > li { padding: 6px 0; border-bottom: 1px solid var(--surface-3); }
 .flag-list > li.sel { background: color-mix(in srgb, var(--accent-2) 16%, transparent); }
+.my-seat-btn { border: 1px solid var(--border); background: var(--surface-1); border-radius: 999px; padding: 5px 12px; cursor: pointer; white-space: nowrap; max-width: 220px; overflow: hidden; text-overflow: ellipsis; color: var(--text-1); }
+.my-seat-btn span { color: var(--accent); }
+.debate.is-mine { box-shadow: inset 0 0 0 2px var(--accent); }
+.debate-mine { font-size: 12px; margin-top: 6px; color: var(--text-2); }
+.debate-mine.on { color: var(--accent); font-weight: 600; }
+.my-standing { margin: 8px 0; padding: 8px 10px; border-radius: 8px; background: var(--surface-2); }
+.my-standing ul { margin: 4px 0 0; padding-left: 16px; }
+.check { display: flex; gap: 6px; align-items: center; margin: 4px 0 8px; cursor: pointer; }
 .flag-list ul { margin: 3px 0 0; padding-left: 16px; }
 .strong { font-weight: 600; }
 .swatch.nodata { background: var(--map-nodata); }

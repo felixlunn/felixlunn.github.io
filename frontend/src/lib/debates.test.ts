@@ -44,3 +44,16 @@ describe("debate flags", () => {
     expect(leadSeat(d, debate)).toBe(7);
   });
 });
+
+import { standing, standsOut } from "./debates";
+
+describe("my seat standing", () => {
+  it("ranks one seat from the notable end of every metric, most notable first", () => {
+    const d = data();
+    const s = standing(d, d.metrics, 2);
+    // crime (higher worse): seat 2 has value 2, 17 seats higher -> 18th of 20. jobs (higher better): value 2, 2 lower -> 3rd of 19.
+    expect(s.map((h) => [h.metric.id, h.rank, h.of])).toEqual([["jobs", 3, 19], ["crime", 18, 20]]);
+    expect(standsOut(s[0])).toBe(false); // top 2 of 19 needed
+    expect(standsOut({ ...s[0], rank: 2 })).toBe(true);
+  });
+});
