@@ -1,6 +1,7 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import App from "./App";
+import { dataUrl } from "./lib/dataUrl";
 import type { DashboardData } from "./types";
 import "./styles.css";
 
@@ -9,11 +10,11 @@ const root = createRoot(document.getElementById("root")!);
 async function load() {
   // Both files are fetched in parallel; data.json is also preloaded from index.html.
   const [data, geo] = await Promise.all([
-    fetch("./data/data.json").then((r) => {
+    fetch(dataUrl("data.json")).then((r) => {
       if (!r.ok) throw new Error(`data.json: HTTP ${r.status}`);
       return r.json() as Promise<DashboardData>;
     }),
-    fetch("./data/boundaries.geojson").then((r) => {
+    fetch(dataUrl("boundaries.geojson")).then((r) => {
       if (!r.ok) throw new Error(`boundaries.geojson: HTTP ${r.status}`);
       return r.json() as Promise<GeoJSON.FeatureCollection>;
     }),

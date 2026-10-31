@@ -15,6 +15,7 @@ import OfficePicker from "./components/OfficePicker";
 import NeighbourhoodsTab, { pctLabel } from "./components/NeighbourhoodsTab";
 import { useColours, type Overlay } from "./components/MapView";
 import { classify } from "./lib/colors";
+import { dataUrl } from "./lib/dataUrl";
 import { debateMetrics, flagSeats, partyOf } from "./lib/debates";
 
 const MapView = lazy(() => import("./components/MapView"));
@@ -90,7 +91,7 @@ export default function App({ data, geo }: { data: DashboardData; geo: GeoJSON.F
     let live = true;
     setNbFile(null);
     setNbStatus("loading");
-    fetch(`./data/lsoa/${nbSeatCode}.json`)
+    fetch(dataUrl(`lsoa/${nbSeatCode}.json`))
       .then((r) => { if (!r.ok) throw new Error(String(r.status)); return r.json() as Promise<NeighbourhoodFile>; })
       .then((f) => { if (live) { setNbFile(f); setNbStatus("idle"); } })
       .catch(() => { if (live) setNbStatus("error"); });
@@ -320,7 +321,7 @@ export default function App({ data, geo }: { data: DashboardData; geo: GeoJSON.F
               Contains public sector information licensed under the Open Government Licence v3.0 and Open Parliament Licence.
               Census 2021 covers England and Wales; police.uk covers England, Wales and Northern Ireland.
             </p>
-            <p className="small"><a href="./data/constituencies.csv" download>Download every metric for every seat (CSV)</a></p>
+            <p className="small"><a href={dataUrl("constituencies.csv")} download="constituencies.csv">Download every metric for every seat (CSV)</a></p>
           </div>
         </div>
       )}

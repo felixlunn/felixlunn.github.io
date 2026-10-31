@@ -74,7 +74,8 @@ export default function DebatesTab({ data, party, setParty, mySeat, active, setA
       )}
 
       {status?.status === "failed" && <p className="small bad">The parliamentary calendar couldn't be loaded on the last data update.</p>}
-      {!debates.length && status?.status !== "failed" && <p className="small muted">No debates are scheduled in the next three weeks.</p>}
+      {data.debates === undefined && <p className="small muted">This copy of the data predates the debates calendar. Refresh the page to load the latest data.</p>}
+      {data.debates !== undefined && !debates.length && status?.status !== "failed" && <p className="small muted">No debates are scheduled in the next three weeks.</p>}
       {debates.length > 0 && !shown.length && <p className="small muted">None of the upcoming debates touch figures where your seat stands out.</p>}
 
       {byDay.map(([day, items]) => (
