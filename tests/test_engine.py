@@ -46,11 +46,6 @@ def test_composite_index_signs():
         engine.composite_index(ds, {"x": 0})
 
 
-def test_match_profile():
-    out = engine.match_profile(tiny(), {"x": 30.4, "y": 20.6}, top_n=2)
-    assert [o["code"] for o in out] == ["C", "D"] or [o["code"] for o in out] == ["D", "C"]
-
-
 def test_kmeans_separates_clusters():
     Z = np.vstack([np.random.default_rng(1).normal(0, 0.1, (20, 2)), np.random.default_rng(2).normal(5, 0.1, (20, 2))])
     labels, _ = engine.kmeans(Z, 2)

@@ -154,28 +154,6 @@ def composite_index(ds: Dataset, weights: dict[str, float]) -> list[dict]:
     return out
 
 
-def match_profile(ds: Dataset, targets: dict[str, float], top_n: int = 10,
-                  country: str | None = None, region: str | None = None) -> list[dict]:
-    """Seats closest to a target profile, e.g. {"private_rented": 35, "age_20_34": 30}.
-
-    Distance is Euclidean in standard-deviation units, so a 1-SD miss on any metric costs the same.
-    """
-    ids = list(targets)
-    X = ds.matrix(ids)
-    complete = ~np.isnan(X).any(axis=1)
-    _, mu, sd = zscore(X[complete])
-    Z = (X - mu) / sd
-    t = (np.array([targets[k] for k in ids], dtype=float) - mu) / sd
-    dist = np.sqrt(((Z - t) ** 2).mean(axis=1))
-    mask = _filter_mask(ds, country, region) & complete
-    order = np.argsort(np.where(mask, dist, np.inf))
-    return [
-        {"code": ds.seats[j]["code"], "name": ds.seats[j]["name"], "distance": round(float(dist[j]), 4),
-         "values": {k: float(X[j, n]) for n, k in enumerate(ids)}}
-        for j in order[:top_n] if mask[j]
-    ]
-
-
 def kmeans(Z: np.ndarray, k: int, seed: int = 7, iters: int = 100) -> tuple[np.ndarray, np.ndarray]:
     """Deterministic k-means with k-means++ initialisation."""
     rng = np.random.default_rng(seed)

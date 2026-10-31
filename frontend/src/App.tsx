@@ -1,11 +1,10 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import type { Choropleth, DashboardData, NeighbourhoodFile } from "./types";
-import { compositeIndex, profileDistance, profileMetrics, similarity, topN, type Scored } from "./lib/analytics";
+import { compositeIndex, profileMetrics, similarity, topN, type Scored } from "./lib/analytics";
 import { fmt, unitSuffix } from "./lib/format";
 import ThemesTab from "./components/ThemesTab";
 import TwinsTab, { type TwinSettings } from "./components/TwinsTab";
 import IndexTab, { PRESETS } from "./components/IndexTab";
-import MatchTab from "./components/MatchTab";
 import Dossier from "./components/Dossier";
 import Legend from "./components/Legend";
 import { PARTY_ID, partyChoropleth } from "./lib/parties";
@@ -19,14 +18,13 @@ import { debateMetrics, flagSeats, partyOf } from "./lib/debates";
 
 const MapView = lazy(() => import("./components/MapView"));
 
-type Tab = "debates" | "neighbourhoods" | "themes" | "twins" | "index" | "match";
+type Tab = "debates" | "neighbourhoods" | "themes" | "twins" | "index";
 const TABS: { id: Tab; label: string }[] = [
   { id: "debates", label: "Debates" },
   { id: "neighbourhoods", label: "Neighbourhoods" },
   { id: "themes", label: "Themes" },
   { id: "twins", label: "Twins" },
   { id: "index", label: "Index" },
-  { id: "match", label: "Match" },
 ];
 
 function readHash(): Record<string, string> {
@@ -132,14 +130,6 @@ export default function App({ data, geo }: { data: DashboardData; geo: GeoJSON.F
   const [weights, setWeights] = useState<Record<string, number>>(() =>
     Object.fromEntries(Object.entries(PRESETS[0].weights).filter(([k]) => metricIds.has(k))),
   );
-  const [targets, setTargets] = useState<Record<string, number>>(() => {
-    const t: Record<string, number> = {};
-    for (const id of ["age_20_34", "private_rented"]) {
-      const m = data.metrics.find((x) => x.id === id);
-      if (m?.national != null) t[id] = Math.round(m.national * 1.4 * 10) / 10;
-    }
-    return t;
-  });
 
   // Keep the URL shareable: #seat=E14001063&metric=private_rented&tab=themes
   useEffect(() => {
@@ -179,9 +169,6 @@ export default function App({ data, geo }: { data: DashboardData; geo: GeoJSON.F
   const indexScores = useMemo(() => (tab === "index" ? compositeIndex(data, weights) : null), [tab, data, weights]);
   const indexRanking = useMemo(() => (indexScores ? topN(data, indexScores, data.seats.length) : []), [indexScores, data]);
 
-  const matchDist = useMemo(() => (tab === "match" && Object.keys(targets).length ? profileDistance(data, targets) : null), [tab, data, targets]);
-  const matchResults = useMemo(() => (matchDist ? topN(data, matchDist, 50, { ascending: true }) : []), [matchDist, data]);
-
   const choropleth: Choropleth = useMemo(() => {
     if (tab === "twins" && twinScores && baseSeat !== null) {
       return {
@@ -199,16 +186,6 @@ export default function App({ data, geo }: { data: DashboardData; geo: GeoJSON.F
         values: indexScores,
         format: (v) => `${v >= 0 ? "+" : ""}${v.toFixed(2)} SD`,
         highlight: indexRanking.slice(0, 20).map((r) => r.code),
-      };
-    }
-    if (tab === "match" && matchDist) {
-      return {
-        title: "Distance from target profile",
-        subtitle: `${Object.keys(targets).length} criteria`,
-        values: matchDist,
-        format: (v) => `${v.toFixed(2)} SD`,
-        highlight: matchResults.slice(0, 15).map((r) => r.code),
-        invert: true,
       };
     }
     if (tab === "neighbourhoods" && nbActive) {
@@ -234,7 +211,7 @@ export default function App({ data, geo }: { data: DashboardData; geo: GeoJSON.F
       values: data.values[metric.id],
       format: (v) => fmt(metric, v),
     };
-  }, [tab, twinScores, twinResults, twinIds, twinSettings, baseSeat, indexScores, indexRanking, weights, matchDist, matchResults, targets, metric, data, partyMode, partyMap, nbActive, activeDebate, debateMetricId, debateParty]);
+  }, [tab, twinScores, twinResults, twinIds, twinSettings, baseSeat, indexScores, indexRanking, weights, metric, data, partyMode, partyMap, nbActive, activeDebate, debateMetricId, debateParty]);
 
   const generated = new Date(data.generated_at);
   const failed = data.sources.filter((s) => s.status === "failed");
@@ -280,7 +257,6 @@ export default function App({ data, geo }: { data: DashboardData; geo: GeoJSON.F
             {tab === "themes" && <ThemesTab data={data} theme={theme} setTheme={(t) => { setTheme(t); const first = t === "politics" ? PARTY_ID : data.metrics.find((m) => m.theme === t)?.id; if (first) setMetricId(first); }} metric={metric} partyMode={partyMode} parties={partyMap} setMetric={setMetricId} selected={baseSeat} onSelect={(i) => select(i)} />}
             {tab === "twins" && <TwinsTab data={data} selected={baseSeat} settings={twinSettings} setSettings={setTwinSettings} results={twinResults} metricCount={twinIds.length} onSelect={(i) => select(i)} />}
             {tab === "index" && <IndexTab data={data} weights={weights} setWeights={setWeights} ranking={indexRanking} selected={selected} onSelect={(i) => select(i)} />}
-            {tab === "match" && <MatchTab data={data} targets={targets} setTargets={setTargets} results={matchResults} selected={selected} onSelect={(i) => select(i)} />}
           </>
         )}
       </nav>
