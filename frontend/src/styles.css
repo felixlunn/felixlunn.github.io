@@ -187,6 +187,9 @@ select, input { font: inherit; color: var(--text-1); background: var(--surface-1
 
 /* ---------- Map ---------- */
 .map-wrap, .map { position: absolute; inset: 0; }
+.map-toggle { position: absolute; top: 12px; left: 12px; z-index: 2; font-size: 12px; padding: 5px 9px; border-radius: 6px; cursor: pointer;
+  border: 1px solid var(--border); background: var(--surface-1); color: var(--text-2); box-shadow: 0 1px 4px rgb(0 0 0 / 0.12); }
+.map-toggle.on { color: var(--accent); border-color: var(--accent); font-weight: 600; }
 .map-loading { display: grid; place-content: center; height: 100%; color: var(--text-2); }
 .tooltip {
   position: absolute; pointer-events: none; background: var(--surface-1); border: 1px solid var(--border); border-radius: 8px;

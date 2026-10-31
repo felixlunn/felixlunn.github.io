@@ -87,7 +87,7 @@ when you zoom in, if the site is built with a free OS Data Hub API key:
 3. Re-run the **Refresh data & deploy** workflow.
 
 The key is used by visitors' browsers to fetch map tiles, so it is visible in the page source; that is how OS
-Maps API keys are designed to be used, and the OpenData plan is free. Without a key the map keeps its plain background.
+Maps API keys are designed to be used, and the OpenData plan is free. Without a key the map keeps its plain background. With a key, an "OS map: on/off" button at the top left of the map hides or shows it (remembered per browser).
 
 ## Running it
 

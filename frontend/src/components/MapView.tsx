@@ -51,9 +51,9 @@ function baseStyle(): maplibregl.StyleSpecification {
 }
 
 /** Fill opacity that lets the base map show through as you zoom in (fully opaque without one). */
-function fillOpacity(hover: number, solid: number, zoomed: number): maplibregl.DataDrivenPropertyValueSpecification<number> {
+function fillOpacity(hover: number, solid: number, zoomed: number, baseMap = !!OS_KEY): maplibregl.DataDrivenPropertyValueSpecification<number> {
   const h = ["boolean", ["feature-state", "hover"], false];
-  if (!OS_KEY) return ["case", h, hover, solid] as never;
+  if (!baseMap) return ["case", h, hover, solid] as never;
   return ["interpolate", ["linear"], ["zoom"], 7, ["case", h, hover, solid], 11, ["case", h, zoomed - 0.2, zoomed]] as never;
 }
 
@@ -93,6 +93,19 @@ export default function MapView({ geo, seats, choropleth, selected, mine = null,
   const el = useRef<HTMLDivElement>(null);
   const map = useRef<MLMap | null>(null);
   const [ready, setReady] = useState(false);
+  // Base map on/off, remembered per browser (only offered when an OS key is configured).
+  const [baseMap, setBaseMap] = useState(() => {
+    try { return localStorage.getItem("whips.baseMap") !== "off"; } catch { return true; }
+  });
+  useEffect(() => {
+    try { localStorage.setItem("whips.baseMap", baseMap ? "on" : "off"); } catch { /* keep for this visit */ }
+    const m = map.current;
+    if (!m || !ready || !OS_KEY) return;
+    m.setLayoutProperty("os", "visibility", baseMap ? "visible" : "none");
+    // Without the base map there's nothing to see through to, so keep the fills solid.
+    m.setPaintProperty("fill", "fill-opacity", fillOpacity(0.75, 1, 0.6, baseMap));
+    m.setPaintProperty("sub-fill", "fill-opacity", fillOpacity(0.7, 0.95, 0.65, baseMap));
+  }, [baseMap, ready]);
   const [hover, setHover] = useState<{ x: number; y: number; i: number } | null>(null);
   const [subHover, setSubHover] = useState<{ x: number; y: number; code: string } | null>(null);
   const indexByCode = useMemo(() => new Map(seats.map((s, i) => [s.code, i])), [seats]);
@@ -264,6 +277,12 @@ export default function MapView({ geo, seats, choropleth, selected, mine = null,
   return (
     <div className="map-wrap">
       <div ref={el} className="map" role="application" aria-label="Map of Westminster constituencies" data-dark={isDark()} />
+      {OS_KEY && (
+        <button className={`map-toggle ${baseMap ? "on" : ""}`} onClick={() => setBaseMap((b) => !b)} aria-pressed={baseMap}
+          title={baseMap ? "Hide the Ordnance Survey base map" : "Show the Ordnance Survey base map"}>
+          {baseMap ? "OS map: on" : "OS map: off"}
+        </button>
+      )}
       {sub && subHover && (
         <div className="tooltip" style={{ left: subHover.x + 14, top: subHover.y + 14 }}>
           <div className="tt-name">{sub.name}</div>
