@@ -16,6 +16,7 @@ import logging
 import os
 import re
 from collections.abc import Iterable
+from dataclasses import replace
 
 import numpy as np
 import pandas as pd
@@ -33,6 +34,7 @@ PAGE = 25_000  # Nomis caps a single CSV response at 25,000 rows
 FALLBACK_DATASETS = {
     "TS001": "NM_2021_1",
     "TS004": "NM_2024_1",
+    "TS007": "NM_2019_1",
     "TS007A": "NM_2020_1",
     "TS011": "NM_2031_1",
     "TS021": "NM_2041_1",
@@ -83,6 +85,7 @@ def find_dataset(s: requests.Session, table: str) -> str:
         for fam in families:
             name = _text(fam.get("name"))
             if pat.search(name.strip()):
+                log.info("Nomis dataset for %s: %s (%s)", table, fam["id"], name)
                 return fam["id"]
     except (requests.RequestException, ValueError, KeyError) as exc:  # pragma: no cover - network
         log.warning("Nomis dataset search for %s failed: %s", table, exc)
@@ -125,6 +128,10 @@ def fetch_csv(s: requests.Session, dataset_id: str, params: dict[str, str]) -> p
             timeout=180,
         )
         r.raise_for_status()
+        if not r.text.strip():
+            if offset:  # previous page was exactly PAGE rows long
+                break
+            raise ValueError(f"Nomis returned an empty response for {r.url}")
         df = pd.read_csv(io.StringIO(r.text))
         frames.append(df)
         if len(df) < PAGE:
@@ -215,26 +222,57 @@ def compute_census_metric(tidy: pd.DataFrame, metric: CensusMetric) -> pd.DataFr
 def load_census(s: requests.Session, metrics: list[CensusMetric]) -> tuple[dict[str, pd.DataFrame], dict[str, str], dict]:
     """Fetch all census tables needed by ``metrics``.
 
+    A table that fails is logged and skipped (its metrics are left out, or taken
+    from the metric's fallback table if it has one), so one bad table doesn't
+    sink the whole build. TS001 (population) is mandatory.
+
     Returns (per-metric num/den frames, constituency names by code, provenance).
     """
-    tables = sorted({m.table for m in metrics})
     geo_type = None
     out: dict[str, pd.DataFrame] = {}
     names: dict[str, str] = {}
-    provenance = {"tables": {}}
-    for table in tables:
-        ds = find_dataset(s, table)
-        if geo_type is None:
-            geo_type = find_pcon_type(s, ds)
-            provenance["geography_type"] = geo_type
-            log.info("Nomis 2024 constituency geography type: %s", geo_type)
-        log.info("Fetching %s (%s)", table, ds)
-        tidy = tidy_census(fetch_csv(s, ds, {"geography": geo_type, "measures": "20100"}))
-        provenance["tables"][table] = ds
-        names.update(dict(zip(tidy["code"], tidy["name"])))
-        for m in metrics:
-            if m.table == table:
-                out[m.id] = compute_census_metric(tidy, m)
+    provenance: dict = {"tables": {}, "failed": {}}
+    cache: dict[str, pd.DataFrame | None] = {}
+
+    def table(code: str) -> pd.DataFrame | None:
+        nonlocal geo_type
+        if code in cache:
+            return cache[code]
+        try:
+            ds = find_dataset(s, code)
+            if geo_type is None:
+                geo_type = find_pcon_type(s, ds)
+                provenance["geography_type"] = geo_type
+                log.info("Nomis 2024 constituency geography type: %s", geo_type)
+            log.info("Fetching %s (%s)", code, ds)
+            tidy = tidy_census(fetch_csv(s, ds, {"geography": geo_type, "measures": "20100"}))
+            if tidy.empty:
+                raise ValueError("no rows")
+            provenance["tables"][code] = ds
+            names.update(dict(zip(tidy["code"], tidy["name"])))
+            cache[code] = tidy
+        except (requests.RequestException, ValueError, LookupError, KeyError) as exc:
+            log.warning("Census table %s failed: %s", code, exc)
+            provenance["failed"][code] = str(exc)[:300]
+            cache[code] = None
+        return cache[code]
+
+    for m in metrics:
+        attempts = [(m.table, m.include)] + ([m.fallback] if m.fallback else [])
+        for code, include in attempts:
+            tidy = table(code)
+            if tidy is None:
+                continue
+            try:
+                out[m.id] = compute_census_metric(tidy, replace(m, table=code, include=include))
+                break
+            except ValueError as exc:
+                log.warning("Metric %s from %s failed: %s", m.id, code, exc)
+                provenance["failed"][f"{code}:{m.id}"] = str(exc)[:300]
+        else:
+            log.warning("Metric %s skipped", m.id)
+    if "population" not in out:
+        raise RuntimeError(f"Census population (TS001) unavailable: {provenance['failed']}")
     return out, names, provenance
 
 

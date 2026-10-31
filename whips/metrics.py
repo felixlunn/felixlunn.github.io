@@ -44,6 +44,7 @@ class CensusMetric:
     polarity: str = "neutral"  # "higher_worse" | "higher_better" | "neutral"
     unit: str = "%"
     is_count: bool = False  # value is the total itself (e.g. population)
+    fallback: tuple[str, tuple[str, ...]] | None = None  # (table, include) tried if the main table fails
 
 
 @dataclass(frozen=True)
@@ -64,10 +65,13 @@ CENSUS_METRICS: list[CensusMetric] = [
     CensusMetric("population", "Usual residents", "people", "TS001", (), is_count=True, unit="people",
                  description="Usual resident population, Census 2021."),
     CensusMetric("age_0_14", "Aged 0-14", "people", "TS007A", (r"^aged (4 years and under|5 to 9|10 to 14)",),
+                 fallback=("TS007", (r"^aged (under 1 year|[1-9] years?|1[0-4] years)$",)),
                  description="Share of residents aged 0-14."),
     CensusMetric("age_20_34", "Aged 20-34", "people", "TS007A", (r"^aged (20|25|30) to",),
+                 fallback=("TS007", (r"^aged (2\d|3[0-4]) years$",)),
                  description="Share of residents aged 20-34 (young adults)."),
     CensusMetric("age_65_plus", "Aged 65+", "people", "TS007A", (r"^aged (65|70|75|80|85)",),
+                 fallback=("TS007", (r"^aged (6[5-9]|[7-9]\d|100) years",)),
                  description="Share of residents aged 65 and over."),
     CensusMetric("ethnic_minority", "Not White British", "people", "TS021", (r"^white: english",), complement=True,
                  description="Share of residents in any ethnic group other than White: English, Welsh, Scottish, Northern Irish or British."),

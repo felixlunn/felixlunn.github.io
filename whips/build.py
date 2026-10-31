@@ -94,7 +94,8 @@ def build(out_dir: Path, skip: set[str] | None = None) -> dict:
     frames.update(census)
     metas += [census_meta(m) for m in CENSUS_METRICS]
     record("census", "Census 2021 (ONS via Nomis)", "https://www.nomisweb.co.uk/sources/census_2021",
-           "ok", f"{len(prov['tables'])} tables; England & Wales only", "March 2021")
+           "ok", f"{len(prov['tables'])} tables; England & Wales only"
+           + (f"; unavailable: {', '.join(sorted(prov['failed']))}" if prov["failed"] else ""), "March 2021")
     log.info("Census: %d metrics (%.0fs)", len(census), time.time() - t0)
     population = census["population"]["num"]
 

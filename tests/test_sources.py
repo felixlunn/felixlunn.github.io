@@ -177,3 +177,34 @@ def test_member_matching():
     out = parliament.match_members(members, {"W1": "Ynys Mon", "E1": "Brighton Pavilion and Hove"})
     assert out["W1"]["party_colour"] == "#d50000"
     assert out["E1"]["mp"] == "B MP"
+
+
+def test_single_year_age_fallback_regexes():
+    labels = ["Total: All usual residents", "Aged under 1 year", "Aged 1 year", "Aged 2 years", "Aged 14 years", "Aged 15 years",
+              "Aged 20 years", "Aged 34 years", "Aged 35 years", "Aged 64 years", "Aged 65 years", "Aged 99 years", "Aged 100 years and over"]
+    pick = lambda mid: nomis.select_categories(labels, metric(mid).fallback[1])  # noqa: E731
+    assert pick("age_0_14") == ["Aged under 1 year", "Aged 1 year", "Aged 2 years", "Aged 14 years"]
+    assert pick("age_20_34") == ["Aged 20 years", "Aged 34 years"]
+    assert pick("age_65_plus") == ["Aged 65 years", "Aged 99 years", "Aged 100 years and over"]
+
+
+def test_load_census_skips_failed_table_and_uses_fallback(monkeypatch):
+    tenure = nomis.tidy_census(nomis_csv(TENURE_LABELS))
+    pop = nomis.tidy_census(nomis_csv([(0, "Total: All usual residents", 1000)], "C2021_RESTYPE_3"))
+    ages = nomis.tidy_census(nomis_csv([(0, "Total: All usual residents", 100), (66, "Aged 65 years", 30)], "C2021_AGE_102"))
+    tables = {"TS001": pop, "TS054": tenure, "TS007": ages}
+    monkeypatch.setattr(nomis, "find_dataset", lambda s, code: code)
+    monkeypatch.setattr(nomis, "find_pcon_type", lambda s, ds: "TYPE172")
+
+    def fake_fetch(s, ds, params):
+        if ds not in tables:
+            raise ValueError("Nomis returned an empty response")
+        return "raw:" + ds
+
+    monkeypatch.setattr(nomis, "fetch_csv", fake_fetch)
+    monkeypatch.setattr(nomis, "tidy_census", lambda raw: tables[raw[4:]])
+    wanted = [metric(m) for m in ("population", "private_rented", "age_65_plus", "bad_health")]
+    out, _names, prov = nomis.load_census(None, wanted)
+    assert set(out) == {"population", "private_rented", "age_65_plus"}
+    assert (out["age_65_plus"]["num"] / out["age_65_plus"]["den"]).iloc[0] == pytest.approx(30.0)
+    assert "TS007A" in prov["failed"] and "TS037" in prov["failed"]
