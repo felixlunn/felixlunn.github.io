@@ -91,6 +91,11 @@ export interface Choropleth {
   highlight?: string[];
   /** Reverse the ramp so that low values are dark (e.g. distances). */
   invert?: boolean;
+  /** Legend wording for seats without a value, and for outlined seats. */
+  nodataLabel?: string;
+  /** Legend note when `invert` is set (default: "Darker = closer match"). */
+  invertNote?: string;
+  highlightLabel?: string;
   /** Categorical map: each value is an index into this list, coloured as given (e.g. parties). */
   categories?: { label: string; colour: string; count: number }[];
 }

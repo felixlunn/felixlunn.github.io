@@ -227,7 +227,10 @@ select, input { font: inherit; color: var(--text-1); background: var(--surface-1
 .flag-list > li { padding: 6px 0; border-bottom: 1px solid var(--surface-3); }
 .flag-list > li.sel { background: color-mix(in srgb, var(--accent-2) 16%, transparent); }
 .flag-list ul { margin: 3px 0 0; padding-left: 16px; }
-.strong { font-weight: 600; }
+.rank-list.battle .grow { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.party.mini { font-size: 10.5px; padding: 1px 5px; flex: none; }
+.battle-cols { display: flex; gap: 8px; padding: 0 0 2px 34px; }
+.battle-cols span:first-child { flex: 1; }
 .swatch.nodata { background: var(--map-nodata); }
 .swatch.outline { border: 2px solid var(--accent-2); }
 .maplibregl-ctrl-attrib { font-size: 10px; }

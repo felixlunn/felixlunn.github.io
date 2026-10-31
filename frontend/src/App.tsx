@@ -11,13 +11,15 @@ import SearchBox from "./components/SearchBox";
 import Legend from "./components/Legend";
 import { PARTY_ID, partyChoropleth } from "./lib/parties";
 import DebatesTab from "./components/DebatesTab";
-import { debateMetrics, flagSeats } from "./lib/debates";
+import BattlegroundTab, { battleground } from "./components/BattlegroundTab";
+import { debateMetrics, flagSeats, partyOf } from "./lib/debates";
 
 const MapView = lazy(() => import("./components/MapView"));
 
-type Tab = "debates" | "themes" | "twins" | "index" | "match";
+type Tab = "debates" | "battleground" | "themes" | "twins" | "index" | "match";
 const TABS: { id: Tab; label: string }[] = [
   { id: "debates", label: "Debates" },
+  { id: "battleground", label: "Battleground" },
   { id: "themes", label: "Themes" },
   { id: "twins", label: "Twins" },
   { id: "index", label: "Index" },
@@ -42,7 +44,19 @@ export default function App({ data, geo }: { data: DashboardData; geo: GeoJSON.F
   const partyMap = useMemo(() => partyChoropleth(data.seats), [data]);
 
   // Debates: which debate is open, which of its metrics shades the map, and whose MPs to flag.
-  const [debateParty, setDebateParty] = useState("Lib Dem");
+  // The party the user works for: flags in Debates, defences and targets in Battleground. Remembered per browser.
+  const parties = useMemo(() => {
+    const n = new Map<string, number>();
+    data.seats.forEach((_, i) => { const p = partyOf(data, i); if (p) n.set(p, (n.get(p) ?? 0) + 1); });
+    return [...n.entries()].sort((a, b) => b[1] - a[1]).map(([p]) => p);
+  }, [data]);
+  const [debateParty, setDebatePartyState] = useState(() => {
+    try { return localStorage.getItem("whips.party") || "Lib Dem"; } catch { return "Lib Dem"; }
+  });
+  const setDebateParty = useCallback((p: string) => {
+    setDebatePartyState(p);
+    try { localStorage.setItem("whips.party", p); } catch { /* storage unavailable: keep for this visit */ }
+  }, []);
   const [debateId, setDebateId] = useState<number | null>(null);
   const [debateMetricId, setDebateMetricId] = useState<string | null>(null);
   const activeDebate = data.debates?.find((d) => d.id === debateId) ?? null;
@@ -139,6 +153,22 @@ export default function App({ data, geo }: { data: DashboardData; geo: GeoJSON.F
         invert: true,
       };
     }
+    if (tab === "battleground" && data.values["majority_pct"]) {
+      const { defences, targets } = battleground(data, debateParty);
+      const vals: (number | null)[] = data.seats.map(() => null);
+      for (const r of [...defences, ...targets]) vals[r.i] = r.majority;
+      return {
+        title: `${debateParty} defences and targets`,
+        subtitle: "Majority at the 2024 general election",
+        values: vals,
+        format: (v) => `${v.toFixed(1)}%`,
+        invert: true,
+        invertNote: "Darker = more marginal",
+        highlight: targets.map((r) => data.seats[r.i].code),
+        highlightLabel: "Targets (outlined)",
+        nodataLabel: "Neither",
+      };
+    }
     if (tab === "debates") {
       const m = activeDebate && debateMetricId ? data.metrics.find((x) => x.id === debateMetricId) : null;
       if (!activeDebate || !m) return partyMap;
@@ -199,6 +229,8 @@ export default function App({ data, geo }: { data: DashboardData; geo: GeoJSON.F
           <>
             {tab === "debates" && <DebatesTab data={data} party={debateParty} setParty={setDebateParty} active={debateId} setActive={openDebate}
               mapMetric={debateMetricId} setMapMetric={setDebateMetricId} selected={selected} onSelect={(i) => select(i)} />}
+            {tab === "battleground" && <BattlegroundTab data={data} party={debateParty} parties={parties} setParty={setDebateParty}
+              selected={selected} onSelect={(i) => select(i)} />}
             {tab === "themes" && <ThemesTab data={data} theme={theme} setTheme={(t) => { setTheme(t); const first = t === "politics" ? PARTY_ID : data.metrics.find((m) => m.theme === t)?.id; if (first) setMetricId(first); }} metric={metric} partyMode={partyMode} parties={partyMap} setMetric={setMetricId} selected={selected} onSelect={(i) => select(i)} />}
             {tab === "twins" && <TwinsTab data={data} selected={selected} settings={twinSettings} setSettings={setTwinSettings} results={twinResults} metricCount={twinIds.length} onSelect={(i) => select(i)} />}
             {tab === "index" && <IndexTab data={data} weights={weights} setWeights={setWeights} ranking={indexRanking} selected={selected} onSelect={(i) => select(i)} />}

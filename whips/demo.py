@@ -95,7 +95,7 @@ def build_demo(out_dir: Path, n: int = 650, seed: int = 42) -> dict:
             "code": code, "name": features[i]["properties"]["name"], "country": countries[i],
             "region": f"Demo region {chr(65 + int(cells[i][1] - 50))}" if countries[i] == "England" else countries[i],
             "mp": f"Demo MP {i + 1:03d}", "party": party, "party_colour": colours.get(party),
-            "first_party_2024": party, "second_party_2024": None, "result_2024": None,
+            "first_party_2024": party, "second_party_2024": next(p for p in rng.permutation(parties[:5]) if p != party), "result_2024": None,
         })
     sources = [{"id": "demo", "name": "SYNTHETIC DEMO DATA - not real", "url": "", "status": "ok",
                 "detail": "Randomly generated for UI development", "as_of": None}]

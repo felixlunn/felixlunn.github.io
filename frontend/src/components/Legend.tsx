@@ -34,17 +34,17 @@ export default function Legend({ ch }: { ch: Choropleth }) {
             {breaks.length > 2 && <span>{ch.format(breaks[Math.floor(breaks.length / 2)])}</span>}
             <span>{ch.format(max)}</span>
           </div>
-          {ch.invert && <div className="legend-sub">Darker = closer match</div>}
+          {ch.invert && <div className="legend-sub">{ch.invertNote ?? "Darker = closer match"}</div>}
         </>
       )}
       {missing > 0 && (
         <div className="legend-nodata">
-          <span className="swatch nodata" /> No data ({missing} seats)
+          <span className="swatch nodata" /> {ch.nodataLabel ?? "No data"} ({missing} seats)
         </div>
       )}
       {ch.highlight && ch.highlight.length > 0 && (
         <div className="legend-nodata">
-          <span className="swatch outline" /> Highlighted ({ch.highlight.length})
+          <span className="swatch outline" /> {ch.highlightLabel ?? "Highlighted"} ({ch.highlight.length})
         </div>
       )}
     </div>
