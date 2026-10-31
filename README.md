@@ -75,6 +75,20 @@ frontend/             Vite + React + TypeScript + MapLibre GL
 .github/workflows/    ci.yml (tests + build) · deploy.yml (refresh data every 2 days + publish)
 ```
 
+## Map style
+
+Choropleths use the ONS Census Maps colour scale (light green for low values to deep indigo for high), which is
+party-neutral. The Ordnance Survey base map (OS Maps API, "Light" style, OpenData tiles, Great Britain) appears
+when you zoom in, if the site is built with a free OS Data Hub API key:
+
+1. Create an account at [osdatahub.os.uk](https://osdatahub.os.uk/), add a project with the **OS Maps API**
+   (the free OpenData plan is enough) and copy its project API key.
+2. In the GitHub repo, go to **Settings > Secrets and variables > Actions** and add a secret named `OS_API_KEY`.
+3. Re-run the **Refresh data & deploy** workflow.
+
+The key is used by visitors' browsers to fetch map tiles, so it is visible in the page source; that is how OS
+Maps API keys are designed to be used, and the OpenData plan is free. Without a key the map keeps its plain background.
+
 ## Running it
 
 ```bash

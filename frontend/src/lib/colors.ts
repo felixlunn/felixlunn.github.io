@@ -1,6 +1,9 @@
-/** Sequential (one hue, light → dark) ramp for the choropleth, per mode. */
-export const RAMP_LIGHT = ["#cde2fb", "#9ec5f4", "#6da7ec", "#3987e5", "#256abf", "#184f95", "#0d366b"];
-export const RAMP_DARK = ["#0d366b", "#184f95", "#256abf", "#2a78d6", "#5598e7", "#86b6ef", "#b7d3f6"];
+/**
+ * Sequential choropleth ramp: the ONS Census Maps scale, light green (low) to deep indigo (high).
+ * Party-neutral, unlike a single blue. Dark mode runs it the other way so high values stay prominent.
+ */
+export const RAMP_LIGHT = ["#cde594", "#80c6a3", "#1f9eb7", "#186290", "#080c54"];
+export const RAMP_DARK = ["#1b2a6b", "#186290", "#1f9eb7", "#80c6a3", "#cde594"];
 
 export function isDark(): boolean {
   const t = document.documentElement.dataset.theme;
