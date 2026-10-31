@@ -7,12 +7,10 @@ import TwinsTab, { type TwinSettings } from "./components/TwinsTab";
 import IndexTab, { PRESETS } from "./components/IndexTab";
 import MatchTab from "./components/MatchTab";
 import Dossier from "./components/Dossier";
-import SearchBox from "./components/SearchBox";
 import Legend from "./components/Legend";
 import { PARTY_ID, partyChoropleth } from "./lib/parties";
 import DebatesTab from "./components/DebatesTab";
 import OfficePicker from "./components/OfficePicker";
-import HomeTab from "./components/HomeTab";
 import NeighbourhoodsTab, { pctLabel } from "./components/NeighbourhoodsTab";
 import { useColours, type Overlay } from "./components/MapView";
 import { classify } from "./lib/colors";
@@ -21,9 +19,8 @@ import { debateMetrics, flagSeats, partyOf } from "./lib/debates";
 
 const MapView = lazy(() => import("./components/MapView"));
 
-type Tab = "home" | "debates" | "neighbourhoods" | "themes" | "twins" | "index" | "match";
+type Tab = "debates" | "neighbourhoods" | "themes" | "twins" | "index" | "match";
 const TABS: { id: Tab; label: string }[] = [
-  { id: "home", label: "Your seat" },
   { id: "debates", label: "Debates" },
   { id: "neighbourhoods", label: "Neighbourhoods" },
   { id: "themes", label: "Themes" },
@@ -52,7 +49,7 @@ export default function App({ data, geo }: { data: DashboardData; geo: GeoJSON.F
     return codeIndex.get(stored("whips.mySeat") ?? "") ?? null;
   });
 
-  const [tab, setTab] = useState<Tab>((TABS.some((t) => t.id === initial.tab) ? initial.tab : "home") as Tab);
+  const [tab, setTab] = useState<Tab>((TABS.some((t) => t.id === initial.tab) ? initial.tab : "debates") as Tab);
   // The homepage opens on the electoral map (seats in party colours) unless the URL asks for a metric.
   const [metricId, setMetricId] = useState(metricIds.has(initial.metric) ? initial.metric : PARTY_ID);
   const partyMode = metricId === PARTY_ID;
@@ -78,7 +75,8 @@ export default function App({ data, geo }: { data: DashboardData; geo: GeoJSON.F
     const d = data.debates?.find((x) => x.id === id);
     setDebateMetricId(d ? debateMetrics(data, d)[0]?.id ?? null : null);
   }, [data]);
-  const [selected, setSelected] = useState<number | null>(codeIndex.get(initial.seat) ?? null);
+  // Arriving with an office set opens that MP's seat briefing.
+  const [selected, setSelected] = useState<number | null>(codeIndex.get(initial.seat) ?? mySeat);
   const focusOn = selected ?? mySeat;
   const [focus, setFocus] = useState<{ code: string; n: number } | null>(focusOn !== null ? { code: data.seats[focusOn].code, n: 0 } : null);
   // Seat the tools start from when nothing else is selected.
@@ -89,7 +87,8 @@ export default function App({ data, geo }: { data: DashboardData; geo: GeoJSON.F
   const [nbMetricId, setNbMetricId] = useState<string | null>(null);
   const nbSeatCode = baseSeat !== null && data.neighbourhoods?.seats.includes(data.seats[baseSeat].code) ? data.seats[baseSeat].code : null;
   useEffect(() => {
-    if ((tab !== "neighbourhoods" && tab !== "home") || !nbSeatCode || nbFile?.seat === nbSeatCode) return;
+    // Load for the Neighbourhoods tab, or for the briefing panel's summary.
+    if ((tab !== "neighbourhoods" && selected === null) || !nbSeatCode || nbFile?.seat === nbSeatCode) return;
     let live = true;
     setNbFile(null);
     setNbStatus("loading");
@@ -98,7 +97,7 @@ export default function App({ data, geo }: { data: DashboardData; geo: GeoJSON.F
       .then((f) => { if (live) { setNbFile(f); setNbStatus("idle"); } })
       .catch(() => { if (live) setNbStatus("error"); });
     return () => { live = false; };
-  }, [tab, nbSeatCode, nbFile?.seat]);
+  }, [tab, selected, nbSeatCode, nbFile?.seat]);
   const nbMetric = nbFile ? (data.metrics.find((m) => m.id === nbMetricId && nbFile.metrics.includes(m.id))
     ?? data.metrics.find((m) => m.id === metricId && nbFile.metrics.includes(m.id))
     ?? data.metrics.find((m) => m.id === "private_rented" && nbFile.metrics.includes(m.id))
@@ -212,7 +211,6 @@ export default function App({ data, geo }: { data: DashboardData; geo: GeoJSON.F
         invert: true,
       };
     }
-    if (tab === "home") return partyMap;
     if (tab === "neighbourhoods" && nbActive) {
       // Constituencies stay grey behind the seat's neighbourhoods.
       return { title: "", values: data.seats.map(() => null), format: String };
@@ -251,8 +249,7 @@ export default function App({ data, geo }: { data: DashboardData; geo: GeoJSON.F
             <div className="tiny muted">Constituency analytics · {data.seats.length} seats</div>
           </div>
         </div>
-        <OfficePicker seats={data.seats} office={mySeat} setOffice={(i) => { setMySeat(i); if (i !== null) setTab("home"); }} onOpen={(i) => select(i)} />
-        <SearchBox seats={data.seats} onPick={(i) => select(i)} placeholder="Find another seat" className="search-compact" />
+        <OfficePicker seats={data.seats} office={mySeat} setOffice={(i) => { setMySeat(i); if (i !== null) select(i); }} onOpen={(i) => select(i)} />
         <button className="link small" onClick={() => setShowSources(true)}>
           Data updated {generated.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
           {failed.length > 0 && <span className="warn-dot" title={`${failed.length} source(s) failed to update`}> ⚠</span>}
@@ -276,10 +273,6 @@ export default function App({ data, geo }: { data: DashboardData; geo: GeoJSON.F
         </div>
         {panelOpen && (
           <>
-            {tab === "home" && <HomeTab data={data} office={mySeat} nbFile={nbFile?.seat === nbSeatCode ? nbFile : null}
-              onBriefing={(i) => select(i)} onSelect={(i) => select(i)} onMetric={showMetric}
-              onDebate={(id) => { setTab("debates"); if (id >= 0) openDebate(id); }}
-              onNeighbourhoods={() => setTab("neighbourhoods")} onBrowse={() => setTab("themes")} />}
             {tab === "debates" && <DebatesTab data={data} party={debateParty} setParty={setDebateParty} mySeat={mySeat} active={debateId} setActive={openDebate}
               mapMetric={debateMetricId} setMapMetric={setDebateMetricId} selected={selected} onSelect={(i) => select(i)} />}
             {tab === "neighbourhoods" && <NeighbourhoodsTab data={data} seat={baseSeat} file={nbFile?.seat === nbSeatCode ? nbFile : null} status={nbStatus}
@@ -301,7 +294,10 @@ export default function App({ data, geo }: { data: DashboardData; geo: GeoJSON.F
       </main>
 
       {selected !== null && (
-        <Dossier data={data} index={selected} onClose={() => setSelected(null)} onSelect={(i) => select(i)} onShowMetric={showMetric} />
+        <Dossier data={data} index={selected} onClose={() => setSelected(null)} onSelect={(i) => select(i)} onShowMetric={showMetric}
+          onDebate={(id) => { setTab("debates"); setPanelOpen(true); if (id >= 0) openDebate(id); }}
+          onNeighbourhoods={() => { setTab("neighbourhoods"); setPanelOpen(true); }}
+          nbFile={nbFile?.seat === data.seats[selected].code ? nbFile : null} />
       )}
 
       {showSources && (

@@ -1,9 +1,10 @@
 import { useMemo } from "react";
-import type { DashboardData } from "../types";
+import type { DashboardData, NeighbourhoodFile } from "../types";
+import { debateMetrics, leadSeat, standing, standsOut } from "../lib/debates";
 import { groupMean, profileMetrics, rankOf, similarity, stats, topN } from "../lib/analytics";
 import { textOn } from "../lib/colors";
 import { partyStyle } from "../lib/parties";
-import { csv, download, fmt, rankText, slug } from "../lib/format";
+import { csv, download, fmt, ordinal, rankText, slug } from "../lib/format";
 
 interface Props {
   data: DashboardData;
@@ -11,9 +12,16 @@ interface Props {
   onClose: () => void;
   onSelect: (i: number) => void;
   onShowMetric: (id: string) => void;
+  /** Open a debate in the Debates tab (-1 for the whole list). */
+  onDebate: (id: number) => void;
+  onNeighbourhoods: () => void;
+  /** This seat's neighbourhood file, when loaded. */
+  nbFile: NeighbourhoodFile | null;
 }
 
-export default function Dossier({ data, index, onClose, onSelect, onShowMetric }: Props) {
+const dayFmt = new Intl.DateTimeFormat("en-GB", { weekday: "short", day: "numeric", month: "short" });
+
+export default function Dossier({ data, index, onClose, onSelect, onShowMetric, onDebate, onNeighbourhoods, nbFile }: Props) {
   const seat = data.seats[index];
   const group = data.peer_groups.find((g) => g.id === seat.peer_group);
   const val = (id: string) => data.values[id]?.[index] ?? null;
@@ -32,6 +40,23 @@ export default function Dossier({ data, index, onClose, onSelect, onShowMetric }
       .sort((a, b) => Math.abs(b.z) - Math.abs(a.z))
       .slice(0, 8);
   }, [data, index]);
+
+  // Upcoming debates that matter to this seat: led by its MP, or touching figures where it is in the most extreme tenth.
+  const debates = useMemo(() => (data.debates ?? []).map((d) => {
+    const metrics = debateMetrics(data, d);
+    const hits = metrics.length ? standing(data, metrics, index) : [];
+    const leading = leadSeat(data, d) === index;
+    return { d, top: hits[0], leading, relevant: leading || (hits.length > 0 && standsOut(hits[0])) };
+  }).filter((x) => x.relevant), [data, index]);
+
+  const hasNeighbourhoods = data.neighbourhoods?.seats.includes(seat.code) ?? false;
+  const deprived = useMemo(() => {
+    if (!nbFile?.imd_decile || nbFile.seat !== seat.code) return null;
+    const rows = nbFile.lsoas.map((l, k) => ({ l, d: nbFile.imd_decile![k] })).filter((r): r is { l: typeof r.l; d: number } => r.d !== null);
+    if (!rows.length) return null;
+    const worst = rows.filter((r) => r.d <= 2);
+    return { total: rows.length, count: worst.length, wards: [...new Set(worst.map((r) => r.l.ward ?? r.l.name))] };
+  }, [nbFile, seat.code]);
 
   const twins = useMemo(() => {
     const ids = profileMetrics(data.metrics);
@@ -76,6 +101,45 @@ export default function Dossier({ data, index, onClose, onSelect, onShowMetric }
           </div>
           {seat.result_2024 && <div className="small muted">2024: {seat.result_2024}{seat.second_party_2024 ? ` · runner-up ${seat.second_party_2024}` : ""}</div>}
         </section>
+
+        {data.debates !== undefined && (
+          <section>
+            <h3>Coming up in Parliament</h3>
+            {debates.length ? (
+              <ul className="home-list">
+                {debates.slice(0, 5).map(({ d, top, leading }) => (
+                  <li key={d.id}>
+                    <button className="home-item" onClick={() => onDebate(d.id)}>
+                      <span className="tiny muted">{dayFmt.format(new Date(`${d.date}T12:00:00`))}{d.time ? ` · ${d.time}` : ""} · {d.venue}</span>
+                      <span className="home-item-title">{d.title}</span>
+                      <span className="small accent">
+                        {leading ? "The MP is leading this debate" : null}
+                        {leading && top ? " · " : null}
+                        {top ? `${top.metric.label} ${fmt(top.metric, top.value)}, ${ordinal(top.rank)} ${top.end === "high" ? "highest" : "lowest"} of ${top.of}` : null}
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="small muted">No debates in the next three weeks touch figures where this seat stands out.</p>
+            )}
+            <button className="link small" onClick={() => onDebate(-1)}>All upcoming debates</button>
+          </section>
+        )}
+
+        {hasNeighbourhoods && (
+          <section>
+            <h3>Neighbourhoods</h3>
+            {deprived && (
+              <p className="small">
+                <strong>{deprived.count} of {deprived.total}</strong> neighbourhoods are among the 20% most deprived in England
+                {deprived.wards.length > 0 && <>: {deprived.wards.slice(0, 4).join(", ")}{deprived.wards.length > 4 ? ` and ${deprived.wards.length - 4} more wards` : ""}</>}.
+              </p>
+            )}
+            <button className="btn" onClick={onNeighbourhoods}>Explore neighbourhoods (LSOAs)</button>
+          </section>
+        )}
 
         {group && (
           <section>
