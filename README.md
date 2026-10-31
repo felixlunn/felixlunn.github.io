@@ -77,8 +77,8 @@ frontend/             Vite + React + TypeScript + MapLibre GL
 
 ## Map style
 
-Choropleths use the ONS Census Maps colour scale (light green for low values to deep indigo for high), which is
-party-neutral. The Ordnance Survey base map (OS Maps API, "Light" style, OpenData tiles, Great Britain) appears
+Choropleths use a temperature scale (cool blue for low values, through pale yellow, to hot red for high;
+ColorBrewer RdYlBu), set in `frontend/src/lib/colors.ts`. The Ordnance Survey base map (OS Maps API, "Light" style, OpenData tiles, Great Britain) appears
 when you zoom in, if the site is built with a free OS Data Hub API key:
 
 1. Create an account at [osdatahub.os.uk](https://osdatahub.os.uk/), add a project with the **OS Maps API**

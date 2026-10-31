@@ -1,9 +1,9 @@
 /**
- * Sequential choropleth ramp: the ONS Census Maps scale, light green (low) to deep indigo (high).
- * Party-neutral, unlike a single blue. Dark mode runs it the other way so high values stay prominent.
+ * Choropleth ramp: a temperature scale, cool blue (low) through pale yellow to hot red (high)
+ * (ColorBrewer RdYlBu, reversed; colour-blind safe). The same in light and dark mode, so "hot = high" always holds.
  */
-export const RAMP_LIGHT = ["#cde594", "#80c6a3", "#1f9eb7", "#186290", "#080c54"];
-export const RAMP_DARK = ["#1b2a6b", "#186290", "#1f9eb7", "#80c6a3", "#cde594"];
+export const RAMP_LIGHT = ["#4575b4", "#91bfdb", "#e0f3f8", "#ffffbf", "#fee090", "#fc8d59", "#d73027"];
+export const RAMP_DARK = RAMP_LIGHT;
 
 export function isDark(): boolean {
   const t = document.documentElement.dataset.theme;
