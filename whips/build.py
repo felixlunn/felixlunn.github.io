@@ -151,16 +151,21 @@ def build(out_dir: Path, skip: set[str] | None = None) -> dict:
     attrs = pd.DataFrame(index=codes)
     if "elections" not in skip:
         try:
-            ef, eattrs = parliament.load_results(s)
+            try:
+                ef, eattrs = parliament.load_results(s)
+                source = ("2024 general election results (House of Commons Library)",
+                          "https://commonslibrary.parliament.uk/research-briefings/cbp-10009/")
+            except Exception as exc:  # noqa: BLE001 - the Library file can refuse automated downloads
+                log.warning("Commons Library results unavailable (%s); using the Members API", exc)
+                ef, eattrs = parliament.load_results_api(s, names)
+                source = ("2024 general election results (UK Parliament Members API)", "https://members-api.parliament.uk/")
             frames.update(ef)
             metas += ELECTION_METRICS
             attrs = attrs.join(eattrs, how="left")
-            record("elections", "2024 general election results (House of Commons Library)",
-                   "https://commonslibrary.parliament.uk/research-briefings/cbp-10009/", "ok", "", "4 July 2024")
+            record("elections", *source, "ok", f"{len(eattrs)} constituencies", "4 July 2024")
         except Exception as exc:  # noqa: BLE001
             log.exception("Election results failed")
-            record("elections", "2024 general election results (House of Commons Library)",
-                   "https://commonslibrary.parliament.uk/research-briefings/cbp-10009/", "failed", str(exc))
+            record("elections", "2024 general election results", "https://members-api.parliament.uk/", "failed", str(exc))
 
     members: dict[str, dict] = {}
     if "members" not in skip:
