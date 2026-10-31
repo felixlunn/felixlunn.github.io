@@ -251,8 +251,8 @@ export default function App({ data, geo }: { data: DashboardData; geo: GeoJSON.F
             <div className="tiny muted">Constituency analytics · {data.seats.length} seats</div>
           </div>
         </div>
-        <SearchBox seats={data.seats} onPick={(i) => select(i)} />
-        <OfficePicker seats={data.seats} office={mySeat} setOffice={setMySeat} onOpen={(i) => select(i)} />
+        <OfficePicker seats={data.seats} office={mySeat} setOffice={(i) => { setMySeat(i); if (i !== null) setTab("home"); }} onOpen={(i) => select(i)} />
+        <SearchBox seats={data.seats} onPick={(i) => select(i)} placeholder="Find another seat" className="search-compact" />
         <button className="link small" onClick={() => setShowSources(true)}>
           Data updated {generated.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
           {failed.length > 0 && <span className="warn-dot" title={`${failed.length} source(s) failed to update`}> ⚠</span>}
@@ -276,7 +276,7 @@ export default function App({ data, geo }: { data: DashboardData; geo: GeoJSON.F
         </div>
         {panelOpen && (
           <>
-            {tab === "home" && <HomeTab data={data} office={mySeat} setOffice={setMySeat} nbFile={nbFile?.seat === nbSeatCode ? nbFile : null}
+            {tab === "home" && <HomeTab data={data} office={mySeat} nbFile={nbFile?.seat === nbSeatCode ? nbFile : null}
               onBriefing={(i) => select(i)} onSelect={(i) => select(i)} onMetric={showMetric}
               onDebate={(id) => { setTab("debates"); if (id >= 0) openDebate(id); }}
               onNeighbourhoods={() => setTab("neighbourhoods")} onBrowse={() => setTab("themes")} />}

@@ -44,35 +44,38 @@ export default function OfficePicker({ seats, office, setOffice, onOpen }: Props
     }
   };
 
+  // Not chosen yet: the bar itself is the search, front and centre in the header.
+  if (!seat) {
+    return (
+      <div className="office office-bar" ref={ref}>
+        <SearchBox seats={seats} onPick={setOffice} placeholder="Which MP's office are you in?"
+          className="office-search-bar" />
+      </div>
+    );
+  }
+
   return (
-    <div className="office" ref={ref}>
-      {seat ? (
-        <div className="office-set">
-          <button className="office-btn" onClick={() => onOpen(office!)} title="Open your seat's briefing">
-            <span className="office-dot" style={{ background: colour }} aria-hidden="true" />
-            <span className="office-text">
-              <span className="tiny muted">Office of</span>
-              <span className="office-name">{seat.mp ?? seat.name}</span>
-            </span>
-          </button>
-          <button className="icon office-change" aria-label="Change office" aria-expanded={open} onClick={() => setOpen((o) => !o)}>▾</button>
-        </div>
-      ) : (
-        <button className="office-btn unset" onClick={() => setOpen((o) => !o)} aria-expanded={open}>Set your office</button>
-      )}
+    <div className="office office-bar" ref={ref}>
+      <div className="office-set">
+        <button className="office-btn" onClick={() => onOpen(office!)} title="Open your seat's briefing">
+          <span className="office-dot" style={{ background: colour }} aria-hidden="true" />
+          <span className="office-text">
+            <span className="office-name">Office of {seat.mp ?? seat.name}</span>
+            <span className="tiny muted office-seat">{seat.name}</span>
+          </span>
+        </button>
+        <button className="icon office-change" aria-label="Change office" aria-expanded={open} onClick={() => setOpen((o) => !o)}>▾</button>
+      </div>
 
       {open && (
-        <div className="office-pop" role="dialog" aria-label="Choose your office">
-          <p className="small"><strong>Which MP's office are you in?</strong></p>
-          <p className="tiny muted">The map outlines their seat, Debates shows how it ranks on each debate's figures, and Themes and Twins start from it. Saved in this browser only.</p>
+        <div className="office-pop" role="dialog" aria-label="Change your office">
+          <p className="small"><strong>Change office</strong></p>
           <SearchBox seats={seats} onPick={(i) => { setOffice(i); setOpen(false); }} placeholder="MP, constituency or postcode" autoFocus className="office-search" />
-          {seat && (
-            <div className="office-actions">
-              <button className="link small" onClick={copy}>{copied ? "Link copied" : "Copy link for this office"}</button>
-              <button className="link small" onClick={() => { setOffice(null); setOpen(false); }}>Clear</button>
-            </div>
-          )}
-          {seat && <p className="tiny muted">Share the link with colleagues: it opens the dashboard set up for {seat.mp ?? seat.name}.</p>}
+          <div className="office-actions">
+            <button className="link small" onClick={copy}>{copied ? "Link copied" : "Copy link for this office"}</button>
+            <button className="link small" onClick={() => { setOffice(null); setOpen(false); }}>Clear</button>
+          </div>
+          <p className="tiny muted">Share the link with colleagues: it opens the dashboard set up for {seat.mp ?? seat.name}. Saved in this browser only.</p>
         </div>
       )}
     </div>

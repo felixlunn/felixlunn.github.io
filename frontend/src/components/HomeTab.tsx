@@ -6,12 +6,10 @@ import { partyStyle } from "../lib/parties";
 import { textOn } from "../lib/colors";
 import { fmt, ordinal, rankText } from "../lib/format";
 import { officeLink } from "./OfficePicker";
-import SearchBox from "./SearchBox";
 
 interface Props {
   data: DashboardData;
   office: number | null;
-  setOffice: (i: number) => void;
   nbFile: NeighbourhoodFile | null;
   onBriefing: (i: number) => void;
   onDebate: (id: number) => void;
@@ -24,7 +22,7 @@ interface Props {
 const dayFmt = new Intl.DateTimeFormat("en-GB", { weekday: "short", day: "numeric", month: "short" });
 
 /** The landing tab: everything for the user's own MP in one place, or a prompt to choose them. */
-export default function HomeTab({ data, office, setOffice, nbFile, onBriefing, onDebate, onMetric, onNeighbourhoods, onBrowse, onSelect }: Props) {
+export default function HomeTab({ data, office, nbFile, onBriefing, onDebate, onMetric, onNeighbourhoods, onBrowse, onSelect }: Props) {
   if (office === null) {
     return (
       <div className="tab-body home">
@@ -34,7 +32,9 @@ export default function HomeTab({ data, office, setOffice, nbFile, onBriefing, o
             Choose your MP and the dashboard opens on their seat: the debates coming up where it stands out, what is unusual about it,
             its neighbourhoods and the seats most like it. Saved in this browser.
           </p>
-          <SearchBox seats={data.seats} onPick={setOffice} placeholder="MP's name, constituency or postcode" autoFocus className="welcome-search" />
+          <button className="btn primary" onClick={() => (document.querySelector(".office-search-bar input") as HTMLInputElement | null)?.focus()}>
+            ↑ Choose your MP in the bar at the top
+          </button>
           <button className="link small" onClick={onBrowse}>Or browse every seat without choosing</button>
         </section>
       </div>
