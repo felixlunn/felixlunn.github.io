@@ -1,5 +1,6 @@
 import { useMemo } from "react";
-import type { DashboardData, Metric } from "../types";
+import type { Choropleth, DashboardData, Metric } from "../types";
+import { PARTY_ID, partyStyle } from "../lib/parties";
 import { rankOf } from "../lib/analytics";
 import { csv, download, fmt, rankText, slug } from "../lib/format";
 import Strip from "./Strip";
@@ -9,14 +10,18 @@ interface Props {
   theme: string;
   setTheme: (t: string) => void;
   metric: Metric;
+  partyMode: boolean;
+  parties: Choropleth;
   setMetric: (id: string) => void;
   selected: number | null;
   onSelect: (i: number) => void;
 }
 
-export default function ThemesTab({ data, theme, setTheme, metric, setMetric, selected, onSelect }: Props) {
+export default function ThemesTab({ data, theme, setTheme, metric, partyMode, parties, setMetric, selected, onSelect }: Props) {
   const themeMetrics = data.metrics.filter((m) => m.theme === theme);
-  const themesWithData = data.themes.filter((t) => data.metrics.some((m) => m.theme === t.id));
+  const hasParties = !!parties.categories?.length;
+  const themesWithData = data.themes.filter((t) => data.metrics.some((m) => m.theme === t.id) || (t.id === "politics" && hasParties));
+  const selParty = selected !== null && data.seats[selected].party ? partyStyle(data.seats[selected].party!, data.seats[selected].party_colour) : null;
   const themeInfo = data.themes.find((t) => t.id === theme);
 
   const ranking = useMemo(() => {
@@ -58,10 +63,19 @@ export default function ThemesTab({ data, theme, setTheme, metric, setMetric, se
           </tr>
         </thead>
         <tbody>
+          {theme === "politics" && hasParties && (
+            <tr className={partyMode ? "active" : ""} onClick={() => setMetric(PARTY_ID)} tabIndex={0}
+              onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && setMetric(PARTY_ID)} aria-label="Show party map">
+              <td><div className="m-label">Party</div><div className="m-rank">Electoral map</div></td>
+              {selected !== null && <td className="num strong">{selParty?.label ?? "–"}</td>}
+              <td className={`num ${selected !== null ? "muted" : "strong"}`}>{parties.categories![0].label}</td>
+              <td />
+            </tr>
+          )}
           {themeMetrics.map((m) => {
             const r = selected !== null ? rankOf(data.values[m.id], selected) : null;
             return (
-              <tr key={m.id} className={m.id === metric.id ? "active" : ""} onClick={() => setMetric(m.id)} tabIndex={0}
+              <tr key={m.id} className={!partyMode && m.id === metric.id ? "active" : ""} onClick={() => setMetric(m.id)} tabIndex={0}
                 onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && setMetric(m.id)} aria-label={`Show ${m.label} on the map`}>
                 <td>
                   <div className="m-label">{m.label}</div>
@@ -79,6 +93,21 @@ export default function ThemesTab({ data, theme, setTheme, metric, setMetric, se
         </tbody>
       </table>
 
+      {partyMode && parties.categories ? (
+        <section className="card">
+          <h3>Seats by party</h3>
+          <p className="small">Each seat is coloured by its current MP's party, which picks up by-elections and defections since July 2024.</p>
+          <ol className="rank-list">
+            {parties.categories.map((c) => (
+              <li key={c.label} className={selParty?.label === c.label ? "sel" : ""}>
+                <span className="swatch" style={{ background: c.colour }} />
+                <span style={{ flex: 1 }}>{c.label}</span>
+                <span className="num">{c.count}</span>
+              </li>
+            ))}
+          </ol>
+        </section>
+      ) : (
       <section className="card">
         <h3>{metric.label}</h3>
         <p className="small">{metric.description}</p>
@@ -119,6 +148,7 @@ export default function ThemesTab({ data, theme, setTheme, metric, setMetric, se
           ))}
         </ol>
       </section>
+      )}
     </div>
   );
 }

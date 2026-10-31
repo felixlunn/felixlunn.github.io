@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import type { DashboardData } from "../types";
 import { groupMean, profileMetrics, rankOf, similarity, stats, topN } from "../lib/analytics";
 import { textOn } from "../lib/colors";
+import { partyStyle } from "../lib/parties";
 import { csv, download, fmt, rankText, slug } from "../lib/format";
 
 interface Props {
@@ -63,7 +64,7 @@ export default function Dossier({ data, index, onClose, onSelect, onShowMetric }
       <div className="dossier-body">
         <section className="mp">
           {seat.party && (
-            <span className="party" style={{ background: seat.party_colour ?? "var(--surface-3)", color: textOn(seat.party_colour) }}>
+            <span className="party" style={{ background: partyStyle(seat.party, seat.party_colour).colour, color: textOn(partyStyle(seat.party, seat.party_colour).colour) }}>
               {seat.party}
             </span>
           )}

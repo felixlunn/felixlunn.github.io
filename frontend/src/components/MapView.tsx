@@ -131,7 +131,8 @@ export default function MapView({ geo, seats, choropleth, selected, focus, onSel
     const expr: unknown[] = ["match", ["get", "code"]];
     seats.forEach((s, i) => {
       const v = choropleth.values[i];
-      if (v !== null && v !== undefined) expr.push(s.code, pick(classify(v, breaks)));
+      if (v === null || v === undefined) return;
+      expr.push(s.code, choropleth.categories ? (choropleth.categories[v]?.colour ?? cssVar("--map-nodata")) : pick(classify(v, breaks)));
     });
     expr.push(cssVar("--map-nodata"));
     m.setPaintProperty("fill", "fill-color", expr.length > 3 ? expr : cssVar("--map-nodata"));
