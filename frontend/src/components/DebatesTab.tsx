@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { DashboardData, Debate } from "../types";
 import { debateMetrics, flagSeats, leadSeat, partyOf, standing, standsOut, type Flag, type Hit } from "../lib/debates";
 import { partyStyle } from "../lib/parties";
@@ -29,6 +29,10 @@ function rankPhrase(h: Hit): string {
 
 export default function DebatesTab({ data, party, setParty, mySeat, active, setActive, mapMetric, setMapMetric, selected, onSelect }: Props) {
   const [onlyMine, setOnlyMine] = useState(false);
+  // Bring an opened debate into view (e.g. when arriving from the "Your seat" tab).
+  useEffect(() => {
+    if (active !== null) document.getElementById(`debate-${active}`)?.scrollIntoView({ block: "start", behavior: "smooth" });
+  }, [active]);
   const debates = data.debates ?? [];
   const parties = useMemo(() => {
     const n = new Map<string, number>();
@@ -74,7 +78,8 @@ export default function DebatesTab({ data, party, setParty, mySeat, active, setA
       )}
 
       {status?.status === "failed" && <p className="small bad">The parliamentary calendar couldn't be loaded on the last data update.</p>}
-      {!debates.length && status?.status !== "failed" && <p className="small muted">No debates are scheduled in the next three weeks.</p>}
+      {data.debates === undefined && <p className="small muted">This copy of the data predates the debates calendar. Refresh the page to load the latest data.</p>}
+      {data.debates !== undefined && !debates.length && status?.status !== "failed" && <p className="small muted">No debates are scheduled in the next three weeks.</p>}
       {debates.length > 0 && !shown.length && <p className="small muted">None of the upcoming debates touch figures where your seat stands out.</p>}
 
       {byDay.map(([day, items]) => (
@@ -103,7 +108,7 @@ function DebateCard({ d, metrics, flags, lead, data, party, mySeat, mine, open, 
   const top = mine[0];
   const summary = !metrics.length ? "No matching data" : flags.length ? `${flags.length} ${party} MP${flags.length > 1 ? "s" : ""} to brief` : `No ${party} seats stand out`;
   return (
-    <article className={`debate ${open ? "open" : ""} ${flags.length ? "has-flags" : ""} ${leadIsMe || (top && standsOut(top)) ? "is-mine" : ""}`}>
+    <article id={`debate-${d.id}`} className={`debate ${open ? "open" : ""} ${flags.length ? "has-flags" : ""} ${leadIsMe || (top && standsOut(top)) ? "is-mine" : ""}`}>
       <button className="debate-head" onClick={onToggle} aria-expanded={open} disabled={!metrics.length && !d.members.length}>
         <div className="tiny muted">{[d.time, d.venue, d.category].filter(Boolean).join(" · ")}</div>
         <div className="debate-title">{d.title}</div>

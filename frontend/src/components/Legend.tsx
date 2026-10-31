@@ -34,7 +34,7 @@ export default function Legend({ ch }: { ch: Choropleth }) {
             {breaks.length > 2 && <span>{ch.format(breaks[Math.floor(breaks.length / 2)])}</span>}
             <span>{ch.format(max)}</span>
           </div>
-          {ch.invert && <div className="legend-sub">Darker = closer match</div>}
+          {ch.invert && <div className="legend-sub">Red = closest match</div>}
         </>
       )}
       {missing > 0 && (

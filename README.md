@@ -6,8 +6,8 @@ theme by theme. The homepage opens on the electoral map, with every seat in its 
 
 | Tool | What it answers |
 |---|---|
-| **Debates** (homepage) | Upcoming Commons debates (not questions, statements or Private Members' Bills) from the UK Parliament calendar, tagged by topic. For each debate it lists the MPs of a chosen party (Lib Dem by default) whose seats are in the most extreme tenth of seats on the figures that debate touches, e.g. a policing debate flags seats with unusually high burglary or anti-social behaviour, and shades the map by those figures. With an office set (below), it shows how your seat ranks on every debate's figures and can filter to the debates where it stands out. |
-| **Your office** (header) | Set which MP's office is using the dashboard (search by MP, seat or postcode). The map outlines and zooms to that seat, Debates ranks it on each debate, Themes and Twins start from it, and the party flagged in Debates defaults to the MP's. Saved per browser; share `…/#office=<GSS code>` ("Copy link for this office") to set up a colleague's browser in one click. |
+| **Debates** | Upcoming Commons debates (not questions, statements or Private Members' Bills) from the UK Parliament calendar, tagged by topic. For each debate it lists the MPs of a chosen party (Lib Dem by default) whose seats are in the most extreme tenth of seats on the figures that debate touches, e.g. a policing debate flags seats with unusually high burglary or anti-social behaviour, and shades the map by those figures. With an office set (below), it shows how your seat ranks on every debate's figures and can filter to the debates where it stands out. |
+| **Your office** (header) | The single search bar: choose the MP's office using the dashboard (search by MP, seat or postcode). It opens that seat's briefing (now headed by the upcoming debates where the seat stands out and a neighbourhoods summary), and does so on every later visit. The map outlines and zooms to that seat, Debates ranks it on each debate, Themes and Twins start from it, and the party flagged in Debates defaults to the MP's. Saved per browser; share `…/#office=<GSS code>` ("Copy link for this office") to set up a colleague's browser in one click. |
 | **Neighbourhoods** | For seats held by Lib Dem MPs in England & Wales: every LSOA (about 1,500 residents each) in the seat, labelled with its ward and council, mapped and ranked on any Census 2021 metric, with badges where it is in the top or bottom 10% of all 35,672 LSOAs in England & Wales, and a CSV of every metric. One small file per seat (`data/lsoa/<code>.json`), loaded on demand. |
 | **Themes** (thematic organiser) | How does this seat compare on people, households, housing, economy, jobs & pay, health, education, transport, policing and politics? About 150 metrics in all. Every metric shades the map, shows the seat's rank ("42nd highest of 575"), the national figure, and a distribution strip. Full rankings download as CSV. |
 | **Constituency dossier** | One-click briefing for a seat: MP and party, 2024 majority and turnout, peer group, the metrics where the seat is most unusual, per-theme tables against national and peer-group averages, and its demographic twins. Exports to CSV or prints as a PDF briefing sheet. |
@@ -77,8 +77,8 @@ frontend/             Vite + React + TypeScript + MapLibre GL
 
 ## Map style
 
-Choropleths use the ONS Census Maps colour scale (light green for low values to deep indigo for high), which is
-party-neutral. The Ordnance Survey base map (OS Maps API, "Light" style, OpenData tiles, Great Britain) appears
+Choropleths use a temperature scale (cool blue for low values, through pale yellow, to hot red for high;
+ColorBrewer RdYlBu), set in `frontend/src/lib/colors.ts`. The Ordnance Survey base map (OS Maps API, "Light" style, OpenData tiles, Great Britain) appears
 when you zoom in, if the site is built with a free OS Data Hub API key:
 
 1. Create an account at [osdatahub.os.uk](https://osdatahub.os.uk/), add a project with the **OS Maps API**
@@ -87,7 +87,7 @@ when you zoom in, if the site is built with a free OS Data Hub API key:
 3. Re-run the **Refresh data & deploy** workflow.
 
 The key is used by visitors' browsers to fetch map tiles, so it is visible in the page source; that is how OS
-Maps API keys are designed to be used, and the OpenData plan is free. Without a key the map keeps its plain background.
+Maps API keys are designed to be used, and the OpenData plan is free. Without a key the map keeps its plain background. With a key, an "OS map: on/off" button at the top left of the map hides or shows it (remembered per browser).
 
 ## Running it
 
