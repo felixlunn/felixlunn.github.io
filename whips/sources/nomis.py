@@ -15,6 +15,7 @@ import io
 import logging
 import os
 import re
+import time
 from collections.abc import Iterable
 from dataclasses import replace
 
@@ -29,6 +30,7 @@ log = logging.getLogger(__name__)
 
 BASE = "https://www.nomisweb.co.uk/api/v01"
 PAGE = 25_000  # Nomis caps a single CSV response at 25,000 rows
+EMPTY_RETRY_WAITS = (5, 20)  # seconds; overridden in tests
 
 # Last-resort fallbacks if metadata search fails. Discovery is preferred.
 FALLBACK_DATASETS = {
@@ -95,32 +97,45 @@ def find_dataset(s: requests.Session, table: str) -> str:
     raise LookupError(f"Could not find a Nomis dataset for census table {table}")
 
 
-def pick_pcon_type(codes: Iterable[dict]) -> str:
-    """Choose the 2024 Westminster constituency geography type from a Nomis codelist."""
-    best = None
+def pick_type(codes: Iterable[dict], *needles: str) -> str:
+    """Choose a geography type from a Nomis codelist whose description contains every needle."""
     for c in codes:
         desc = _text(c.get("description")).lower()
-        if "parliamentary constituenc" in desc and "2024" in desc:
-            best = str(c["value"])
-            break
-    if best is None:
-        raise LookupError("No 2024 parliamentary constituency geography type listed")
-    return best if best.upper().startswith("TYPE") else f"TYPE{best}"
+        if all(n in desc for n in needles):
+            v = str(c["value"])
+            return v if v.upper().startswith("TYPE") else f"TYPE{v}"
+    raise LookupError(f"No geography type matching {needles} listed")
+
+
+def pick_pcon_type(codes: Iterable[dict]) -> str:
+    """Choose the 2024 Westminster constituency geography type from a Nomis codelist."""
+    return pick_type(codes, "parliamentary constituenc", "2024")
+
+
+def _type_codes(s: requests.Session, dataset_id: str) -> list[dict]:
+    data = get_json(s, f"{BASE}/dataset/{dataset_id}/geography/TYPE.def.sdmx.json", params=_auth_params())
+    codelists = _as_list(data.get("structure", {}).get("codelists", {}).get("codelist"))
+    return [c for cl in codelists for c in _as_list(cl.get("code"))]
 
 
 def find_pcon_type(s: requests.Session, dataset_id: str) -> str:
     override = os.environ.get("NOMIS_PCON_TYPE")
     if override:
         return override
-    data = get_json(s, f"{BASE}/dataset/{dataset_id}/geography/TYPE.def.sdmx.json", params=_auth_params())
-    codelists = _as_list(data.get("structure", {}).get("codelists", {}).get("codelist"))
-    codes = [c for cl in codelists for c in _as_list(cl.get("code"))]
-    return pick_pcon_type(codes)
+    return pick_pcon_type(_type_codes(s, dataset_id))
+
+
+def find_lsoa_type(s: requests.Session, dataset_id: str) -> str:
+    return pick_type(_type_codes(s, dataset_id), "lower layer", "2021")
+
+
+class EmptyResponse(ValueError):
+    """Nomis answered 200 with no body (e.g. table not published for that geography)."""
 
 
 def fetch_csv(s: requests.Session, dataset_id: str, params: dict[str, str]) -> pd.DataFrame:
     """Download a Nomis dataset as CSV, following record-offset pagination."""
-    frames, offset = [], 0
+    frames, offset, attempt = [], 0, 0
     while True:
         r = s.get(
             f"{BASE}/dataset/{dataset_id}.data.csv",
@@ -131,7 +146,11 @@ def fetch_csv(s: requests.Session, dataset_id: str, params: dict[str, str]) -> p
         if not r.text.strip():
             if offset:  # previous page was exactly PAGE rows long
                 break
-            raise ValueError(f"Nomis returned an empty response for {r.url}")
+            if attempt < len(EMPTY_RETRY_WAITS):  # may be transient throttling
+                time.sleep(EMPTY_RETRY_WAITS[attempt])
+                attempt += 1
+                continue
+            raise EmptyResponse(f"Nomis returned an empty response for {r.url}")
         df = pd.read_csv(io.StringIO(r.text))
         frames.append(df)
         if len(df) < PAGE:
@@ -219,12 +238,28 @@ def compute_census_metric(tidy: pd.DataFrame, metric: CensusMetric) -> pd.DataFr
     return pd.DataFrame({"num": num * 100, "den": den})
 
 
-def load_census(s: requests.Session, metrics: list[CensusMetric]) -> tuple[dict[str, pd.DataFrame], dict[str, str], dict]:
+def aggregate_lsoa(tidy: pd.DataFrame, lookup: dict[str, str]) -> pd.DataFrame:
+    """Sum LSOA-level counts into 2024 constituencies using a best-fit lookup (LSOA21CD -> PCON24CD)."""
+    df = tidy.assign(code=tidy["code"].map(lookup)).dropna(subset=["code"])
+    if df.empty:
+        raise ValueError("LSOA lookup matched no rows")
+    out = df.groupby(["code", "cat", "label"], as_index=False, dropna=False)["value"].sum()
+    out["name"] = out["code"]
+    return out[["code", "name", "cat", "label", "value"]]
+
+
+def load_census(s: requests.Session, metrics: list[CensusMetric],
+                lsoa_lookup=None) -> tuple[dict[str, pd.DataFrame], dict[str, str], dict]:
     """Fetch all census tables needed by ``metrics``.
 
     A table that fails is logged and skipped (its metrics are left out, or taken
     from the metric's fallback table if it has one), so one bad table doesn't
     sink the whole build. TS001 (population) is mandatory.
+
+    Not every table is published on Nomis for 2024 constituencies. When a
+    table comes back empty and ``lsoa_lookup`` (a callable returning
+    {LSOA21CD: PCON24CD}) is given, the table is fetched for LSOAs instead and
+    summed to constituencies with the ONS best-fit lookup.
 
     Returns (per-metric num/den frames, constituency names by code, provenance).
     """
@@ -245,13 +280,21 @@ def load_census(s: requests.Session, metrics: list[CensusMetric]) -> tuple[dict[
                 provenance["geography_type"] = geo_type
                 log.info("Nomis 2024 constituency geography type: %s", geo_type)
             log.info("Fetching %s (%s)", code, ds)
-            tidy = tidy_census(fetch_csv(s, ds, {"geography": geo_type, "measures": "20100"}))
+            try:
+                tidy = tidy_census(fetch_csv(s, ds, {"geography": geo_type, "measures": "20100"}))
+            except EmptyResponse:
+                if lsoa_lookup is None:
+                    raise
+                log.info("%s not published for 2024 constituencies; aggregating from LSOAs", code)
+                lsoa = tidy_census(fetch_csv(s, ds, {"geography": find_lsoa_type(s, ds), "measures": "20100"}))
+                tidy = aggregate_lsoa(lsoa, lsoa_lookup())
+                provenance.setdefault("aggregated_from_lsoa", []).append(code)
             if tidy.empty:
                 raise ValueError("no rows")
             provenance["tables"][code] = ds
             names.update(dict(zip(tidy["code"], tidy["name"])))
             cache[code] = tidy
-        except (requests.RequestException, ValueError, LookupError, KeyError) as exc:
+        except (requests.RequestException, ValueError, LookupError, KeyError, RuntimeError) as exc:
             log.warning("Census table %s failed: %s", code, exc)
             provenance["failed"][code] = str(exc)[:300]
             cache[code] = None

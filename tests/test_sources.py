@@ -208,3 +208,73 @@ def test_load_census_skips_failed_table_and_uses_fallback(monkeypatch):
     assert set(out) == {"population", "private_rented", "age_65_plus"}
     assert (out["age_65_plus"]["num"] / out["age_65_plus"]["den"]).iloc[0] == pytest.approx(30.0)
     assert "TS007A" in prov["failed"] and "TS037" in prov["failed"]
+
+
+def test_aggregate_lsoa_and_lookup_parsing():
+    from whips.sources import boundaries
+    lookup = boundaries.parse_lookup([
+        {"attributes": {"LSOA21CD": "E01000001", "PCON24CD": "E14000001", "ObjectId": 1}},
+        {"attributes": {"lsoa21cd": "E01000002", "pcon24cd": "E14000001"}},
+        {"attributes": {"LSOA21CD": "E01000003", "PCON24CD": "E14000002"}},
+    ])
+    assert lookup == {"E01000001": "E14000001", "E01000002": "E14000001", "E01000003": "E14000002"}
+    lsoa = pd.DataFrame({
+        "code": ["E01000001", "E01000001", "E01000002", "E01000002", "E01000003", "E01000003", "W01999999"],
+        "name": "x", "cat": [0, 1, 0, 1, 0, 1, 0],
+        "label": ["Total: All households", "Private rented"] * 3 + ["Total: All households"],
+        "value": [10, 2, 30, 6, 50, 25, 99],
+    })
+    agg = nomis.aggregate_lsoa(lsoa, lookup)
+    out = nomis.compute_census_metric(agg, metric("private_rented"))
+    assert out.loc["E14000001", "num"] / out.loc["E14000001", "den"] == pytest.approx(20.0)
+    assert out.loc["E14000002", "num"] / out.loc["E14000002", "den"] == pytest.approx(50.0)
+
+
+def test_empty_constituency_table_falls_back_to_lsoas(monkeypatch):
+    calls = []
+    pop = nomis_csv([(0, "Total: All usual residents", 1000)], "C2021_RESTYPE_3")
+    lsoa_tenure = pd.DataFrame([
+        {"GEOGRAPHY_CODE": lsoa, "GEOGRAPHY_NAME": lsoa, "C2021_TENURE_9": cat, "C2021_TENURE_9_NAME": label,
+         "MEASURES": 20100, "OBS_VALUE": v}
+        for lsoa, cat, label, v in [("L1", 0, "Total: All households", 40), ("L1", 1003, "Private rented", 10),
+                                    ("L2", 0, "Total: All households", 60), ("L2", 1003, "Private rented", 20)]
+    ])
+    monkeypatch.setattr(nomis, "find_dataset", lambda s, code: code)
+    monkeypatch.setattr(nomis, "find_pcon_type", lambda s, ds: "TYPE172")
+    monkeypatch.setattr(nomis, "find_lsoa_type", lambda s, ds: "TYPE151")
+
+    def fake_fetch(s, ds, params):
+        calls.append((ds, params["geography"]))
+        if ds == "TS001":
+            return pop
+        if params["geography"] == "TYPE172":
+            raise nomis.EmptyResponse("empty")
+        return lsoa_tenure
+
+    monkeypatch.setattr(nomis, "fetch_csv", fake_fetch)
+    out, _n, prov = nomis.load_census(None, [metric("population"), metric("private_rented")],
+                                      lambda: {"L1": "E14001063", "L2": "E14001063"})
+    assert (out["private_rented"]["num"] / out["private_rented"]["den"]).loc["E14001063"] == pytest.approx(30.0)
+    assert prov["aggregated_from_lsoa"] == ["TS054"]
+    assert ("TS054", "TYPE151") in calls
+
+
+def test_fetch_csv_retries_empty_then_raises(monkeypatch):
+    class R:
+        text = ""
+        url = "u"
+
+        def raise_for_status(self):
+            pass
+
+    n = {"calls": 0}
+
+    class S:
+        def get(self, *a, **k):
+            n["calls"] += 1
+            return R()
+
+    monkeypatch.setattr(nomis, "EMPTY_RETRY_WAITS", (0, 0))
+    with pytest.raises(nomis.EmptyResponse):
+        nomis.fetch_csv(S(), "NM_1_1", {})
+    assert n["calls"] == 3

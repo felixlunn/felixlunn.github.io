@@ -90,11 +90,20 @@ def build(out_dir: Path, skip: set[str] | None = None) -> dict:
 
     # 2. Census 2021 (required)
     t0 = time.time()
-    census, _census_names, prov = nomis.load_census(s, CENSUS_METRICS)
+    lookup_cache: dict = {}
+
+    def lsoa_lookup():
+        if "v" not in lookup_cache:
+            lookup_cache["v"] = bsrc.load_lsoa_pcon_lookup(s)
+            log.info("LSOA -> constituency lookup: %d LSOAs", len(lookup_cache["v"]))
+        return lookup_cache["v"]
+
+    census, _census_names, prov = nomis.load_census(s, CENSUS_METRICS, lsoa_lookup)
     frames.update(census)
     metas += [census_meta(m) for m in CENSUS_METRICS]
     record("census", "Census 2021 (ONS via Nomis)", "https://www.nomisweb.co.uk/sources/census_2021",
            "ok", f"{len(prov['tables'])} tables; England & Wales only"
+           + (f"; {len(prov['aggregated_from_lsoa'])} summed from LSOAs (ONS best-fit)" if prov.get("aggregated_from_lsoa") else "")
            + (f"; unavailable: {', '.join(sorted(prov['failed']))}" if prov["failed"] else ""), "March 2021")
     log.info("Census: %d metrics (%.0fs)", len(census), time.time() - t0)
     population = census["population"]["num"]

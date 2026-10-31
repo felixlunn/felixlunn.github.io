@@ -41,7 +41,7 @@ UNRESOLVED = {"under investigation", "status update unavailable"}
 class _RateLimiter:
     """police.uk allows 15 requests/second; stay comfortably under it."""
 
-    def __init__(self, per_second: float = 10.0):
+    def __init__(self, per_second: float = 12.0):
         self.interval = 1.0 / per_second
         self.lock = threading.Lock()
         self.next = 0.0
@@ -131,7 +131,7 @@ def summarise(crimes: list[dict]) -> dict[str, int]:
 
 
 def load_police(s: requests.Session, boundaries: dict, population: pd.Series, months: int | None = None,
-                workers: int = 6) -> tuple[dict[str, pd.DataFrame], list[str]]:
+                workers: int = 12) -> tuple[dict[str, pd.DataFrame], list[str]]:
     """Return per-metric num/den frames and the months covered."""
     months = months or int(os.environ.get("POLICE_MONTHS", "3"))
     month_list = latest_months(s, months)

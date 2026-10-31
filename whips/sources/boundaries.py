@@ -88,3 +88,49 @@ def load_boundaries(s: requests.Session) -> dict:
     if len(feats) < 600:
         raise ValueError(f"Expected ~650 constituencies, got {len(feats)}")
     return {"type": "FeatureCollection", "features": feats}
+
+
+LOOKUP_PATTERN = re.compile(r"lsoa.?(20)?21.*(pcon.?24|westminster.*2024)", re.I)
+
+
+def find_lookup_service(s: requests.Session) -> str:
+    override = os.environ.get("LSOA_PCON_LOOKUP_SERVICE")
+    if override:
+        return override
+    data = get_json(s, ARCGIS_ROOT, params={"f": "json"})
+    names = [svc["name"] for svc in data.get("services", [])
+             if svc.get("type") == "FeatureServer" and LOOKUP_PATTERN.search(svc.get("name", ""))]
+    if not names:
+        raise LookupError("No LSOA 2021 -> PCON 2024 lookup service found on the ONS portal")
+    name = sorted(names, key=len)[0]
+    log.info("LSOA lookup service: %s", name)
+    return f"{ARCGIS_ROOT}/{name}/FeatureServer/0"
+
+
+def parse_lookup(rows: list[dict]) -> dict[str, str]:
+    out = {}
+    for r in rows:
+        a = {k.upper(): v for k, v in (r.get("attributes") or r.get("properties") or r).items()}
+        if a.get("LSOA21CD") and a.get("PCON24CD"):
+            out[a["LSOA21CD"]] = a["PCON24CD"]
+    return out
+
+
+def load_lsoa_pcon_lookup(s: requests.Session) -> dict[str, str]:
+    """ONS best-fit lookup from 2021 LSOAs to July 2024 Westminster constituencies (England & Wales)."""
+    layer = find_lookup_service(s)
+    rows, offset = [], 0
+    while True:
+        data = get_json(s, f"{layer}/query", params={
+            "where": "1=1", "outFields": "*", "returnGeometry": "false", "f": "json",
+            "resultOffset": offset, "resultRecordCount": 2000,
+        })
+        batch = data.get("features", [])
+        rows.extend(batch)
+        if not batch or not data.get("exceededTransferLimit"):
+            break
+        offset += len(batch)
+    lookup = parse_lookup(rows)
+    if len(lookup) < 30_000:
+        raise ValueError(f"LSOA lookup looks incomplete: {len(lookup)} rows")
+    return lookup
