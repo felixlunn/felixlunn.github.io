@@ -4,11 +4,25 @@ import "maplibre-gl/dist/maplibre-gl.css";
 import type { Choropleth, Seat } from "../types";
 import { classify, isDark, quantileBreaks, ramp } from "../lib/colors";
 
+/** A finer layer drawn over the constituencies, e.g. the LSOAs of one seat. */
+export interface Overlay {
+  /** Changing the key re-fits the map to the overlay. */
+  key: string;
+  geo: GeoJSON.FeatureCollection;
+  colours: Record<string, string>;
+  label: (code: string) => { name: string; sub?: string; value: string };
+}
+
+const EMPTY: GeoJSON.FeatureCollection = { type: "FeatureCollection", features: [] };
+
 interface Props {
   geo: GeoJSON.FeatureCollection;
   seats: Seat[];
   choropleth: Choropleth;
   selected: string | null;
+  /** The user's own seat (office), always outlined. */
+  mine?: string | null;
+  overlay?: Overlay | null;
   focus: { code: string; n: number } | null;
   onSelect: (code: string) => void;
 }
@@ -45,11 +59,12 @@ export function useColours(ch: Choropleth) {
   }, [ch]);
 }
 
-export default function MapView({ geo, seats, choropleth, selected, focus, onSelect }: Props) {
+export default function MapView({ geo, seats, choropleth, selected, mine = null, overlay = null, focus, onSelect }: Props) {
   const el = useRef<HTMLDivElement>(null);
   const map = useRef<MLMap | null>(null);
   const [ready, setReady] = useState(false);
   const [hover, setHover] = useState<{ x: number; y: number; i: number } | null>(null);
+  const [subHover, setSubHover] = useState<{ x: number; y: number; code: string } | null>(null);
   const indexByCode = useMemo(() => new Map(seats.map((s, i) => [s.code, i])), [seats]);
   const { breaks, pick } = useColours(choropleth);
   const onSelectRef = useRef(onSelect);
@@ -75,7 +90,11 @@ export default function MapView({ geo, seats, choropleth, selected, focus, onSel
       m.addSource("pcon", { type: "geojson", data: geo, promoteId: "code" });
       m.addLayer({ id: "fill", type: "fill", source: "pcon", paint: { "fill-color": cssVar("--map-nodata"), "fill-opacity": ["case", ["boolean", ["feature-state", "hover"], false], 0.75, 1] } });
       m.addLayer({ id: "line", type: "line", source: "pcon", paint: { "line-color": cssVar("--map-line"), "line-width": ["interpolate", ["linear"], ["zoom"], 4, 0.2, 9, 1.2] } });
+      m.addSource("sub", { type: "geojson", data: EMPTY, promoteId: "code" });
+      m.addLayer({ id: "sub-fill", type: "fill", source: "sub", paint: { "fill-color": cssVar("--map-nodata"), "fill-opacity": ["case", ["boolean", ["feature-state", "hover"], false], 0.7, 0.95] } });
+      m.addLayer({ id: "sub-line", type: "line", source: "sub", paint: { "line-color": cssVar("--map-line"), "line-width": 0.6 } });
       m.addLayer({ id: "highlight", type: "line", source: "pcon", filter: ["in", ["get", "code"], ["literal", []]], paint: { "line-color": cssVar("--accent-2"), "line-width": 2.2 } });
+      m.addLayer({ id: "mine", type: "line", source: "pcon", filter: ["==", ["get", "code"], ""], paint: { "line-color": cssVar("--accent"), "line-width": 3, "line-dasharray": [2, 1] } });
       m.addLayer({ id: "selected", type: "line", source: "pcon", filter: ["==", ["get", "code"], ""], paint: { "line-color": cssVar("--text-1"), "line-width": 3 } });
       // Fit to the data itself (covers the UK for real boundaries).
       const all: [number, number, number, number] = [Infinity, Infinity, -Infinity, -Infinity];
@@ -91,7 +110,25 @@ export default function MapView({ geo, seats, choropleth, selected, focus, onSel
       setReady(true);
     });
     let hovered: string | null = null;
+    let subHovered: string | null = null;
+    const overSub = (p: maplibregl.PointLike) => m.getLayer("sub-fill") && m.queryRenderedFeatures(p, { layers: ["sub-fill"] }).length > 0;
+    m.on("mousemove", "sub-fill", (e) => {
+      const code = e.features?.[0]?.properties?.code;
+      if (!code) return;
+      if (subHovered !== code) {
+        if (subHovered) m.setFeatureState({ source: "sub", id: subHovered }, { hover: false });
+        subHovered = String(code);
+        m.setFeatureState({ source: "sub", id: subHovered }, { hover: true });
+      }
+      setSubHover({ x: e.point.x, y: e.point.y, code: String(code) });
+    });
+    m.on("mouseleave", "sub-fill", () => {
+      if (subHovered) m.setFeatureState({ source: "sub", id: subHovered }, { hover: false });
+      subHovered = null;
+      setSubHover(null);
+    });
     m.on("mousemove", "fill", (e) => {
+      if (overSub(e.point)) { setHover(null); return; }
       const f = e.features?.[0];
       if (!f) return;
       const code = String(f.properties?.code);
@@ -111,6 +148,7 @@ export default function MapView({ geo, seats, choropleth, selected, focus, onSel
       setHover(null);
     });
     m.on("click", "fill", (e) => {
+      if (overSub(e.point)) return;
       const code = e.features?.[0]?.properties?.code;
       if (code) onSelectRef.current(String(code));
     });
@@ -143,9 +181,41 @@ export default function MapView({ geo, seats, choropleth, selected, focus, onSel
     if (ready) map.current?.setFilter("selected", ["==", ["get", "code"], selected ?? ""]);
   }, [selected, ready]);
 
+  // Overlay: data and fit when the overlay (seat) changes, colours whenever they change.
+  const overlayKey = overlay?.key ?? null;
+  const overlayRef = useRef<string | null>(null);
+  overlayRef.current = overlayKey;
   useEffect(() => {
     const m = map.current;
-    if (!m || !ready || !focus) return;
+    if (!m || !ready) return;
+    (m.getSource("sub") as GeoJSONSource | undefined)?.setData(overlay?.geo ?? EMPTY);
+    if (overlay?.geo.features.length) {
+      const all: [number, number, number, number] = [Infinity, Infinity, -Infinity, -Infinity];
+      overlay.geo.features.forEach((f) => {
+        const [a, b, c, d] = bbox(f.geometry);
+        all[0] = Math.min(all[0], a); all[1] = Math.min(all[1], b); all[2] = Math.max(all[2], c); all[3] = Math.max(all[3], d);
+      });
+      const w = m.getContainer().clientWidth;
+      m.fitBounds(all, { padding: w < 700 ? 20 : { top: 40, bottom: 40, left: 40, right: 40 }, maxZoom: 13, duration: 600 });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [overlayKey, ready]);
+  useEffect(() => {
+    const m = map.current;
+    if (!m || !ready || !overlay) return;
+    const expr: unknown[] = ["match", ["get", "code"]];
+    for (const [code, colour] of Object.entries(overlay.colours)) expr.push(code, colour);
+    expr.push(cssVar("--map-nodata"));
+    m.setPaintProperty("sub-fill", "fill-color", expr.length > 3 ? expr : cssVar("--map-nodata"));
+  }, [overlay, ready]);
+
+  useEffect(() => {
+    if (ready) map.current?.setFilter("mine", ["==", ["get", "code"], mine ?? ""]);
+  }, [mine, ready]);
+
+  useEffect(() => {
+    const m = map.current;
+    if (!m || !ready || !focus || overlayRef.current) return; // an overlay frames the map itself
     const f = geo.features.find((x) => x.properties?.code === focus.code);
     if (!f) return;
     // Expand the seat's box so neighbouring seats stay in view for context.
@@ -158,19 +228,29 @@ export default function MapView({ geo, seats, choropleth, selected, focus, onSel
     m.fitBounds([a, b, c, d], { padding, maxZoom: 9, duration: 700 });
   }, [focus, geo, ready]);
 
-  const hv = hover ? seats[hover.i] : null;
+  const sub = overlay && subHover ? overlay.label(subHover.code) : null;
+  const hv = hover && !sub ? seats[hover.i] : null;
   const hvValue = hover ? choropleth.values[hover.i] : null;
   return (
     <div className="map-wrap">
       <div ref={el} className="map" role="application" aria-label="Map of Westminster constituencies" data-dark={isDark()} />
+      {sub && subHover && (
+        <div className="tooltip" style={{ left: subHover.x + 14, top: subHover.y + 14 }}>
+          <div className="tt-name">{sub.name}</div>
+          {sub.sub && <div className="tt-sub">{sub.sub}</div>}
+          <div className="tt-val"><strong>{sub.value}</strong></div>
+        </div>
+      )}
       {hv && hover && (
         <div className="tooltip" style={{ left: hover.x + 14, top: hover.y + 14 }}>
           <div className="tt-name">{hv.name}</div>
           <div className="tt-sub">{hv.party ?? hv.country}</div>
-          <div className="tt-val">
-            <span className="muted">{choropleth.title}: </span>
-            <strong>{hvValue === null || hvValue === undefined ? "No data" : choropleth.format(hvValue)}</strong>
-          </div>
+          {choropleth.title && (
+            <div className="tt-val">
+              <span className="muted">{choropleth.title}: </span>
+              <strong>{hvValue === null || hvValue === undefined ? "No data" : choropleth.format(hvValue)}</strong>
+            </div>
+          )}
         </div>
       )}
     </div>

@@ -287,13 +287,14 @@ def _cache_dir():
     return Path(d) if d else None
 
 
-def cached_table(code: str, includes: list[tuple[str, ...]]) -> pd.DataFrame | None:
+def cached_table(code: str, includes: list[tuple[str, ...]], suffix: str = "") -> pd.DataFrame | None:
     """A previously fetched census table (Census 2021 never changes), if it covers every metric's patterns.
 
     A table fetched whole covers anything; one fetched for selected categories
     only covers the patterns it was fetched for.
     """
     d = _cache_dir()
+    code = code + suffix
     if not d or not (d / f"{code}.csv.gz").exists() or not (d / f"{code}.json").exists():
         return None
     try:
@@ -308,9 +309,10 @@ def cached_table(code: str, includes: list[tuple[str, ...]]) -> pd.DataFrame | N
         return None
 
 
-def store_table(code: str, tidy: pd.DataFrame, includes: list[tuple[str, ...]] | None) -> None:
-    """Cache a table; ``includes`` None means the whole table was fetched."""
+def store_table(code: str, tidy: pd.DataFrame, includes: list[tuple[str, ...]] | None, suffix: str = "") -> None:
+    """Cache a table; ``includes`` None means the whole table was fetched. ``suffix`` ".lsoa" for LSOA-level tables."""
     d = _cache_dir()
+    code = code + suffix
     if not d:
         return
     d.mkdir(parents=True, exist_ok=True)
@@ -320,7 +322,7 @@ def store_table(code: str, tidy: pd.DataFrame, includes: list[tuple[str, ...]] |
 
 
 def load_census(s: requests.Session, metrics: list[CensusMetric],
-                lsoa_lookup=None) -> tuple[dict[str, pd.DataFrame], dict[str, str], dict]:
+                lsoa_lookup=None, lsoa_metrics: dict[str, pd.DataFrame] | None = None) -> tuple[dict[str, pd.DataFrame], dict[str, str], dict]:
     """Fetch all census tables needed by ``metrics``.
 
     A table that fails is logged and skipped (its metrics are left out, or taken
@@ -331,6 +333,9 @@ def load_census(s: requests.Session, metrics: list[CensusMetric],
     table comes back empty and ``lsoa_lookup`` (a callable returning
     {LSOA21CD: PCON24CD}) is given, the table is fetched for LSOAs instead and
     summed to constituencies with the ONS best-fit lookup.
+
+    If ``lsoa_metrics`` is a dict, it is also filled with each metric's num/den
+    for every LSOA (England & Wales), fetching LSOA-level tables where needed.
 
     Returns (per-metric num/den frames, constituency names by code, provenance).
     """
@@ -344,6 +349,29 @@ def load_census(s: requests.Session, metrics: list[CensusMetric],
         includes.setdefault(m.table, []).append(m.include)
         if m.fallback:
             includes.setdefault(m.fallback[0], []).append(m.fallback[1])
+
+    lsoa_cache: dict[str, pd.DataFrame | None] = {}
+
+    def lsoa_table(code: str, ds: str | None = None) -> pd.DataFrame | None:
+        """LSOA-level table limited to the categories the metrics use (cached between runs)."""
+        if code in lsoa_cache:
+            return lsoa_cache[code]
+        try:
+            hit = cached_table(code, includes.get(code, []), suffix=".lsoa")
+            if hit is None:
+                ds = ds or find_dataset(s, code)
+                t0 = time.time()
+                hit = fetch_lsoa_table(s, ds, includes.get(code, []))
+                if hit.empty:
+                    raise ValueError("no LSOA rows")
+                store_table(code, hit, includes.get(code, []), suffix=".lsoa")
+                log.info("%s: fetched for LSOAs in %.0fs", code, time.time() - t0)
+            lsoa_cache[code] = hit
+        except (requests.RequestException, ValueError, LookupError, KeyError, RuntimeError) as exc:
+            log.warning("LSOA table %s failed: %s", code, exc)
+            provenance["failed"][f"{code}:lsoa"] = str(exc)[:300]
+            lsoa_cache[code] = None
+        return lsoa_cache[code]
 
     def table(code: str) -> pd.DataFrame | None:
         nonlocal geo_type
@@ -372,7 +400,10 @@ def load_census(s: requests.Session, metrics: list[CensusMetric],
                 log.info("%s not published for 2024 constituencies; aggregating from LSOAs", code)
                 t0 = time.time()
                 fetched_for = includes.get(code, [])
-                tidy = aggregate_lsoa(fetch_lsoa_table(s, ds, fetched_for), lsoa_lookup())
+                lsoa = lsoa_table(code, ds)
+                if lsoa is None:
+                    raise ValueError("LSOA fallback failed")
+                tidy = aggregate_lsoa(lsoa, lsoa_lookup())
                 log.info("%s: summed from LSOAs in %.0fs", code, time.time() - t0)
                 provenance.setdefault("aggregated_from_lsoa", []).append(code)
             if tidy.empty:
@@ -403,6 +434,17 @@ def load_census(s: requests.Session, metrics: list[CensusMetric],
             log.warning("Metric %s skipped", m.id)
     if "population" not in out:
         raise RuntimeError(f"Census population (TS001) unavailable: {provenance['failed']}")
+    if lsoa_metrics is not None:
+        for m in metrics:
+            for code, include in [(m.table, m.include)] + ([m.fallback] if m.fallback else []):
+                tidy = lsoa_table(code)
+                if tidy is None:
+                    continue
+                try:
+                    lsoa_metrics[m.id] = compute_census_metric(tidy, replace(m, table=code, include=include))
+                    break
+                except ValueError as exc:
+                    log.warning("LSOA metric %s from %s failed: %s", m.id, code, exc)
     return out, names, provenance
 
 

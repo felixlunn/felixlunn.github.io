@@ -59,6 +59,26 @@ export function flagSeats(data: DashboardData, metrics: Metric[], party: string,
     .sort((a, b) => b.hits.length - a.hits.length || a.hits[0].rank / a.hits[0].of - b.hits[0].rank / b.hits[0].of);
 }
 
+/** How one seat ranks on each metric, counted from the notable end, most notable first. */
+export function standing(data: DashboardData, metrics: Metric[], seat: number): Hit[] {
+  const hits: Hit[] = [];
+  for (const m of metrics) {
+    const vals = data.values[m.id];
+    const v = vals?.[seat];
+    if (v === null || v === undefined) continue;
+    const end: Hit["end"] = m.polarity === "higher_better" ? "low" : "high";
+    const valid = vals.filter((x): x is number => x !== null);
+    const rank = 1 + valid.filter((x) => (end === "high" ? x > v : x < v)).length;
+    hits.push({ metric: m, value: v, rank, of: valid.length, end });
+  }
+  return hits.sort((a, b) => a.rank / a.of - b.rank / b.of);
+}
+
+/** True when a hit is in the most extreme `share` of seats (the same test the party flags use). */
+export function standsOut(h: Hit, share = 0.1): boolean {
+  return h.rank <= Math.max(1, Math.ceil(h.of * share));
+}
+
 /** Seat index of a debate's lead member, matched on constituency name. */
 export function leadSeat(data: DashboardData, d: Debate): number | null {
   const norm = (s: string) => s.toLowerCase().replace(/&/g, "and").replace(/[^a-z0-9]+/g, " ").trim();

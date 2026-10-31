@@ -18,6 +18,7 @@ import argparse
 import json
 import logging
 import math
+import re
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -32,11 +33,16 @@ from .metrics import (
 )
 from .sources import boundaries as bsrc
 from .sources import debates as debates_src
+from .sources import imd as imd_src
+from .sources import lsoa as lsoa_src
 from .sources import nomis, nomis_extra, parliament, police
 
 log = logging.getLogger("whips.build")
 
-SKIPPABLE = ["debates", "claimants", "aps", "ashe", "bres", "business", "popest", "police", "elections", "members", "lsoa"]
+# Neighbourhood (LSOA) profiles are published for seats held by this party.
+NEIGHBOURHOOD_PARTY = re.compile(r"^(liberal democrats?|lib ?dems?|ld)$", re.I)
+
+SKIPPABLE = ["imd", "neighbourhoods", "debates", "claimants", "aps", "ashe", "bres", "business", "popest", "police", "elections", "members", "lsoa"]
 
 COUNTRY_BY_PREFIX = {"E": "England", "W": "Wales", "S": "Scotland", "N": "Northern Ireland"}
 
@@ -102,7 +108,9 @@ def build(out_dir: Path, skip: set[str] | None = None) -> dict:
             log.info("LSOA -> constituency lookup: %d LSOAs", len(lookup_cache["v"]))
         return lookup_cache["v"]
 
-    census, _census_names, prov = nomis.load_census(s, CENSUS_METRICS, None if "lsoa" in skip else lsoa_lookup)
+    want_lsoa = "lsoa" not in skip and "neighbourhoods" not in skip
+    lsoa_frames: dict[str, pd.DataFrame] | None = {} if want_lsoa else None
+    census, _census_names, prov = nomis.load_census(s, CENSUS_METRICS, None if "lsoa" in skip else lsoa_lookup, lsoa_frames)
     frames.update(census)
     metas += [census_meta(m) for m in CENSUS_METRICS]
     record("census", "Census 2021 (ONS via Nomis)", "https://www.nomisweb.co.uk/sources/census_2021",
@@ -113,6 +121,21 @@ def build(out_dir: Path, skip: set[str] | None = None) -> dict:
     population = census["population"]["num"]
 
     # 3. Optional sources
+    imd_deciles = None
+    if "imd" not in skip:
+        try:
+            imd = imd_src.load_imd(s)
+            frames.update(imd_src.seat_frames(imd, lsoa_lookup()))
+            metas += imd_src.IMD_METRICS
+            if lsoa_frames is not None:
+                lsoa_frames.update(imd_src.lsoa_frames(imd))
+                imd_deciles = imd["decile"]
+            record("imd", "English Indices of Deprivation 2025 (MHCLG)", imd_src.PAGE_URL, "ok",
+                   f"{len(imd)} LSOAs; England only; best-fit to constituencies, population-weighted", "2025")
+        except Exception as exc:  # noqa: BLE001
+            log.exception("IMD failed")
+            record("imd", "English Indices of Deprivation 2025 (MHCLG)", imd_src.PAGE_URL, "failed", str(exc))
+
     if "claimants" not in skip:
         try:
             cf, period = nomis.load_claimants(s)
@@ -190,6 +213,17 @@ def build(out_dir: Path, skip: set[str] | None = None) -> dict:
             "second_party_2024": a.get("second_party"),
             "result_2024": a.get("result"),
         })
+    neighbourhoods = None
+    if lsoa_frames:
+        try:
+            chosen = {st["code"]: st["name"] for st in seats if st.get("party") and NEIGHBOURHOOD_PARTY.match(st["party"].strip())}
+            neighbourhoods = lsoa_src.write_seat_files(s, out_dir, chosen, lsoa_lookup(), lsoa_frames, imd_deciles)
+            record("neighbourhoods", "Neighbourhood (LSOA) census profiles", "https://geoportal.statistics.gov.uk/", "ok",
+                   f"{len(neighbourhoods['seats'])} Lib Dem seats in England & Wales; {neighbourhoods['lsoas']} LSOAs", "March 2021")
+        except Exception as exc:  # noqa: BLE001
+            log.exception("Neighbourhood profiles failed")
+            record("neighbourhoods", "Neighbourhood (LSOA) census profiles", "https://geoportal.statistics.gov.uk/", "failed", str(exc))
+
     debates: list[dict] = []
     if "debates" not in skip:
         try:
@@ -199,11 +233,11 @@ def build(out_dir: Path, skip: set[str] | None = None) -> dict:
         except Exception as exc:  # noqa: BLE001
             log.exception("What's On calendar failed")
             record("debates", "Upcoming Commons debates (UK Parliament What's On)", debates_src.SOURCE_URL, "failed", str(exc))
-    return finish(out_dir, geo, seats, metrics, values, sources, demo=False, debates=debates)
+    return finish(out_dir, geo, seats, metrics, values, sources, demo=False, debates=debates, neighbourhoods=neighbourhoods)
 
 
 def finish(out_dir: Path, geo: dict, seats: list[dict], metrics: list[dict], values: dict[str, list],
-           sources: list[dict], demo: bool, debates: list[dict] | None = None) -> dict:
+           sources: list[dict], demo: bool, debates: list[dict] | None = None, neighbourhoods: dict | None = None) -> dict:
     """Add peer groups and write all output files."""
     ds = engine.Dataset.from_json({"seats": seats, "metrics": metrics, "values": values})
     groups, group_meta = engine.peer_groups(ds)
@@ -221,6 +255,7 @@ def finish(out_dir: Path, geo: dict, seats: list[dict], metrics: list[dict], val
         "sources": sources,
         "debates": debates or [],
         "debate_topics": debates_src.topic_catalogue(),
+        "neighbourhoods": neighbourhoods,
     }
     (out_dir / "data.json").write_text(json.dumps(data, separators=(",", ":"), allow_nan=False))
     (out_dir / "boundaries.geojson").write_text(json.dumps(geo, separators=(",", ":")))

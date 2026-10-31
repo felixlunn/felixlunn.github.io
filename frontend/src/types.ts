@@ -61,6 +61,8 @@ export interface DashboardData {
   peer_groups: PeerGroup[];
   sources: Source[];
   debates?: Debate[];
+  /** Seats with neighbourhood (LSOA) files in data/lsoa/<code>.json. */
+  neighbourhoods?: { seats: string[]; lsoas: number; metrics: number } | null;
   debate_topics?: DebateTopic[];
 }
 
@@ -93,4 +95,18 @@ export interface Choropleth {
   invert?: boolean;
   /** Categorical map: each value is an index into this list, coloured as given (e.g. parties). */
   categories?: { label: string; colour: string; count: number }[];
+}
+
+/** One seat's neighbourhood (LSOA) census profile. Arrays align with `lsoas`. */
+export interface NeighbourhoodFile {
+  seat: string;
+  name: string;
+  lsoas: { code: string; name: string; ward: string | null; council: string | null }[];
+  metrics: string[];
+  values: Record<string, (number | null)[]>;
+  /** Percentile (0-100) among all LSOAs in England & Wales. */
+  pct: Record<string, (number | null)[]>;
+  /** IMD 2025 decile, 1 = most deprived 10% of neighbourhoods in England; null in Wales. */
+  imd_decile?: (number | null)[];
+  geo: GeoJSON.FeatureCollection;
 }
