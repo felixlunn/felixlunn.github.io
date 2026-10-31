@@ -1,0 +1,177 @@
+import { useEffect, useMemo, useRef, useState } from "react";
+import maplibregl, { type GeoJSONSource, type Map as MLMap } from "maplibre-gl";
+import "maplibre-gl/dist/maplibre-gl.css";
+import type { Choropleth, Seat } from "../types";
+import { classify, isDark, quantileBreaks, ramp } from "../lib/colors";
+
+interface Props {
+  geo: GeoJSON.FeatureCollection;
+  seats: Seat[];
+  choropleth: Choropleth;
+  selected: string | null;
+  focus: { code: string; n: number } | null;
+  onSelect: (code: string) => void;
+}
+
+const UK_BOUNDS: [number, number, number, number] = [-8.6, 49.85, 1.8, 60.9];
+
+function cssVar(name: string): string {
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || "#ccc";
+}
+
+function bbox(geom: GeoJSON.Geometry): [number, number, number, number] {
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  const walk = (c: unknown): void => {
+    if (Array.isArray(c) && typeof c[0] === "number") {
+      const [x, y] = c as number[];
+      minX = Math.min(minX, x); maxX = Math.max(maxX, x);
+      minY = Math.min(minY, y); maxY = Math.max(maxY, y);
+    } else if (Array.isArray(c)) c.forEach(walk);
+  };
+  if ("coordinates" in geom) walk(geom.coordinates);
+  return [minX, minY, maxX, maxY];
+}
+
+export function useColours(ch: Choropleth) {
+  return useMemo(() => {
+    const colours = ramp();
+    const breaks = quantileBreaks(ch.values, colours.length);
+    const palette = ch.invert ? [...colours].reverse() : colours;
+    // With fewer distinct breaks than classes, use the darker end of the ramp evenly.
+    const used = palette.slice(0, breaks.length + 1);
+    const step = (palette.length - 1) / Math.max(used.length - 1, 1);
+    const pick = (k: number) => palette[Math.round(k * step)];
+    return { breaks, pick, classes: breaks.length + 1 };
+  }, [ch]);
+}
+
+export default function MapView({ geo, seats, choropleth, selected, focus, onSelect }: Props) {
+  const el = useRef<HTMLDivElement>(null);
+  const map = useRef<MLMap | null>(null);
+  const [ready, setReady] = useState(false);
+  const [hover, setHover] = useState<{ x: number; y: number; i: number } | null>(null);
+  const indexByCode = useMemo(() => new Map(seats.map((s, i) => [s.code, i])), [seats]);
+  const { breaks, pick } = useColours(choropleth);
+  const onSelectRef = useRef(onSelect);
+  onSelectRef.current = onSelect;
+
+  useEffect(() => {
+    if (!el.current) return;
+    const m = new maplibregl.Map({
+      container: el.current,
+      style: { version: 8, sources: {}, layers: [{ id: "bg", type: "background", paint: { "background-color": cssVar("--map-sea") } }] },
+      bounds: UK_BOUNDS,
+      fitBoundsOptions: { padding: 20 },
+      attributionControl: false,
+      dragRotate: false,
+      pitchWithRotate: false,
+      maxZoom: 13,
+      minZoom: 3,
+    });
+    m.touchZoomRotate.disableRotation();
+    m.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");
+    m.addControl(new maplibregl.AttributionControl({ compact: true, customAttribution: "Boundaries: ONS (OGL), Contains OS data © Crown copyright" }));
+    m.on("load", () => {
+      m.addSource("pcon", { type: "geojson", data: geo, promoteId: "code" });
+      m.addLayer({ id: "fill", type: "fill", source: "pcon", paint: { "fill-color": cssVar("--map-nodata"), "fill-opacity": ["case", ["boolean", ["feature-state", "hover"], false], 0.75, 1] } });
+      m.addLayer({ id: "line", type: "line", source: "pcon", paint: { "line-color": cssVar("--map-line"), "line-width": ["interpolate", ["linear"], ["zoom"], 4, 0.2, 9, 1.2] } });
+      m.addLayer({ id: "highlight", type: "line", source: "pcon", filter: ["in", ["get", "code"], ["literal", []]], paint: { "line-color": cssVar("--accent-2"), "line-width": 2.2 } });
+      m.addLayer({ id: "selected", type: "line", source: "pcon", filter: ["==", ["get", "code"], ""], paint: { "line-color": cssVar("--text-1"), "line-width": 3 } });
+      // Fit to the data itself (covers the UK for real boundaries).
+      const all: [number, number, number, number] = [Infinity, Infinity, -Infinity, -Infinity];
+      geo.features.forEach((f) => {
+        // Expand the seat's box so neighbouring seats stay in view for context.
+    const [x0, y0, x1, y1] = bbox(f.geometry);
+    const ex = (x1 - x0) * 0.8, ey = (y1 - y0) * 0.8;
+    const [a, b, c, d] = [x0 - ex, y0 - ey, x1 + ex, y1 + ey];
+        all[0] = Math.min(all[0], a); all[1] = Math.min(all[1], b);
+        all[2] = Math.max(all[2], c); all[3] = Math.max(all[3], d);
+      });
+      if (Number.isFinite(all[0]) && !focus) m.fitBounds(all, { padding: 20, duration: 0 });
+      setReady(true);
+    });
+    let hovered: string | null = null;
+    m.on("mousemove", "fill", (e) => {
+      const f = e.features?.[0];
+      if (!f) return;
+      const code = String(f.properties?.code);
+      if (hovered !== code) {
+        if (hovered) m.setFeatureState({ source: "pcon", id: hovered }, { hover: false });
+        hovered = code;
+        m.setFeatureState({ source: "pcon", id: code }, { hover: true });
+      }
+      m.getCanvas().style.cursor = "pointer";
+      const i = indexByCode.get(code);
+      if (i !== undefined) setHover({ x: e.point.x, y: e.point.y, i });
+    });
+    m.on("mouseleave", "fill", () => {
+      if (hovered) m.setFeatureState({ source: "pcon", id: hovered }, { hover: false });
+      hovered = null;
+      m.getCanvas().style.cursor = "";
+      setHover(null);
+    });
+    m.on("click", "fill", (e) => {
+      const code = e.features?.[0]?.properties?.code;
+      if (code) onSelectRef.current(String(code));
+    });
+    map.current = m;
+    return () => m.remove();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Data updates (e.g. a different data.json) without rebuilding the map.
+  useEffect(() => {
+    if (ready) (map.current?.getSource("pcon") as GeoJSONSource | undefined)?.setData(geo);
+  }, [geo, ready]);
+
+  // Recolour: one `match` expression, no geometry reload.
+  useEffect(() => {
+    const m = map.current;
+    if (!m || !ready) return;
+    const expr: unknown[] = ["match", ["get", "code"]];
+    seats.forEach((s, i) => {
+      const v = choropleth.values[i];
+      if (v !== null && v !== undefined) expr.push(s.code, pick(classify(v, breaks)));
+    });
+    expr.push(cssVar("--map-nodata"));
+    m.setPaintProperty("fill", "fill-color", expr.length > 3 ? expr : cssVar("--map-nodata"));
+    m.setFilter("highlight", ["in", ["get", "code"], ["literal", choropleth.highlight ?? []]]);
+  }, [choropleth, breaks, pick, seats, ready]);
+
+  useEffect(() => {
+    if (ready) map.current?.setFilter("selected", ["==", ["get", "code"], selected ?? ""]);
+  }, [selected, ready]);
+
+  useEffect(() => {
+    const m = map.current;
+    if (!m || !ready || !focus) return;
+    const f = geo.features.find((x) => x.properties?.code === focus.code);
+    if (!f) return;
+    // Expand the seat's box so neighbouring seats stay in view for context.
+    const [x0, y0, x1, y1] = bbox(f.geometry);
+    const ex = (x1 - x0) * 0.8, ey = (y1 - y0) * 0.8;
+    const [a, b, c, d] = [x0 - ex, y0 - ey, x1 + ex, y1 + ey];
+    // Leave room for the dossier panel on the right on wide screens.
+    const w = m.getContainer().clientWidth;
+    const padding = window.innerWidth < 860 || w < 900 ? 30 : { top: 80, bottom: 80, left: 80, right: 480 };
+    m.fitBounds([a, b, c, d], { padding, maxZoom: 9, duration: 700 });
+  }, [focus, geo, ready]);
+
+  const hv = hover ? seats[hover.i] : null;
+  const hvValue = hover ? choropleth.values[hover.i] : null;
+  return (
+    <div className="map-wrap">
+      <div ref={el} className="map" role="application" aria-label="Map of Westminster constituencies" data-dark={isDark()} />
+      {hv && hover && (
+        <div className="tooltip" style={{ left: hover.x + 14, top: hover.y + 14 }}>
+          <div className="tt-name">{hv.name}</div>
+          <div className="tt-sub">{hv.party ?? hv.country}</div>
+          <div className="tt-val">
+            <span className="muted">{choropleth.title}: </span>
+            <strong>{hvValue === null || hvValue === undefined ? "No data" : choropleth.format(hvValue)}</strong>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
