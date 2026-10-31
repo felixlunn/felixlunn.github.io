@@ -72,4 +72,6 @@ export interface Choropleth {
   highlight?: string[];
   /** Reverse the ramp so that low values are dark (e.g. distances). */
   invert?: boolean;
+  /** Categorical map: each value is an index into this list, coloured as given (e.g. parties). */
+  categories?: { label: string; colour: string; count: number }[];
 }

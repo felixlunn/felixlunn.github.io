@@ -9,6 +9,7 @@ import MatchTab from "./components/MatchTab";
 import Dossier from "./components/Dossier";
 import SearchBox from "./components/SearchBox";
 import Legend from "./components/Legend";
+import { PARTY_ID, partyChoropleth } from "./lib/parties";
 
 const MapView = lazy(() => import("./components/MapView"));
 
@@ -30,9 +31,12 @@ export default function App({ data, geo }: { data: DashboardData; geo: GeoJSON.F
   const metricIds = useMemo(() => new Set(data.metrics.map((m) => m.id)), [data]);
 
   const [tab, setTab] = useState<Tab>((TABS.some((t) => t.id === initial.tab) ? initial.tab : "themes") as Tab);
-  const [metricId, setMetricId] = useState(metricIds.has(initial.metric) ? initial.metric : metricIds.has("private_rented") ? "private_rented" : data.metrics[0].id);
-  const metric = data.metrics.find((m) => m.id === metricId)!;
-  const [theme, setTheme] = useState(metric.theme);
+  // The homepage opens on the electoral map (seats in party colours) unless the URL asks for a metric.
+  const [metricId, setMetricId] = useState(metricIds.has(initial.metric) ? initial.metric : PARTY_ID);
+  const partyMode = metricId === PARTY_ID;
+  const metric = data.metrics.find((m) => m.id === metricId) ?? data.metrics.find((m) => m.theme === "politics") ?? data.metrics[0];
+  const [theme, setTheme] = useState(partyMode ? "politics" : metric.theme);
+  const partyMap = useMemo(() => partyChoropleth(data.seats), [data]);
   const [selected, setSelected] = useState<number | null>(codeIndex.get(initial.seat) ?? null);
   const [focus, setFocus] = useState<{ code: string; n: number } | null>(selected !== null ? { code: data.seats[selected].code, n: 0 } : null);
   const [showSources, setShowSources] = useState(false);
@@ -121,13 +125,14 @@ export default function App({ data, geo }: { data: DashboardData; geo: GeoJSON.F
         invert: true,
       };
     }
+    if (partyMode) return partyMap;
     return {
       title: metric.label + unitSuffix(metric),
       subtitle: metric.source,
       values: data.values[metric.id],
       format: (v) => fmt(metric, v),
     };
-  }, [tab, twinScores, twinResults, twinIds, twinSettings, selected, indexScores, indexRanking, weights, matchDist, matchResults, targets, metric, data]);
+  }, [tab, twinScores, twinResults, twinIds, twinSettings, selected, indexScores, indexRanking, weights, matchDist, matchResults, targets, metric, data, partyMode, partyMap]);
 
   const generated = new Date(data.generated_at);
   const failed = data.sources.filter((s) => s.status === "failed");
@@ -166,7 +171,7 @@ export default function App({ data, geo }: { data: DashboardData; geo: GeoJSON.F
         </div>
         {panelOpen && (
           <>
-            {tab === "themes" && <ThemesTab data={data} theme={theme} setTheme={(t) => { setTheme(t); const first = data.metrics.find((m) => m.theme === t); if (first) setMetricId(first.id); }} metric={metric} setMetric={setMetricId} selected={selected} onSelect={(i) => select(i)} />}
+            {tab === "themes" && <ThemesTab data={data} theme={theme} setTheme={(t) => { setTheme(t); const first = t === "politics" ? PARTY_ID : data.metrics.find((m) => m.theme === t)?.id; if (first) setMetricId(first); }} metric={metric} partyMode={partyMode} parties={partyMap} setMetric={setMetricId} selected={selected} onSelect={(i) => select(i)} />}
             {tab === "twins" && <TwinsTab data={data} selected={selected} settings={twinSettings} setSettings={setTwinSettings} results={twinResults} metricCount={twinIds.length} onSelect={(i) => select(i)} />}
             {tab === "index" && <IndexTab data={data} weights={weights} setWeights={setWeights} ranking={indexRanking} selected={selected} onSelect={(i) => select(i)} />}
             {tab === "match" && <MatchTab data={data} targets={targets} setTargets={setTargets} results={matchResults} selected={selected} onSelect={(i) => select(i)} />}

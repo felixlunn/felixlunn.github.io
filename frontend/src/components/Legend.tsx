@@ -8,10 +8,21 @@ export default function Legend({ ch }: { ch: Choropleth }) {
   const max = vals.length ? Math.max(...vals) : null;
   const missing = ch.values.length - vals.length;
   return (
-    <div className="legend" aria-label="Map legend">
+    <div className={`legend ${ch.categories ? "wide" : ""}`} aria-label="Map legend">
       <div className="legend-title">{ch.title}</div>
       {ch.subtitle && <div className="legend-sub">{ch.subtitle}</div>}
-      {min !== null && max !== null && (
+      {ch.categories && (
+        <ul className="legend-cats">
+          {ch.categories.map((c) => (
+            <li key={c.label}>
+              <span className="swatch" style={{ background: c.colour }} />
+              <span className="cat-label">{c.label}</span>
+              <span className="num">{c.count}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+      {!ch.categories && min !== null && max !== null && (
         <>
           <div className="legend-bar">
             {Array.from({ length: classes }, (_, k) => (
