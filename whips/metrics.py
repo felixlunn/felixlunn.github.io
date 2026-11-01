@@ -26,7 +26,7 @@ THEMES: list[dict[str, str]] = [
     {"id": "health", "label": "Health & care", "description": "Self-reported health, disability and unpaid care (Census 2021)."},
     {"id": "education", "label": "Education & skills", "description": "Adult qualification levels and students (Census 2021)."},
     {"id": "transport", "label": "Transport", "description": "How and how far people travel to work, and car access (Census 2021)."},
-    {"id": "policing", "label": "Policing", "description": "Recorded street-level crime and investigation outcomes (police.uk)."},
+    {"id": "policing", "label": "Policing & justice", "description": "Recorded street-level crime and investigation outcomes (police.uk), and the Crown Court backlog in the seat's police force area (MoJ)."},
     {"id": "politics", "label": "Politics", "description": "2024 general election result, turnout and vote shares (House of Commons Library)."},
 ]
 
