@@ -36,7 +36,8 @@ TOPICS: dict[str, tuple[str, str, list[str]]] = {
     "health": ("Health & care",
                r"\bnhs\b|health|hospital|\bgps?\b|general practi|dent(al|ist)|cancer|ambulance|hospice|patients?|"
                r"social care|carers?\b|disab|dementia|stroke|nurs|gynaecolog|menopaus|endometriosis|maternity|medic",
-               ["bad_health", "disabled_a_lot", "disabled", "carers_50h", "unpaid_carers", "age_80_plus", "inactive_sick"]),
+               ["gp_contact_good", "gp_wait_ok", "nhs_diabetes", "nhs_depression", "nhs_dementia", "nhs_copd", "bad_health",
+                "disabled_a_lot", "carers_50h"]),
     "housing": ("Housing",
                 r"housing|\bhomes?\b|planning|\brent(ers?|ed|ing|s)?\b|leasehold|homeless|landlord|mortgage|council tax|"
                 r"stamp duty|temporary accommodation",
