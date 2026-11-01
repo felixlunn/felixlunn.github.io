@@ -10,10 +10,13 @@ class FakeSession:
         self.counts, self.params = counts, []
 
     def get(self, url, timeout, params):
+        url_ = url
         self.params.append(params)
         n = self.counts[params["askingMemberId"]]
 
         class R:
+            url = url_
+
             def raise_for_status(self):
                 pass
 

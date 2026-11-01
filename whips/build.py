@@ -323,8 +323,7 @@ def finish(out_dir: Path, geo: dict, seats: list[dict], metrics: list[dict], val
     wide = pd.DataFrame({"code": [s["code"] for s in seats], "name": [s["name"] for s in seats],
                          "country": [s["country"] for s in seats], "region": [s["region"] for s in seats],
                          "mp": [s["mp"] for s in seats], "party": [s["party"] for s in seats]})
-    for m in metrics:
-        wide[m["id"]] = values[m["id"]]
+    wide = pd.concat([wide, pd.DataFrame({m["id"]: values[m["id"]] for m in metrics})], axis=1)
     wide.to_csv(out_dir / "constituencies.csv", index=False)
     log.info("Wrote %s: %d seats, %d metrics", out_dir, len(seats), len(metrics))
     return data
