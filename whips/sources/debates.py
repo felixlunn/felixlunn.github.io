@@ -55,7 +55,7 @@ TOPICS: dict[str, tuple[str, str, list[str]]] = {
     "education": ("Education & children",
                   r"school|education|teacher|\bsend\b|special educational|universit|students?|skills|apprentice|"
                   r"childcare|nurser|children|young people|learning",
-                  ["idaci", "no_qualifications", "age_0_14", "hh_dependent_children", "hh_lone_parent"]),
+                  ["gcse_em4", "school_fsm", "idaci", "no_qualifications", "age_0_14", "hh_dependent_children"]),
     "rural": ("Rural & farming",
               r"farm|agricultur|rural|countryside|fishing|fisheries|food security|coastal|national park",
               ["jobs_agriculture", "heat_oil", "commute_30km_plus"]),
