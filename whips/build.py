@@ -34,6 +34,7 @@ from .metrics import (
 from .sources import boundaries as bsrc
 from .sources import debates as debates_src
 from .sources import epc as epc_src
+from .sources import schools as schools_src
 from .sources import imd as imd_src
 from .sources import lsoa as lsoa_src
 from .sources import nomis, nomis_extra, parliament, police
@@ -43,7 +44,7 @@ log = logging.getLogger("whips.build")
 # Neighbourhood (LSOA) profiles are published for seats held by this party.
 NEIGHBOURHOOD_PARTY = re.compile(r"^(liberal democrats?|lib ?dems?|ld)$", re.I)
 
-SKIPPABLE = ["epc", "imd", "neighbourhoods", "debates", "claimants", "aps", "ashe", "bres", "business", "popest", "police", "elections", "members", "lsoa"]
+SKIPPABLE = ["schools", "epc", "imd", "neighbourhoods", "debates", "claimants", "aps", "ashe", "bres", "business", "popest", "police", "elections", "members", "lsoa"]
 
 COUNTRY_BY_PREFIX = {"E": "England", "W": "Wales", "S": "Scotland", "N": "Northern Ireland"}
 
@@ -89,6 +90,17 @@ def build(out_dir: Path, skip: set[str] | None = None) -> dict:
 
     def record(sid, name, url, status, detail="", as_of=None):
         sources.append({"id": sid, "name": name, "url": url, "status": status, "detail": detail, "as_of": as_of})
+
+    def optional(sid: str, name: str, url: str, detail: str, load, meta_list: list[MetricMeta]) -> None:
+        """Run an optional source: ``load()`` returns (frames, period). A failure is recorded, not raised."""
+        try:
+            got, period = load()
+            frames.update(got)
+            metas.extend(m for m in meta_list if m.id in got)
+            record(sid, name, url, "ok", detail, period)
+        except Exception as exc:  # noqa: BLE001 - optional source
+            log.exception("%s failed", name)
+            record(sid, name, url, "failed", str(exc)[:300])
 
     # 1. Boundaries (required)
     t0 = time.time()
@@ -150,6 +162,12 @@ def build(out_dir: Path, skip: set[str] | None = None) -> dict:
     extra_frames, extra_metas = nomis_extra.load_all(s, skip, record)
     frames.update(extra_frames)
     metas += extra_metas
+
+    if "schools" not in skip:
+        optional("gias", "Schools register (DfE Get Information about Schools)", schools_src.GIAS_PAGE,
+                 "Open schools in England, by July 2024 constituency", lambda: schools_src.load_gias(s), schools_src.SCHOOL_METRICS)
+        optional("ks4", "GCSE results by constituency (DfE Key stage 4 performance)", schools_src.KS4_PAGE,
+                 "Pupils' constituency of residence; England", lambda: schools_src.load_ks4(s), schools_src.KS4_METRICS)
 
     if "epc" not in skip:
         try:
