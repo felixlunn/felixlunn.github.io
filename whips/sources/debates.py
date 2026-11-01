@@ -49,7 +49,7 @@ TOPICS: dict[str, tuple[str, str, list[str]]] = {
                         "inactive_sick", "never_worked"]),
     "energy": ("Energy & heating",
                r"energy|fuel|heating|heat pump|net zero|climate|electricity|\bgas\b|insulation|solar",
-               ["epc_f_g", "heat_oil", "heat_electric", "no_central_heating"]),
+               ["fuel_poverty", "epc_f_g", "heat_oil", "heat_electric", "no_central_heating"]),
     "transport": ("Transport",
                   r"transport|\bbus(es)?\b|\brail|\btrains?\b|\broads?\b|pothole|cycl|motorist|driving|car park|travel|airport",
                   ["no_car", "commute_bus", "commute_train", "commute_car", "commute_30km_plus"]),

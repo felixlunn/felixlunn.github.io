@@ -10,7 +10,7 @@ on:
   workflow_dispatch:
     inputs:
       skip:
-        description: "Optional sources to skip, space-separated (nhs schools epc imd neighbourhoods debates claimants aps ashe bres business popest police elections members lsoa)"
+        description: "Optional sources to skip, space-separated (fuel_poverty nhs schools epc imd neighbourhoods debates claimants aps ashe bres business popest police elections members lsoa)"
         required: false
         default: ""
 
@@ -53,7 +53,7 @@ jobs:
         run: |
           SKIP=""
           for s in $SKIP_INPUT; do
-            case "$s" in nhs|schools|epc|imd|neighbourhoods|debates|claimants|aps|ashe|bres|business|popest|police|elections|members|lsoa) SKIP="$SKIP --skip $s" ;; *) echo "ignoring '$s'" ;; esac
+            case "$s" in fuel_poverty|nhs|schools|epc|imd|neighbourhoods|debates|claimants|aps|ashe|bres|business|popest|police|elections|members|lsoa) SKIP="$SKIP --skip $s" ;; *) echo "ignoring '$s'" ;; esac
           done
           python -m whips.build --out frontend/public/data $SKIP
 
