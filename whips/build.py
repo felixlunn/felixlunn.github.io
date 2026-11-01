@@ -37,6 +37,7 @@ from .sources import debates as debates_src
 from .sources import epc as epc_src
 from .sources import fuel_poverty as fuel_src
 from .sources import nhs as nhs_src
+from .sources import questions as questions_src
 from .sources import rail as rail_src
 from .sources import schools as schools_src
 from .sources import imd as imd_src
@@ -48,7 +49,7 @@ log = logging.getLogger("whips.build")
 # Neighbourhood (LSOA) profiles are published for seats held by this party.
 NEIGHBOURHOOD_PARTY = re.compile(r"^(liberal democrats?|lib ?dems?|ld)$", re.I)
 
-SKIPPABLE = ["rail", "courts", "fuel_poverty", "nhs", "schools", "epc", "imd", "neighbourhoods", "debates", "claimants", "aps", "ashe", "bres", "business", "popest", "police", "elections", "members", "lsoa"]
+SKIPPABLE = ["questions", "rail", "courts", "fuel_poverty", "nhs", "schools", "epc", "imd", "neighbourhoods", "debates", "claimants", "aps", "ashe", "bres", "business", "popest", "police", "elections", "members", "lsoa"]
 
 COUNTRY_BY_PREFIX = {"E": "England", "W": "Wales", "S": "Scotland", "N": "Northern Ireland"}
 
@@ -248,6 +249,10 @@ def build(out_dir: Path, skip: set[str] | None = None) -> dict:
         except Exception as exc:  # noqa: BLE001
             log.exception("Members API failed")
             record("members", "Current MPs (UK Parliament Members API)", "https://members-api.parliament.uk/", "failed", str(exc))
+
+    if members and "questions" not in skip:
+        optional("questions", "Written questions (UK Parliament)", questions_src.SOURCE_URL, "Tabled by each current MP",
+                 lambda: questions_src.load_questions(s, members), questions_src.QUESTION_METRICS)
 
     # 4. Assemble seats + values
     metrics, values = assemble(codes, frames, metas)
