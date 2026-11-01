@@ -28,30 +28,15 @@ interface Props {
 }
 
 /**
- * Ordnance Survey base map (OS Maps API, "Light" style, OpenData tiles). Needs a free OS Data Hub API key,
- * supplied at build time as VITE_OS_API_KEY; without one the map keeps its plain background.
- * The API serves Web Mercator tiles from zoom 7 (Great Britain only); at whole-UK zoom the seats cover the land anyway.
+ * Base map: OpenFreeMap (open-source vector tiles from OpenStreetMap; no API key, no usage limits).
+ * "Positron" is a pale style made to sit under data; the dark style matches dark mode.
+ * Our layers go beneath its labels, so place names stay readable over the shading.
  */
-const OS_KEY = (import.meta.env.VITE_OS_API_KEY as string | undefined)?.trim();
-const OS_ATTRIBUTION = `Contains OS data © Crown copyright and database rights ${new Date().getFullYear()}`;
+const BASEMAP_URL = (dark: boolean) => `https://tiles.openfreemap.org/styles/${dark ? "dark" : "positron"}`;
+const PLAIN: maplibregl.StyleSpecification = { version: 8, sources: {}, layers: [] };
 
-function baseStyle(): maplibregl.StyleSpecification {
-  const bg: maplibregl.LayerSpecification = { id: "bg", type: "background", paint: { "background-color": cssVar("--map-sea") } };
-  if (!OS_KEY) return { version: 8, sources: {}, layers: [bg] };
-  return {
-    version: 8,
-    sources: {
-      os: {
-        type: "raster", tileSize: 256, minzoom: 7, maxzoom: 16, attribution: OS_ATTRIBUTION,
-        tiles: [`https://api.os.uk/maps/raster/v1/zxy/Light_3857/{z}/{x}/{y}.png?key=${encodeURIComponent(OS_KEY)}`],
-      },
-    },
-    layers: [bg, { id: "os", type: "raster", source: "os", paint: { "raster-opacity": isDark() ? 0.55 : 1 } }],
-  };
-}
-
-/** Fill opacity that lets the base map show through as you zoom in (fully opaque without one). */
-function fillOpacity(hover: number, solid: number, zoomed: number, baseMap = !!OS_KEY): maplibregl.DataDrivenPropertyValueSpecification<number> {
+/** Fill opacity: lets the base map show through as you zoom in; solid without one. */
+function fillOpacity(hover: number, solid: number, zoomed: number, baseMap: boolean): maplibregl.DataDrivenPropertyValueSpecification<number> {
   const h = ["boolean", ["feature-state", "hover"], false];
   if (!baseMap) return ["case", h, hover, solid] as never;
   return ["interpolate", ["linear"], ["zoom"], 7, ["case", h, hover, solid], 11, ["case", h, zoomed - 0.2, zoomed]] as never;
@@ -93,19 +78,24 @@ export default function MapView({ geo, seats, choropleth, selected, mine = null,
   const el = useRef<HTMLDivElement>(null);
   const map = useRef<MLMap | null>(null);
   const [ready, setReady] = useState(false);
-  // Base map on/off, remembered per browser (only offered when an OS key is configured).
+  // Base map on/off, remembered per browser.
   const [baseMap, setBaseMap] = useState(() => {
     try { return localStorage.getItem("whips.baseMap") !== "off"; } catch { return true; }
   });
   useEffect(() => {
     try { localStorage.setItem("whips.baseMap", baseMap ? "on" : "off"); } catch { /* keep for this visit */ }
     const m = map.current;
-    if (!m || !ready || !OS_KEY) return;
-    m.setLayoutProperty("os", "visibility", baseMap ? "visible" : "none");
+    if (!m || !ready) return;
+    const visibility = baseMap ? "visible" : "none";
+    for (const id of baseLayers.current) m.setLayoutProperty(id, "visibility", visibility);
+    m.setLayoutProperty("bg", "visibility", baseMap && baseLayers.current.length ? "none" : "visible");
     // Without the base map there's nothing to see through to, so keep the fills solid.
     m.setPaintProperty("fill", "fill-opacity", fillOpacity(0.75, 1, 0.6, baseMap));
     m.setPaintProperty("sub-fill", "fill-opacity", fillOpacity(0.7, 0.95, 0.65, baseMap));
   }, [baseMap, ready]);
+  const baseMapRef = useRef(baseMap);
+  baseMapRef.current = baseMap;
+  const baseLayers = useRef<string[]>([]); // the base map's own layers, hidden when it's switched off
   const [hover, setHover] = useState<{ x: number; y: number; i: number } | null>(null);
   const [subHover, setSubHover] = useState<{ x: number; y: number; code: string } | null>(null);
   const indexByCode = useMemo(() => new Map(seats.map((s, i) => [s.code, i])), [seats]);
@@ -117,7 +107,7 @@ export default function MapView({ geo, seats, choropleth, selected, mine = null,
     if (!el.current) return;
     const m = new maplibregl.Map({
       container: el.current,
-      style: baseStyle(),
+      style: BASEMAP_URL(isDark()),
       bounds: UK_BOUNDS,
       fitBoundsOptions: { padding: 20 },
       attributionControl: false,
@@ -128,17 +118,33 @@ export default function MapView({ geo, seats, choropleth, selected, mine = null,
     });
     m.touchZoomRotate.disableRotation();
     m.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");
-    m.addControl(new maplibregl.AttributionControl({ compact: true, customAttribution: OS_KEY ? "Boundaries: ONS (OGL)" : "Boundaries: ONS (OGL), Contains OS data © Crown copyright" }));
+    m.addControl(new maplibregl.AttributionControl({ compact: true, customAttribution: "Boundaries: ONS (OGL), Contains OS data © Crown copyright" }));
+    // If the base map can't load (offline, blocked), carry on with a plain background.
+    let fellBack = false;
+    m.on("error", (e) => {
+      if (!fellBack && !m.isStyleLoaded() && !baseLayers.current.length) {
+        fellBack = true;
+        console.warn("Base map unavailable; using a plain background", e.error);
+        m.setStyle(PLAIN);
+      }
+    });
     m.on("load", () => {
+      const styleLayers = m.getStyle().layers ?? [];
+      baseLayers.current = styleLayers.map((l) => l.id);
+      const labels = styleLayers.find((l) => l.type === "symbol")?.id; // our layers go just beneath the labels
+      const on = baseMapRef.current && baseLayers.current.length > 0;
+      for (const id of baseLayers.current) m.setLayoutProperty(id, "visibility", on ? "visible" : "none");
+      m.addLayer({ id: "bg", type: "background", layout: { visibility: on ? "none" : "visible" }, paint: { "background-color": cssVar("--map-sea") } }, styleLayers[0]?.id);
+      const add = (layer: maplibregl.AddLayerObject) => m.addLayer(layer, labels);
       m.addSource("pcon", { type: "geojson", data: geo, promoteId: "code" });
-      m.addLayer({ id: "fill", type: "fill", source: "pcon", paint: { "fill-color": cssVar("--map-nodata"), "fill-opacity": fillOpacity(0.75, 1, 0.6) } });
-      m.addLayer({ id: "line", type: "line", source: "pcon", paint: { "line-color": cssVar("--map-line"), "line-width": ["interpolate", ["linear"], ["zoom"], 4, 0.2, 9, 1.2] } });
+      add({ id: "fill", type: "fill", source: "pcon", paint: { "fill-color": cssVar("--map-nodata"), "fill-opacity": fillOpacity(0.75, 1, 0.6, on) } });
+      add({ id: "line", type: "line", source: "pcon", paint: { "line-color": cssVar("--map-line"), "line-width": ["interpolate", ["linear"], ["zoom"], 4, 0.2, 9, 1.2] } });
       m.addSource("sub", { type: "geojson", data: EMPTY, promoteId: "code" });
-      m.addLayer({ id: "sub-fill", type: "fill", source: "sub", paint: { "fill-color": cssVar("--map-nodata"), "fill-opacity": fillOpacity(0.7, 0.95, 0.65) } });
-      m.addLayer({ id: "sub-line", type: "line", source: "sub", paint: { "line-color": cssVar("--map-line"), "line-width": 0.6 } });
-      m.addLayer({ id: "highlight", type: "line", source: "pcon", filter: ["in", ["get", "code"], ["literal", []]], paint: { "line-color": cssVar("--accent-2"), "line-width": 2.2 } });
-      m.addLayer({ id: "mine", type: "line", source: "pcon", filter: ["==", ["get", "code"], ""], paint: { "line-color": cssVar("--accent"), "line-width": 3, "line-dasharray": [2, 1] } });
-      m.addLayer({ id: "selected", type: "line", source: "pcon", filter: ["==", ["get", "code"], ""], paint: { "line-color": cssVar("--text-1"), "line-width": 3 } });
+      add({ id: "sub-fill", type: "fill", source: "sub", paint: { "fill-color": cssVar("--map-nodata"), "fill-opacity": fillOpacity(0.7, 0.95, 0.65, on) } });
+      add({ id: "sub-line", type: "line", source: "sub", paint: { "line-color": cssVar("--map-line"), "line-width": 0.6 } });
+      add({ id: "highlight", type: "line", source: "pcon", filter: ["in", ["get", "code"], ["literal", []]], paint: { "line-color": cssVar("--accent-2"), "line-width": 2.2 } });
+      add({ id: "mine", type: "line", source: "pcon", filter: ["==", ["get", "code"], ""], paint: { "line-color": cssVar("--accent"), "line-width": 3, "line-dasharray": [2, 1] } });
+      add({ id: "selected", type: "line", source: "pcon", filter: ["==", ["get", "code"], ""], paint: { "line-color": cssVar("--text-1"), "line-width": 3 } });
       // Fit to the data itself (covers the UK for real boundaries).
       const all: [number, number, number, number] = [Infinity, Infinity, -Infinity, -Infinity];
       geo.features.forEach((f) => {
@@ -277,12 +283,10 @@ export default function MapView({ geo, seats, choropleth, selected, mine = null,
   return (
     <div className="map-wrap">
       <div ref={el} className="map" role="application" aria-label="Map of Westminster constituencies" data-dark={isDark()} />
-      {OS_KEY && (
-        <button className={`map-toggle ${baseMap ? "on" : ""}`} onClick={() => setBaseMap((b) => !b)} aria-pressed={baseMap}
-          title={baseMap ? "Hide the Ordnance Survey base map" : "Show the Ordnance Survey base map"}>
-          {baseMap ? "OS map: on" : "OS map: off"}
-        </button>
-      )}
+      <button className={`map-toggle ${baseMap ? "on" : ""}`} onClick={() => setBaseMap((b) => !b)} aria-pressed={baseMap}
+        title={baseMap ? "Hide the base map (streets and place names)" : "Show the base map (streets and place names)"}>
+        {baseMap ? "Base map: on" : "Base map: off"}
+      </button>
       {sub && subHover && (
         <div className="tooltip" style={{ left: subHover.x + 14, top: subHover.y + 14 }}>
           <div className="tt-name">{sub.name}</div>
