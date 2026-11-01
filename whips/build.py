@@ -34,6 +34,7 @@ from .metrics import (
 from .sources import boundaries as bsrc
 from .sources import debates as debates_src
 from .sources import epc as epc_src
+from .sources import fuel_poverty as fuel_src
 from .sources import nhs as nhs_src
 from .sources import schools as schools_src
 from .sources import imd as imd_src
@@ -45,7 +46,7 @@ log = logging.getLogger("whips.build")
 # Neighbourhood (LSOA) profiles are published for seats held by this party.
 NEIGHBOURHOOD_PARTY = re.compile(r"^(liberal democrats?|lib ?dems?|ld)$", re.I)
 
-SKIPPABLE = ["nhs", "schools", "epc", "imd", "neighbourhoods", "debates", "claimants", "aps", "ashe", "bres", "business", "popest", "police", "elections", "members", "lsoa"]
+SKIPPABLE = ["fuel_poverty", "nhs", "schools", "epc", "imd", "neighbourhoods", "debates", "claimants", "aps", "ashe", "bres", "business", "popest", "police", "elections", "members", "lsoa"]
 
 COUNTRY_BY_PREFIX = {"E": "England", "W": "Wales", "S": "Scotland", "N": "Northern Ireland"}
 
@@ -149,6 +150,15 @@ def build(out_dir: Path, skip: set[str] | None = None) -> dict:
         except Exception as exc:  # noqa: BLE001
             log.exception("IMD failed")
             record("imd", "English Indices of Deprivation 2025 (MHCLG)", imd_src.PAGE_URL, "failed", str(exc))
+
+    if "fuel_poverty" not in skip:
+        def fuel():
+            seat_f, lsoa_f, year = fuel_src.load_fuel_poverty(s)
+            if lsoa_frames is not None:
+                lsoa_frames.update(lsoa_f)  # also shown per neighbourhood
+            return seat_f, year
+        optional("fuel_poverty", "Sub-regional fuel poverty (DESNZ)", fuel_src.SOURCE_URL,
+                 "Low Income Low Energy Efficiency measure; England", fuel, fuel_src.FUEL_POVERTY_METRICS)
 
     if "claimants" not in skip:
         try:
