@@ -32,6 +32,7 @@ from .metrics import (
     CENSUS_METRICS, CLAIMANT_METRICS, ELECTION_METRICS, POLICE_METRICS, THEMES, MetricMeta, census_meta,
 )
 from .sources import boundaries as bsrc
+from .sources import courts as courts_src
 from .sources import debates as debates_src
 from .sources import epc as epc_src
 from .sources import fuel_poverty as fuel_src
@@ -46,7 +47,7 @@ log = logging.getLogger("whips.build")
 # Neighbourhood (LSOA) profiles are published for seats held by this party.
 NEIGHBOURHOOD_PARTY = re.compile(r"^(liberal democrats?|lib ?dems?|ld)$", re.I)
 
-SKIPPABLE = ["fuel_poverty", "nhs", "schools", "epc", "imd", "neighbourhoods", "debates", "claimants", "aps", "ashe", "bres", "business", "popest", "police", "elections", "members", "lsoa"]
+SKIPPABLE = ["courts", "fuel_poverty", "nhs", "schools", "epc", "imd", "neighbourhoods", "debates", "claimants", "aps", "ashe", "bres", "business", "popest", "police", "elections", "members", "lsoa"]
 
 COUNTRY_BY_PREFIX = {"E": "England", "W": "Wales", "S": "Scotland", "N": "Northern Ireland"}
 
@@ -159,6 +160,11 @@ def build(out_dir: Path, skip: set[str] | None = None) -> dict:
             return seat_f, year
         optional("fuel_poverty", "Sub-regional fuel poverty (DESNZ)", fuel_src.SOURCE_URL,
                  "Low Income Low Energy Efficiency measure; England", fuel, fuel_src.FUEL_POVERTY_METRICS)
+
+    if "courts" not in skip:
+        optional("courts", "Criminal court statistics: Crown Court (MoJ)", courts_src.SOURCE_URL,
+                 "By police force area (London combined; South Wales includes Gwent and Dyfed-Powys); England & Wales",
+                 lambda: courts_src.load_courts(s, lsoa_lookup(), population), courts_src.COURT_METRICS)
 
     if "claimants" not in skip:
         try:

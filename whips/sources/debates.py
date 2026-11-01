@@ -32,7 +32,7 @@ TOPICS: dict[str, tuple[str, str, list[str]]] = {
                  r"police|policing|crime|criminal|knife|anti-?social|burglar|shoplift|theft|drug|county lines|"
                  r"violence|abuse|assault|strangulation|fraud|victims|justice|prison|sentenc|stalking|vawg|off-road bikes",
                  ["crime_rate", "crime_violence", "crime_asb", "crime_burglary", "crime_shoplifting", "crime_vehicle",
-                  "crime_drugs", "outcome_no_suspect"]),
+                  "crime_drugs", "outcome_no_suspect", "court_open_per_1k", "court_backlog_change"]),
     "health": ("Health & care",
                r"\bnhs\b|health|hospital|\bgps?\b|general practi|dent(al|ist)|cancer|ambulance|hospice|patients?|"
                r"social care|carers?\b|disab|dementia|stroke|nurs|gynaecolog|menopaus|endometriosis|maternity|medic",
