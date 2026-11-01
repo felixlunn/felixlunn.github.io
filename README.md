@@ -77,16 +77,9 @@ frontend/             Vite + React + TypeScript + MapLibre GL
 ## Map style
 
 Choropleths use a temperature scale (cool blue for low values, through pale yellow, to hot red for high;
-ColorBrewer RdYlBu), set in `frontend/src/lib/colors.ts`. The Ordnance Survey base map (OS Maps API, "Light" style, OpenData tiles, Great Britain) appears
-when you zoom in, if the site is built with a free OS Data Hub API key:
-
-1. Create an account at [osdatahub.os.uk](https://osdatahub.os.uk/), add a project with the **OS Maps API**
-   (the free OpenData plan is enough) and copy its project API key.
-2. In the GitHub repo, go to **Settings > Secrets and variables > Actions** and add a secret named `OS_API_KEY`.
-3. Re-run the **Refresh data & deploy** workflow.
-
-The key is used by visitors' browsers to fetch map tiles, so it is visible in the page source; that is how OS
-Maps API keys are designed to be used, and the OpenData plan is free. Without a key the map keeps its plain background. With a key, an "OS map: on/off" button at the top left of the map hides or shows it (remembered per browser).
+ColorBrewer RdYlBu), set in `frontend/src/lib/colors.ts`. Underneath is an open-source base map from
+[OpenFreeMap](https://openfreemap.org/) (OpenStreetMap data, "Positron" style; no API key), with place names drawn
+above the shading. The "Base map: on/off" button at the top left of the map hides or shows it, remembered per browser.
 
 ## Running it
 
