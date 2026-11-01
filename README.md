@@ -40,6 +40,7 @@ All data are open, refreshed automatically **every two days** by GitHub Actions,
 | [OHID Fingertips](https://fingertips.phe.org.uk/profile/general-practice): NHS QOF disease registers and GP Patient Survey | Diagnosed conditions (diabetes, high blood pressure, depression, asthma, COPD, dementia, heart disease, stroke, cancer, serious mental illness, obesity, kidney disease, AF, learning disability, smoking) and GP access, summed over GP practices located in the seat (by postcode, via postcodes.io) | England | Annual |
 | [DESNZ sub-regional fuel poverty](https://www.gov.uk/government/collections/fuel-poverty-sub-regional-statistics) | Households in fuel poverty, by constituency and (in Neighbourhoods) by LSOA | England | Annual |
 | [MoJ criminal court statistics](https://www.gov.uk/government/collections/criminal-court-statistics) | Crown Court open cases per 1,000 residents and the backlog's change over the year, for the seat's police force area (London combined; South Wales includes Gwent and Dyfed-Powys) | England & Wales | Quarterly |
+| [ORR estimates of station usage](https://dataportal.orr.gov.uk/statistics/usage/estimates-of-station-usage/) with DfT NaPTAN station locations | Rail journeys (entries and exits) per resident and number of stations, stations placed in seats by location | Great Britain | Annual |
 | [UK Parliament What's On](https://whatson.parliament.uk/) | Upcoming Commons debates for the Debates panel (next 3 weeks) | UK | Every run |
 | [UK Parliament Members API](https://members-api.parliament.uk/) | Current MP and party (picks up by-elections and defections) | UK | Every run |
 
@@ -156,7 +157,7 @@ Render / Fly.io; point `WHIPS_DATA` at the deployed `data.json` URL.
 
 These parts of the original plan are not built yet:
 
-- **Rail performance** (station delays and cancellations). Needs Rail Data Marketplace / HSP credentials; add
+- **Rail performance** (station delays and cancellations; station usage is included). Needs Rail Data Marketplace / HSP credentials; add
   them as a repository secret and write a `whips/sources/rail.py` adapter.
 - **Schools**: DfE Explore Education Statistics (KS4 / Progress 8) and Ofsted. Most data are school- or
   local-authority-level, so they need a school → constituency lookup.

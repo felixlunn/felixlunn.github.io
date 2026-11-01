@@ -37,6 +37,7 @@ from .sources import debates as debates_src
 from .sources import epc as epc_src
 from .sources import fuel_poverty as fuel_src
 from .sources import nhs as nhs_src
+from .sources import rail as rail_src
 from .sources import schools as schools_src
 from .sources import imd as imd_src
 from .sources import lsoa as lsoa_src
@@ -47,7 +48,7 @@ log = logging.getLogger("whips.build")
 # Neighbourhood (LSOA) profiles are published for seats held by this party.
 NEIGHBOURHOOD_PARTY = re.compile(r"^(liberal democrats?|lib ?dems?|ld)$", re.I)
 
-SKIPPABLE = ["courts", "fuel_poverty", "nhs", "schools", "epc", "imd", "neighbourhoods", "debates", "claimants", "aps", "ashe", "bres", "business", "popest", "police", "elections", "members", "lsoa"]
+SKIPPABLE = ["rail", "courts", "fuel_poverty", "nhs", "schools", "epc", "imd", "neighbourhoods", "debates", "claimants", "aps", "ashe", "bres", "business", "popest", "police", "elections", "members", "lsoa"]
 
 COUNTRY_BY_PREFIX = {"E": "England", "W": "Wales", "S": "Scotland", "N": "Northern Ireland"}
 
@@ -160,6 +161,10 @@ def build(out_dir: Path, skip: set[str] | None = None) -> dict:
             return seat_f, year
         optional("fuel_poverty", "Sub-regional fuel poverty (DESNZ)", fuel_src.SOURCE_URL,
                  "Low Income Low Energy Efficiency measure; England", fuel, fuel_src.FUEL_POVERTY_METRICS)
+
+    if "rail" not in skip:
+        optional("rail", "Estimates of station usage (ORR)", rail_src.ORR_PAGE,
+                 "Stations located with DfT NaPTAN; Great Britain", lambda: rail_src.load_rail(s, geo, population), rail_src.RAIL_METRICS)
 
     if "courts" not in skip:
         optional("courts", "Criminal court statistics: Crown Court (MoJ)", courts_src.SOURCE_URL,

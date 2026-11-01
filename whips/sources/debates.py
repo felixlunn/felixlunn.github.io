@@ -52,7 +52,7 @@ TOPICS: dict[str, tuple[str, str, list[str]]] = {
                ["fuel_poverty", "epc_f_g", "heat_oil", "heat_electric", "no_central_heating"]),
     "transport": ("Transport",
                   r"transport|\bbus(es)?\b|\brail|\btrains?\b|\broads?\b|pothole|cycl|motorist|driving|car park|travel|airport",
-                  ["no_car", "commute_bus", "commute_train", "commute_car", "commute_30km_plus"]),
+                  ["no_car", "commute_bus", "commute_train", "rail_journeys_per_resident", "commute_car", "commute_30km_plus"]),
     "education": ("Education & children",
                   r"school|education|teacher|\bsend\b|special educational|universit|students?|skills|apprentice|"
                   r"childcare|nurser|children|young people|learning",
