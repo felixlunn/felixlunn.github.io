@@ -78,9 +78,9 @@ frontend/             Vite + React + TypeScript + MapLibre GL
 ## Map style
 
 Choropleths use a temperature scale (cool blue for low values, through pale yellow, to hot red for high;
-ColorBrewer RdYlBu), set in `frontend/src/lib/colors.ts`. Underneath is an open-source base map from
-[OpenFreeMap](https://openfreemap.org/) (OpenStreetMap data, "Positron" style; no API key), with place names drawn
-above the shading. The "Base map: on/off" button at the top left of the map hides or shows it, remembered per browser.
+ColorBrewer RdYlBu), set in `frontend/src/lib/colors.ts`. Underneath is the standard OpenStreetMap map (no API key;
+used within the [OSM tile usage policy](https://operations.osmfoundation.org/policies/tiles/), with attribution), which shows
+through as you zoom in. The "Base map: on/off" button at the top left of the map hides or shows it, remembered per browser.
 
 ## Running it
 
