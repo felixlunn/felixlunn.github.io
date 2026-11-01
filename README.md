@@ -37,6 +37,7 @@ All data are open, refreshed automatically **every two days** by GitHub Actions,
 | [Energy Performance Certificates](https://get-energy-performance-data.communities.gov.uk/) (MHCLG) | Share of homes rated EPC A-C and F-G (domestic certificates lodged in the last 10 years). Needs a free bearer token as the `EPC_TOKEN` repository secret | England & Wales | Every run |
 | [DfE Get Information about Schools](https://get-information-schools.service.gov.uk/) | Pupils eligible for free school meals, at academies, at independent schools (schools located in the seat) | England | Every run |
 | [DfE Key stage 4 performance](https://explore-education-statistics.service.gov.uk/find-statistics/key-stage-4-performance) | GCSE English & maths grade 4+/5+ and Attainment 8, by pupils' constituency of residence | England | Annual |
+| [OHID Fingertips](https://fingertips.phe.org.uk/profile/general-practice): NHS QOF disease registers and GP Patient Survey | Diagnosed conditions (diabetes, high blood pressure, depression, asthma, COPD, dementia, heart disease, stroke, cancer, serious mental illness, obesity, kidney disease, AF, learning disability, smoking) and GP access, summed over GP practices located in the seat (by postcode, via postcodes.io) | England | Annual |
 | [UK Parliament What's On](https://whatson.parliament.uk/) | Upcoming Commons debates for the Debates panel (next 3 weeks) | UK | Every run |
 | [UK Parliament Members API](https://members-api.parliament.uk/) | Current MP and party (picks up by-elections and defections) | UK | Every run |
 

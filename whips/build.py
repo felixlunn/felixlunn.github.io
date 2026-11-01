@@ -34,6 +34,7 @@ from .metrics import (
 from .sources import boundaries as bsrc
 from .sources import debates as debates_src
 from .sources import epc as epc_src
+from .sources import nhs as nhs_src
 from .sources import schools as schools_src
 from .sources import imd as imd_src
 from .sources import lsoa as lsoa_src
@@ -44,7 +45,7 @@ log = logging.getLogger("whips.build")
 # Neighbourhood (LSOA) profiles are published for seats held by this party.
 NEIGHBOURHOOD_PARTY = re.compile(r"^(liberal democrats?|lib ?dems?|ld)$", re.I)
 
-SKIPPABLE = ["schools", "epc", "imd", "neighbourhoods", "debates", "claimants", "aps", "ashe", "bres", "business", "popest", "police", "elections", "members", "lsoa"]
+SKIPPABLE = ["nhs", "schools", "epc", "imd", "neighbourhoods", "debates", "claimants", "aps", "ashe", "bres", "business", "popest", "police", "elections", "members", "lsoa"]
 
 COUNTRY_BY_PREFIX = {"E": "England", "W": "Wales", "S": "Scotland", "N": "Northern Ireland"}
 
@@ -168,6 +169,10 @@ def build(out_dir: Path, skip: set[str] | None = None) -> dict:
                  "Open schools in England, by July 2024 constituency", lambda: schools_src.load_gias(s), schools_src.SCHOOL_METRICS)
         optional("ks4", "GCSE results by constituency (DfE Key stage 4 performance)", schools_src.KS4_PAGE,
                  "Pupils' constituency of residence; England", lambda: schools_src.load_ks4(s), schools_src.KS4_METRICS)
+
+    if "nhs" not in skip:
+        optional("nhs", "NHS GP practice data: QOF disease registers and GP Patient Survey (OHID Fingertips)", nhs_src.SOURCE_URL,
+                 "Practices placed in their constituency by postcode; England", lambda: nhs_src.load_nhs(s), nhs_src.NHS_METRICS)
 
     if "epc" not in skip:
         try:
