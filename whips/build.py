@@ -33,6 +33,7 @@ from .metrics import (
 )
 from .sources import boundaries as bsrc
 from .sources import debates as debates_src
+from .sources import epc as epc_src
 from .sources import imd as imd_src
 from .sources import lsoa as lsoa_src
 from .sources import nomis, nomis_extra, parliament, police
@@ -42,7 +43,7 @@ log = logging.getLogger("whips.build")
 # Neighbourhood (LSOA) profiles are published for seats held by this party.
 NEIGHBOURHOOD_PARTY = re.compile(r"^(liberal democrats?|lib ?dems?|ld)$", re.I)
 
-SKIPPABLE = ["imd", "neighbourhoods", "debates", "claimants", "aps", "ashe", "bres", "business", "popest", "police", "elections", "members", "lsoa"]
+SKIPPABLE = ["epc", "imd", "neighbourhoods", "debates", "claimants", "aps", "ashe", "bres", "business", "popest", "police", "elections", "members", "lsoa"]
 
 COUNTRY_BY_PREFIX = {"E": "England", "W": "Wales", "S": "Scotland", "N": "Northern Ireland"}
 
@@ -149,6 +150,17 @@ def build(out_dir: Path, skip: set[str] | None = None) -> dict:
     extra_frames, extra_metas = nomis_extra.load_all(s, skip, record)
     frames.update(extra_frames)
     metas += extra_metas
+
+    if "epc" not in skip:
+        try:
+            ef, period = epc_src.load_epc(s, names)
+            frames.update(ef)
+            metas += epc_src.EPC_METRICS
+            record("epc", "Energy Performance Certificates (MHCLG)", epc_src.SOURCE_URL, "ok",
+                   "Domestic certificates lodged in the last 10 years; England & Wales", period)
+        except Exception as exc:  # noqa: BLE001
+            log.exception("EPC failed")
+            record("epc", "Energy Performance Certificates (MHCLG)", epc_src.SOURCE_URL, "failed", str(exc))
 
     if "police" not in skip:
         try:
