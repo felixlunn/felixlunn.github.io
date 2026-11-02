@@ -1,21 +1,18 @@
 import { useEffect, useMemo, useState } from "react";
 import type { DashboardData, Debate } from "../types";
-import { debateMetrics, flagSeats, leadSeat, partyOf, standing, standsOut, type Flag, type Hit } from "../lib/debates";
+import { debateMetrics, leadSeat, standing, standsOut, type Hit } from "../lib/debates";
 import { partyStyle } from "../lib/parties";
 import { textOn } from "../lib/colors";
 import { fmt, ordinal } from "../lib/format";
 
 interface Props {
   data: DashboardData;
-  party: string;
-  setParty: (p: string) => void;
-  /** The user's own seat (index), if they've chosen one. */
+  /** The seat of the MP chosen in the toolbar, if any. Debates are flagged only for this seat. */
   mySeat: number | null;
   active: number | null;
   setActive: (id: number | null) => void;
   mapMetric: string | null;
   setMapMetric: (id: string) => void;
-  selected: number | null;
   onSelect: (i: number) => void;
 }
 
@@ -27,27 +24,24 @@ function rankPhrase(h: Hit): string {
   return h.rank <= h.of / 2 ? `${ordinal(h.rank)} ${hi} of ${h.of}` : `${ordinal(h.of - h.rank + 1)} ${lo} of ${h.of}`;
 }
 
-export default function DebatesTab({ data, party, setParty, mySeat, active, setActive, mapMetric, setMapMetric, selected, onSelect }: Props) {
+export default function DebatesTab({ data, mySeat, active, setActive, mapMetric, setMapMetric, onSelect }: Props) {
   const [onlyMine, setOnlyMine] = useState(false);
-  // Bring an opened debate into view (e.g. when arriving from the "Your seat" tab).
+  // Bring an opened debate into view (e.g. when arriving from the seat briefing).
   useEffect(() => {
     if (active !== null) document.getElementById(`debate-${active}`)?.scrollIntoView({ block: "start", behavior: "smooth" });
   }, [active]);
   const debates = data.debates ?? [];
-  const parties = useMemo(() => {
-    const n = new Map<string, number>();
-    data.seats.forEach((_, i) => { const p = partyOf(data, i); if (p) n.set(p, (n.get(p) ?? 0) + 1); });
-    return [...n.entries()].sort((a, b) => b[1] - a[1]).map(([p]) => p);
-  }, [data]);
 
   const rows = useMemo(() => debates.map((d) => {
     const metrics = debateMetrics(data, d);
-    const lead = leadSeat(data, d);
+    const leading = mySeat !== null && leadSeat(data, d) === mySeat;
     const mine = mySeat !== null && metrics.length ? standing(data, metrics, mySeat) : [];
-    const relevant = (mySeat !== null && lead === mySeat) || (mine.length > 0 && standsOut(mine[0]));
-    return { d, metrics, flags: metrics.length ? flagSeats(data, metrics, party) : [], lead, mine, relevant };
-  }), [debates, data, party, mySeat]);
-  const shown = onlyMine && mySeat !== null ? rows.filter((r) => r.relevant) : rows;
+    // Flagged only when the chosen MP is leading, or their seat is in the most extreme tenth on one of the debate's figures.
+    const standouts = mine.filter((h) => standsOut(h));
+    return { d, metrics, mine, standouts, leading, flagged: leading || standouts.length > 0 };
+  }), [debates, data, mySeat]);
+  const flaggedCount = rows.filter((r) => r.flagged).length;
+  const shown = onlyMine && mySeat !== null ? rows.filter((r) => r.flagged) : rows;
 
   const byDay = useMemo(() => {
     const g = new Map<string, typeof rows>();
@@ -56,25 +50,26 @@ export default function DebatesTab({ data, party, setParty, mySeat, active, setA
   }, [shown]);
 
   const status = data.sources.find((s) => s.id === "debates");
+  const seat = mySeat !== null ? data.seats[mySeat] : null;
 
   return (
     <div className="tab-body">
-      <p className="muted small">
-        Upcoming Commons debates (not questions, statements or Private Members' Bills), with the {party} MPs whose seats are in the most extreme tenth of seats on the
-        figures each debate touches.
-      </p>
-      <label className="field">
-        <span>Flag MPs from</span>
-        <select value={party} onChange={(e) => setParty(e.target.value)}>
-          {parties.map((p) => <option key={p}>{p}</option>)}
-        </select>
-      </label>
-      {mySeat === null && <p className="tiny muted">Set your office in the header to see how your MP's seat ranks on each debate.</p>}
-      {mySeat !== null && (
-        <label className="check small">
-          <input type="checkbox" checked={onlyMine} onChange={(e) => setOnlyMine(e.target.checked)} />
-          Only debates where {data.seats[mySeat].name} stands out ({rows.filter((r) => r.relevant).length})
-        </label>
+      <p className="muted small">Upcoming Commons debates (not questions, statements or Private Members' Bills).</p>
+      {seat === null ? (
+        <p className="small">
+          Choose your MP in the bar at the top to flag the debates where their seat stands out: in the most extreme tenth of seats
+          on a figure the debate touches, or where they're leading the debate.
+        </p>
+      ) : (
+        <>
+          <p className="small">
+            <strong>{flaggedCount}</strong> {flaggedCount === 1 ? "debate stands" : "debates stand"} out for {seat.mp ?? seat.name} ({seat.name}).
+          </p>
+          <label className="check small">
+            <input type="checkbox" checked={onlyMine} onChange={(e) => setOnlyMine(e.target.checked)} />
+            Only show these
+          </label>
+        </>
       )}
 
       {status?.status === "failed" && <p className="small bad">The parliamentary calendar couldn't be loaded on the last data update.</p>}
@@ -85,10 +80,10 @@ export default function DebatesTab({ data, party, setParty, mySeat, active, setA
       {byDay.map(([day, items]) => (
         <section key={day} className="debate-day">
           <h3>{dayFmt.format(new Date(`${day}T12:00:00`))}</h3>
-          {items.map(({ d, metrics, flags, lead, mine }) => (
-            <DebateCard key={d.id} d={d} metrics={metrics} flags={flags} lead={lead} data={data} party={party} mySeat={mySeat} mine={mine}
-              open={active === d.id} onToggle={() => setActive(active === d.id ? null : d.id)}
-              mapMetric={mapMetric} setMapMetric={setMapMetric} selected={selected} onSelect={onSelect} />
+          {items.map((r) => (
+            <DebateCard key={r.d.id} {...r} data={data} mySeat={mySeat}
+              open={active === r.d.id} onToggle={() => setActive(active === r.d.id ? null : r.d.id)}
+              mapMetric={mapMetric} setMapMetric={setMapMetric} onSelect={onSelect} />
           ))}
         </section>
       ))}
@@ -97,18 +92,16 @@ export default function DebatesTab({ data, party, setParty, mySeat, active, setA
   );
 }
 
-function DebateCard({ d, metrics, flags, lead, data, party, mySeat, mine, open, onToggle, mapMetric, setMapMetric, selected, onSelect }: {
-  d: Debate; metrics: ReturnType<typeof debateMetrics>; flags: Flag[]; lead: number | null; data: DashboardData; party: string;
-  mySeat: number | null; mine: Hit[];
-  open: boolean; onToggle: () => void; mapMetric: string | null; setMapMetric: (id: string) => void; selected: number | null; onSelect: (i: number) => void;
+function DebateCard({ d, metrics, mine, standouts, leading, flagged, data, mySeat, open, onToggle, mapMetric, setMapMetric, onSelect }: {
+  d: Debate; metrics: ReturnType<typeof debateMetrics>; mine: Hit[]; standouts: Hit[]; leading: boolean; flagged: boolean;
+  data: DashboardData; mySeat: number | null;
+  open: boolean; onToggle: () => void; mapMetric: string | null; setMapMetric: (id: string) => void; onSelect: (i: number) => void;
 }) {
   const topicLabels = d.topics.map((t) => data.debate_topics?.find((x) => x.id === t)?.label ?? t);
-  const leadIsParty = lead !== null && partyOf(data, lead) === party;
-  const leadIsMe = mySeat !== null && lead === mySeat;
-  const top = mine[0];
-  const summary = !metrics.length ? "No matching data" : flags.length ? `${flags.length} ${party} MP${flags.length > 1 ? "s" : ""} to brief` : `No ${party} seats stand out`;
+  const lead = leadSeat(data, d);
+  const top = standouts[0];
   return (
-    <article id={`debate-${d.id}`} className={`debate ${open ? "open" : ""} ${flags.length ? "has-flags" : ""} ${leadIsMe || (top && standsOut(top)) ? "is-mine" : ""}`}>
+    <article id={`debate-${d.id}`} className={`debate ${open ? "open" : ""} ${flagged ? "is-mine" : ""}`}>
       <button className="debate-head" onClick={onToggle} aria-expanded={open} disabled={!metrics.length && !d.members.length}>
         <div className="tiny muted">{[d.time, d.venue, d.category].filter(Boolean).join(" · ")}</div>
         <div className="debate-title">{d.title}</div>
@@ -123,13 +116,13 @@ function DebateCard({ d, metrics, flags, lead, data, party, mySeat, mine, open, 
           })}
           {topicLabels.map((t) => <span key={t} className="topic">{t}</span>)}
         </div>
-        {(leadIsMe || top) && (
-          <div className={`debate-mine ${leadIsMe || standsOut(top) ? "on" : ""}`}>
-            {leadIsMe ? "You're leading this debate" : "Your seat"}
-            {top && <>{leadIsMe ? " · " : ": "}{top.metric.label} {fmt(top.metric, top.value)}, {rankPhrase(top)}</>}
+        {flagged && (
+          <div className="debate-mine on">
+            {leading ? "Your MP is leading this debate" : "Your seat stands out"}
+            {top && <>{leading ? " · " : ": "}{top.metric.label} {fmt(top.metric, top.value)}, {rankPhrase(top)}</>}
+            {standouts.length > 1 && <span className="muted"> (+{standouts.length - 1} more)</span>}
           </div>
         )}
-        <div className={`debate-flags ${flags.length ? "on" : ""}`}>{leadIsParty && !leadIsMe ? `Led by a ${party} MP · ` : ""}{summary}</div>
       </button>
 
       {open && (
@@ -149,7 +142,7 @@ function DebateCard({ d, metrics, flags, lead, data, party, mySeat, mine, open, 
           )}
           {mySeat !== null && mine.length > 0 && (
             <div className="my-standing">
-              <div className="tiny muted">Your seat, {data.seats[mySeat].name}, on these figures</div>
+              <div className="tiny muted">{data.seats[mySeat].name} on these figures (bold: in the most extreme tenth of seats)</div>
               <ul>
                 {mine.map((h) => (
                   <li key={h.metric.id} className={`small ${standsOut(h) ? "strong" : ""}`}>
@@ -159,27 +152,7 @@ function DebateCard({ d, metrics, flags, lead, data, party, mySeat, mine, open, 
               </ul>
             </div>
           )}
-          {flags.length > 0 && (
-            <ol className="flag-list">
-              {flags.map((f) => {
-                const s = data.seats[f.seat];
-                return (
-                  <li key={s.code} className={f.seat === selected ? "sel" : ""}>
-                    <button className="link strong" onClick={() => onSelect(f.seat)}>{s.mp ?? s.name}</button>
-                    <span className="tiny muted"> {s.name}</span>
-                    <ul>
-                      {f.hits.slice(0, 3).map((h) => (
-                        <li key={h.metric.id} className="small">
-                          {h.metric.label}: <strong>{fmt(h.metric, h.value)}</strong> <span className="muted">({rankPhrase(h)}; national {fmt(h.metric, h.metric.national)})</span>
-                        </li>
-                      ))}
-                      {f.hits.length > 3 && <li className="tiny muted">+{f.hits.length - 3} more</li>}
-                    </ul>
-                  </li>
-                );
-              })}
-            </ol>
-          )}
+          {!metrics.length && <p className="small muted">This debate's title doesn't match a topic with figures.</p>}
         </div>
       )}
     </article>
