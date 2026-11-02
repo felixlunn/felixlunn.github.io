@@ -48,6 +48,7 @@ from .sources import schools as schools_src
 from .sources import sewage as sewage_src
 from .sources import imd as imd_src
 from .sources import life_expectancy as life_src
+from .sources import roads as roads_src
 from .sources import housing_stock as housing_stock_src
 from .sources import child_poverty as child_poverty_src
 from .sources import lsoa as lsoa_src
@@ -58,7 +59,7 @@ log = logging.getLogger("whips.build")
 # Neighbourhood (LSOA) profiles are published for seats held by this party.
 NEIGHBOURHOOD_PARTY = re.compile(r"^(liberal democrats?|lib ?dems?|ld)$", re.I)
 
-SKIPPABLE = ["housing_stock", "child_poverty", "dental", "life_expectancy", "affordability", "homelessness", "ev", "sewage", "petitions", "questions", "rail", "courts", "fuel_poverty", "nhs", "schools", "epc", "imd", "neighbourhoods", "debates", "claimants", "aps", "ashe", "bres", "business", "popest", "police", "elections", "members", "lsoa"]
+SKIPPABLE = ["roads", "housing_stock", "child_poverty", "dental", "life_expectancy", "affordability", "homelessness", "ev", "sewage", "petitions", "questions", "rail", "courts", "fuel_poverty", "nhs", "schools", "epc", "imd", "neighbourhoods", "debates", "claimants", "aps", "ashe", "bres", "business", "popest", "police", "elections", "members", "lsoa"]
 
 COUNTRY_BY_PREFIX = {"E": "England", "W": "Wales", "S": "Scotland", "N": "Northern Ireland"}
 
@@ -307,6 +308,11 @@ def build(out_dir: Path, skip: set[str] | None = None) -> dict:
         optional("housing_stock", "Council Taxbase and net additional dwellings (MHCLG)", housing_stock_src.SOURCE_URL,
                  "By council, shared out across the seats each council covers; England",
                  lambda: housing_stock_src.load_housing_stock(s, council_weights()), housing_stock_src.HOUSING_STOCK_METRICS)
+
+    if "roads" not in skip:
+        optional("roads", "Road safety data: STATS19 collisions (DfT)", roads_src.SOURCE_URL,
+                 "Injury collisions placed by neighbourhood or location, last five years; Great Britain",
+                 lambda: roads_src.load_roads(s, geo, lsoa_lookup(), (frames["turnout"]["den"] if "turnout" in frames else population).dropna()), roads_src.ROAD_METRICS)
 
     petitions = None
     if "petitions" not in skip:
