@@ -59,6 +59,8 @@ All data are open, refreshed automatically **every two days** by GitHub Actions,
 | [DfT bus statistics](https://www.gov.uk/government/statistical-data-sets/bus-statistics-data-tables) | Bus journeys per person (BUS01f) and change in bus service miles since 2010 (BUS02d), by local transport authority, averaged across seats | England | Annual |
 | [DfT vehicle licensing statistics](https://www.gov.uk/government/statistical-data-sets/vehicle-licensing-statistics-data-files) | Privately kept cars per household and plug-in share of private cars, summed from neighbourhoods (VEH0125, VEH0145) | England & Wales | Quarterly |
 | [DfE explore education statistics](https://explore-education-statistics.service.gov.uk/) API | Pupils with EHC plans and on SEN support (by constituency); EHC plans issued within 20 weeks and funded childcare take-up by eligible 2-year-olds (by council, shared out across seats) | England | Annual |
+| [OHID Fingertips](https://fingertips.phe.org.uk/) air pollution | Share of adult deaths attributable to PM2.5 air pollution, by council, averaged across seats | England | Annual |
+| [DESNZ renewable electricity by local authority](https://www.gov.uk/government/statistics/regional-renewable-statistics) | Solar PV installations per 100 households, by council, shared out across seats | England & Wales | Annual |
 
 Census 2021 covers England and Wales only (Scotland's census was 2022 and Northern Ireland's is published by
 NISRA), so census metrics show "No data" for Scottish and Northern Irish seats. Wherever a metric is a ratio,

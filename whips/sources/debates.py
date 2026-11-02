@@ -51,7 +51,7 @@ TOPICS: dict[str, tuple[str, str, list[str]]] = {
                         "inactive_sick", "never_worked"]),
     "energy": ("Energy & heating",
                r"energy|fuel|heating|heat pump|net zero|climate|electricity|\bgas\b|insulation|solar",
-               ["fuel_poverty", "epc_f_g", "heat_oil", "heat_electric", "no_central_heating"]),
+               ["fuel_poverty", "epc_f_g", "solar_pv_per_100_hh", "heat_oil", "heat_electric", "no_central_heating"]),
     "transport": ("Transport",
                   r"transport|electric vehicle|\bev\b|charg(ing|ers?) point|chargepoint|\bbus(es)?\b|\brail|\btrains?\b|\broads?\b|pothole|road safety|speed limit|collision|cycl|motorist|driving|car park|travel|airport",
                   ["no_car", "commute_bus", "commute_train", "rail_journeys_per_resident", "commute_car", "commute_30km_plus",
@@ -60,9 +60,10 @@ TOPICS: dict[str, tuple[str, str, list[str]]] = {
                   r"school|education|teacher|\bsend\b|special educational|universit|students?|skills|apprentice|"
                   r"childcare|nurser|children|young people|learning",
                   ["gcse_em4", "school_fsm", "pupils_ehc_plan", "ehc_within_20_weeks", "early_years_2yo_takeup", "child_poverty_ahc", "idaci", "no_qualifications", "age_0_14", "hh_dependent_children"]),
-    "water": ("Water & sewage",
-              r"sewage|water compan|water bill|rivers?\b|bathing water|storm overflow|ofwat|pollution|chalk stream|\bwater\b",
-              ["sewage_spills", "sewage_hours"]),
+    "water": ("Water, sewage & air",
+              r"sewage|water compan|water bill|rivers?\b|bathing water|storm overflow|ofwat|pollution|chalk stream|\bwater\b|"
+              r"air quality|clean air|emissions zone|\bulez\b",
+              ["sewage_spills", "sewage_hours", "air_pollution_deaths"]),
     "rural": ("Rural & farming",
               r"farm|agricultur|rural|countryside|fishing|fisheries|food security|coastal|national park",
               ["jobs_agriculture", "heat_oil", "commute_30km_plus"]),

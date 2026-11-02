@@ -48,6 +48,7 @@ from .sources import schools as schools_src
 from .sources import sewage as sewage_src
 from .sources import imd as imd_src
 from .sources import life_expectancy as life_src
+from .sources import air_energy as air_src
 from .sources import children as children_src
 from .sources import vehicles as vehicles_src
 from .sources import buses as buses_src
@@ -63,7 +64,7 @@ log = logging.getLogger("whips.build")
 # Neighbourhood (LSOA) profiles are published for seats held by this party.
 NEIGHBOURHOOD_PARTY = re.compile(r"^(liberal democrats?|lib ?dems?|ld)$", re.I)
 
-SKIPPABLE = ["children", "vehicles", "buses", "cqc", "roads", "housing_stock", "child_poverty", "dental", "life_expectancy", "affordability", "homelessness", "ev", "sewage", "petitions", "questions", "rail", "courts", "fuel_poverty", "nhs", "schools", "epc", "imd", "neighbourhoods", "debates", "claimants", "aps", "ashe", "bres", "business", "popest", "police", "elections", "members", "lsoa"]
+SKIPPABLE = ["renewables", "air_pollution", "children", "vehicles", "buses", "cqc", "roads", "housing_stock", "child_poverty", "dental", "life_expectancy", "affordability", "homelessness", "ev", "sewage", "petitions", "questions", "rail", "courts", "fuel_poverty", "nhs", "schools", "epc", "imd", "neighbourhoods", "debates", "claimants", "aps", "ashe", "bres", "business", "popest", "police", "elections", "members", "lsoa"]
 
 COUNTRY_BY_PREFIX = {"E": "England", "W": "Wales", "S": "Scotland", "N": "Northern Ireland"}
 
@@ -337,6 +338,16 @@ def build(out_dir: Path, skip: set[str] | None = None) -> dict:
         optional("children", "SEND and early years (DfE explore education statistics)", children_src.SOURCE_URL,
                  "SEN pupils by constituency; EHC plan timeliness and 2-year-old childcare take-up by council; England",
                  lambda: children_src.load_children(s, council_weights()), children_src.CHILDREN_METRICS)
+
+    if "air_pollution" not in skip:
+        optional("air_pollution", "Air pollution mortality (OHID Fingertips)", air_src.SOURCE_URL,
+                 "By council, averaged over the councils each seat covers; England",
+                 lambda: air_src.load_air(s, council_weights()), air_src.AIR_METRICS)
+
+    if "renewables" not in skip:
+        optional("renewables", "Renewable electricity by local authority (DESNZ)", air_src.RENEWABLES_URL,
+                 "Solar PV installations by council, shared out across the seats each council covers; England & Wales",
+                 lambda: air_src.load_renewables(s, council_weights()), air_src.RENEWABLE_METRICS)
 
     petitions = None
     if "petitions" not in skip:
