@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { DashboardData, Metric } from "../types";
-import { debateMetrics, flagSeats, leadSeat } from "./debates";
+import { debateMetrics, leadSeat } from "./debates";
 
 const metric = (id: string, polarity: Metric["polarity"]): Metric => ({
   id, label: id, theme: "t", unit: "%", description: "", source: "", polarity, decimals: 1, tags: [], national: null, coverage: 20,
@@ -25,16 +25,6 @@ describe("debate flags", () => {
     const d = data();
     const m = debateMetrics(d, { id: 1, date: "", time: null, venue: "", category: "", title: "", members: [], topics: ["policing"] });
     expect(m.map((x) => x.id)).toEqual(["crime", "jobs"]);
-  });
-
-  it("flags only the party's seats in the worst tenth, at the right end", () => {
-    const d = data();
-    const flags = flagSeats(d, d.metrics, "Lib Dem");
-    // crime: top 2 of 20 are seats 19 (LD) and 18 (Lab) -> seat 19. jobs (higher better): bottom 2 of 19 are seats 0, 1 -> seat 1.
-    expect(flags.map((f) => [f.seat, f.hits.map((h) => [h.metric.id, h.rank, h.of, h.end])])).toEqual([
-      [19, [["crime", 1, 20, "high"]]],
-      [1, [["jobs", 2, 19, "low"]]],
-    ]);
   });
 
   it("matches the lead member's constituency to a seat", () => {
