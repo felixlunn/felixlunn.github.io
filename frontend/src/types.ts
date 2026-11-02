@@ -61,6 +61,11 @@ export interface DashboardData {
   peer_groups: PeerGroup[];
   sources: Source[];
   debates?: Debate[];
+  /** Open Parliament petitions and, per seat, [petition index, signatures, over-representation index] lists. */
+  petitions?: {
+    items: { id: number; title: string; signatures: number; url: string }[];
+    by_seat: Record<string, { top: [number, number, number][]; local: [number, number, number][] }>;
+  } | null;
   /** Seats with neighbourhood (LSOA) files in data/lsoa/<code>.json. */
   neighbourhoods?: { seats: string[]; lsoas: number; metrics: number } | null;
   debate_topics?: DebateTopic[];
