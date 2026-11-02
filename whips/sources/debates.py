@@ -41,7 +41,8 @@ TOPICS: dict[str, tuple[str, str, list[str]]] = {
     "housing": ("Housing",
                 r"housing|\bhomes?\b|planning|\brent(ers?|ed|ing|s)?\b|leasehold|homeless|landlord|mortgage|council tax|"
                 r"stamp duty|temporary accommodation",
-                ["private_rented", "social_rented", "overcrowded", "deprived_2plus", "hh_no_english", "flats"]),
+                ["temp_accommodation_per_1k", "homeless_duty_per_1k", "affordability_ratio", "private_rented", "social_rented",
+                 "overcrowded"]),
     "cost_of_living": ("Cost of living & work",
                        r"cost of living|economy|economic|jobs?\b|employment|unemploy|wages?|\bpay\b|benefit|universal credit|"
                        r"welfare|poverty|minimum wage|budget|\btax|pensions?|bereavement support|household support",

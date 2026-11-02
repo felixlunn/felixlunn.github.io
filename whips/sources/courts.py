@@ -27,6 +27,7 @@ import requests
 from ..http import get_json
 from ..metrics import MetricMeta
 from .boundaries import ARCGIS_ROOT
+from .councils import arcgis_rows, column
 from .lsoa import _services, find_ward_service
 
 log = logging.getLogger(__name__)
@@ -115,22 +116,8 @@ def seat_areas(s: requests.Session, lsoa_to_pcon: dict[str, str]) -> dict[str, s
         raise LookupError("No council to police force area lookup found on the ONS portal")
     pfa_layer = f"{ARCGIS_ROOT}/{pfa_svc[0][1]}/FeatureServer/0"
 
-    def all_rows(layer: str) -> list[dict]:
-        rows, offset = [], 0
-        while True:
-            data = get_json(s, f"{layer}/query", params={"where": "1=1", "outFields": "*", "returnGeometry": "false",
-                                                        "f": "json", "resultOffset": offset, "resultRecordCount": 2000})
-            batch = [f["attributes"] for f in data.get("features", [])]
-            rows += batch
-            if not batch or not data.get("exceededTransferLimit"):
-                return rows
-            offset += len(batch)
-
-    def col(row: dict, pattern: str):
-        return next((v for k, v in row.items() if re.fullmatch(pattern, k, re.I)), None)
-
-    lad_pfa = {col(r, r"LAD\d{2}CD"): area_key(col(r, r"PFA\d{2}NM") or "") for r in all_rows(pfa_layer)}
-    lsoa_lad = {r["LSOA21CD"]: col(r, r"LAD\d{2}CD") for r in all_rows(ward) if r.get("LSOA21CD")}
+    lad_pfa = {column(r, r"LAD\d{2}CD"): area_key(column(r, r"PFA\d{2}NM") or "") for r in arcgis_rows(s, pfa_layer)}
+    lsoa_lad = {r["LSOA21CD"]: column(r, r"LAD\d{2}CD") for r in arcgis_rows(s, ward) if r.get("LSOA21CD")}
     votes: dict[str, Counter] = {}
     for lsoa, pcon in lsoa_to_pcon.items():
         area = lad_pfa.get(lsoa_lad.get(lsoa))

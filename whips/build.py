@@ -36,7 +36,9 @@ from .sources import courts as courts_src
 from .sources import debates as debates_src
 from .sources import epc as epc_src
 from .sources import ev as ev_src
+from .sources import councils as councils_src
 from .sources import fuel_poverty as fuel_src
+from .sources import housing as housing_src
 from .sources import nhs as nhs_src
 from .sources import petitions as petitions_src
 from .sources import questions as questions_src
@@ -52,7 +54,7 @@ log = logging.getLogger("whips.build")
 # Neighbourhood (LSOA) profiles are published for seats held by this party.
 NEIGHBOURHOOD_PARTY = re.compile(r"^(liberal democrats?|lib ?dems?|ld)$", re.I)
 
-SKIPPABLE = ["ev", "sewage", "petitions", "questions", "rail", "courts", "fuel_poverty", "nhs", "schools", "epc", "imd", "neighbourhoods", "debates", "claimants", "aps", "ashe", "bres", "business", "popest", "police", "elections", "members", "lsoa"]
+SKIPPABLE = ["affordability", "homelessness", "ev", "sewage", "petitions", "questions", "rail", "courts", "fuel_poverty", "nhs", "schools", "epc", "imd", "neighbourhoods", "debates", "claimants", "aps", "ashe", "bres", "business", "popest", "police", "elections", "members", "lsoa"]
 
 COUNTRY_BY_PREFIX = {"E": "England", "W": "Wales", "S": "Scotland", "N": "Northern Ireland"}
 
@@ -261,6 +263,23 @@ def build(out_dir: Path, skip: set[str] | None = None) -> dict:
     if members and "questions" not in skip:
         optional("questions", "Written questions (UK Parliament)", questions_src.SOURCE_URL, "Tabled by each current MP",
                  lambda: questions_src.load_questions(s, members), questions_src.QUESTION_METRICS)
+
+    council_cache: dict = {}
+
+    def council_weights():
+        """Seat x council overlaps (fetched once, shared by council-level sources)."""
+        if "w" not in council_cache:
+            council_cache["w"] = councils_src.seat_council_weights(lsoa_lookup(), councils_src.lsoa_to_lad(s))
+        return council_cache["w"]
+
+    if "affordability" not in skip:
+        optional("affordability", "Housing affordability (ONS)", housing_src.ONS_PAGE,
+                 "By council, averaged over the councils each seat covers; England & Wales",
+                 lambda: housing_src.load_affordability(s, council_weights()), housing_src.AFFORDABILITY_METRICS)
+    if "homelessness" not in skip:
+        optional("homelessness", "Statutory homelessness (MHCLG)", housing_src.HOMELESS_PAGE,
+                 "By council, shared out across the seats each council covers; England",
+                 lambda: housing_src.load_homelessness(s, council_weights()), housing_src.HOMELESS_METRICS)
 
     if "ev" not in skip:
         optional("ev", "EV charging infrastructure statistics (DfT, from Zapmap)", ev_src.SOURCE_URL, "Public chargers by constituency; UK",
