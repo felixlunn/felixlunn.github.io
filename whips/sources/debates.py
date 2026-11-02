@@ -57,6 +57,9 @@ TOPICS: dict[str, tuple[str, str, list[str]]] = {
                   r"school|education|teacher|\bsend\b|special educational|universit|students?|skills|apprentice|"
                   r"childcare|nurser|children|young people|learning",
                   ["gcse_em4", "school_fsm", "idaci", "no_qualifications", "age_0_14", "hh_dependent_children"]),
+    "water": ("Water & sewage",
+              r"sewage|water compan|water bill|rivers?\b|bathing water|storm overflow|ofwat|pollution|chalk stream|\bwater\b",
+              ["sewage_spills", "sewage_hours"]),
     "rural": ("Rural & farming",
               r"farm|agricultur|rural|countryside|fishing|fisheries|food security|coastal|national park",
               ["jobs_agriculture", "heat_oil", "commute_30km_plus"]),

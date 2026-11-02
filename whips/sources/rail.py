@@ -15,10 +15,8 @@ import re
 
 import pandas as pd
 import requests
-from pyproj import Transformer
-from shapely.geometry import Point, shape
-from shapely.strtree import STRtree
 
+from ..geo import SeatLocator, en_to_lonlat
 from ..metrics import MetricMeta
 
 log = logging.getLogger(__name__)
@@ -74,8 +72,7 @@ def parse_naptan(text: str) -> pd.DataFrame:
     # Some stations (e.g. new Elizabeth line ones) only have British National Grid coordinates.
     missing = df["Longitude"].isna() & df["Easting"].notna() & df["Northing"].notna()
     if missing.any():
-        to_wgs84 = Transformer.from_crs("EPSG:27700", "EPSG:4326", always_xy=True)
-        lon, lat = to_wgs84.transform(df.loc[missing, "Easting"].astype(float).values, df.loc[missing, "Northing"].astype(float).values)
+        lon, lat = en_to_lonlat(df.loc[missing, "Easting"].astype(float), df.loc[missing, "Northing"].astype(float))
         df.loc[missing, "Longitude"], df.loc[missing, "Latitude"] = lon, lat
     full = pd.DataFrame({"key": df["CommonName"].map(norm), "lon": df["Longitude"], "lat": df["Latitude"]})
     # Also index each station without its bracketed part ("Witham (Essex)" -> "witham"), unless that is ambiguous.
@@ -100,20 +97,7 @@ def locate(stations: pd.DataFrame, places: pd.DataFrame, geo: dict) -> pd.DataFr
         return hits[0] if len(hits) == 1 else k
     st["key"] = st["key"].map(by_prefix)
     st = st.join(loc, on="key").dropna(subset=["lon", "lat"])
-    polys = [shape(f["geometry"]) for f in geo["features"]]
-    codes = [f["properties"]["code"] for f in geo["features"]]
-    tree = STRtree(polys)
-    seat = []
-    for lon, lat in zip(st["lon"], st["lat"]):
-        p = Point(lon, lat)
-        hit = next((codes[i] for i in tree.query(p) if polys[i].covers(p)), None)
-        if hit is None:
-            # Boundaries are generalised and clipped to the coast, so riverside/coastal stations can fall just
-            # outside: take the nearest seat if it's within ~2 km.
-            i = tree.nearest(p)
-            hit = codes[i] if polys[i].distance(p) < 0.02 else None
-        seat.append(hit)
-    return st.assign(pcon=seat).dropna(subset=["pcon"])
+    return st.assign(pcon=SeatLocator(geo).seats(st["lon"], st["lat"])).dropna(subset=["pcon"])
 
 
 def seat_frames(located: pd.DataFrame, population: pd.Series, all_codes: list[str]) -> dict[str, pd.DataFrame]:
