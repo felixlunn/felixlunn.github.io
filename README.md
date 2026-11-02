@@ -43,6 +43,7 @@ All data are open, refreshed automatically **every two days** by GitHub Actions,
 | [ORR estimates of station usage](https://dataportal.orr.gov.uk/statistics/usage/estimates-of-station-usage/) with DfT NaPTAN station locations | Rail journeys (entries and exits) per resident and number of stations, stations placed in seats by location | Great Britain | Annual |
 | [UK Parliament written questions API](https://questions-statements.parliament.uk/written-questions) | Written questions tabled by each current MP in the last 12 months | UK | Every run |
 | [UK Parliament petitions](https://petition.parliament.uk/) | Signatures to open petitions per 1,000 voters, and in each seat's briefing the most-signed petitions and those signed far more there than nationally | UK | Every run |
+| [Environment Agency storm overflow returns](https://www.data.gov.uk/dataset/19f6064d-7356-466f-844e-d20ea10ae9fd/event-duration-monitoring-storm-overflows-annual-returns) (EDM) | Sewage spills and spill hours from storm overflows, placed in seats by outlet location (new Environment theme) | England & Wales | Annual |
 | [UK Parliament What's On](https://whatson.parliament.uk/) | Upcoming Commons debates for the Debates panel (next 3 weeks) | UK | Every run |
 | [UK Parliament Members API](https://members-api.parliament.uk/) | Current MP and party (picks up by-elections and defections) | UK | Every run |
 
