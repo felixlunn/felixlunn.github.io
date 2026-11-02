@@ -48,6 +48,7 @@ from .sources import schools as schools_src
 from .sources import sewage as sewage_src
 from .sources import imd as imd_src
 from .sources import life_expectancy as life_src
+from .sources import children as children_src
 from .sources import vehicles as vehicles_src
 from .sources import buses as buses_src
 from .sources import cqc as cqc_src
@@ -62,7 +63,7 @@ log = logging.getLogger("whips.build")
 # Neighbourhood (LSOA) profiles are published for seats held by this party.
 NEIGHBOURHOOD_PARTY = re.compile(r"^(liberal democrats?|lib ?dems?|ld)$", re.I)
 
-SKIPPABLE = ["vehicles", "buses", "cqc", "roads", "housing_stock", "child_poverty", "dental", "life_expectancy", "affordability", "homelessness", "ev", "sewage", "petitions", "questions", "rail", "courts", "fuel_poverty", "nhs", "schools", "epc", "imd", "neighbourhoods", "debates", "claimants", "aps", "ashe", "bres", "business", "popest", "police", "elections", "members", "lsoa"]
+SKIPPABLE = ["children", "vehicles", "buses", "cqc", "roads", "housing_stock", "child_poverty", "dental", "life_expectancy", "affordability", "homelessness", "ev", "sewage", "petitions", "questions", "rail", "courts", "fuel_poverty", "nhs", "schools", "epc", "imd", "neighbourhoods", "debates", "claimants", "aps", "ashe", "bres", "business", "popest", "police", "elections", "members", "lsoa"]
 
 COUNTRY_BY_PREFIX = {"E": "England", "W": "Wales", "S": "Scotland", "N": "Northern Ireland"}
 
@@ -331,6 +332,11 @@ def build(out_dir: Path, skip: set[str] | None = None) -> dict:
         optional("vehicles", "Vehicle licensing statistics (DfT)", vehicles_src.SOURCE_URL,
                  "Privately kept cars and plug-in vehicles by neighbourhood; England & Wales",
                  lambda: vehicles_src.load_vehicles(s, lsoa_lookup(), census["no_car"]["den"] if "no_car" in census else None), vehicles_src.VEHICLE_METRICS)
+
+    if "children" not in skip:
+        optional("children", "SEND and early years (DfE explore education statistics)", children_src.SOURCE_URL,
+                 "SEN pupils by constituency; EHC plan timeliness and 2-year-old childcare take-up by council; England",
+                 lambda: children_src.load_children(s, council_weights()), children_src.CHILDREN_METRICS)
 
     petitions = None
     if "petitions" not in skip:

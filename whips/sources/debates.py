@@ -59,7 +59,7 @@ TOPICS: dict[str, tuple[str, str, list[str]]] = {
     "education": ("Education & children",
                   r"school|education|teacher|\bsend\b|special educational|universit|students?|skills|apprentice|"
                   r"childcare|nurser|children|young people|learning",
-                  ["gcse_em4", "school_fsm", "idaci", "no_qualifications", "age_0_14", "hh_dependent_children"]),
+                  ["gcse_em4", "school_fsm", "pupils_ehc_plan", "ehc_within_20_weeks", "early_years_2yo_takeup", "child_poverty_ahc", "idaci", "no_qualifications", "age_0_14", "hh_dependent_children"]),
     "water": ("Water & sewage",
               r"sewage|water compan|water bill|rivers?\b|bathing water|storm overflow|ofwat|pollution|chalk stream|\bwater\b",
               ["sewage_spills", "sewage_hours"]),
