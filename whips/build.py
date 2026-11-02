@@ -46,6 +46,7 @@ from .sources import rail as rail_src
 from .sources import schools as schools_src
 from .sources import sewage as sewage_src
 from .sources import imd as imd_src
+from .sources import life_expectancy as life_src
 from .sources import lsoa as lsoa_src
 from .sources import nomis, nomis_extra, parliament, police
 
@@ -54,7 +55,7 @@ log = logging.getLogger("whips.build")
 # Neighbourhood (LSOA) profiles are published for seats held by this party.
 NEIGHBOURHOOD_PARTY = re.compile(r"^(liberal democrats?|lib ?dems?|ld)$", re.I)
 
-SKIPPABLE = ["affordability", "homelessness", "ev", "sewage", "petitions", "questions", "rail", "courts", "fuel_poverty", "nhs", "schools", "epc", "imd", "neighbourhoods", "debates", "claimants", "aps", "ashe", "bres", "business", "popest", "police", "elections", "members", "lsoa"]
+SKIPPABLE = ["life_expectancy", "affordability", "homelessness", "ev", "sewage", "petitions", "questions", "rail", "courts", "fuel_poverty", "nhs", "schools", "epc", "imd", "neighbourhoods", "debates", "claimants", "aps", "ashe", "bres", "business", "popest", "police", "elections", "members", "lsoa"]
 
 COUNTRY_BY_PREFIX = {"E": "England", "W": "Wales", "S": "Scotland", "N": "Northern Ireland"}
 
@@ -272,6 +273,10 @@ def build(out_dir: Path, skip: set[str] | None = None) -> dict:
             council_cache["w"] = councils_src.seat_council_weights(lsoa_lookup(), councils_src.lsoa_to_lad(s))
         return council_cache["w"]
 
+    if "life_expectancy" not in skip:
+        optional("life_expectancy", "Life expectancy at birth (OHID Fingertips)", life_src.SOURCE_URL,
+                 "By council, averaged over the councils each seat covers; England",
+                 lambda: life_src.load_life_expectancy(s, council_weights()), life_src.LIFE_METRICS)
     if "affordability" not in skip:
         optional("affordability", "Housing affordability (ONS)", housing_src.ONS_PAGE,
                  "By council, averaged over the councils each seat covers; England & Wales",

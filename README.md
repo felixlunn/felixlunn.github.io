@@ -47,6 +47,7 @@ All data are open, refreshed automatically **every two days** by GitHub Actions,
 | [DfT EV charging infrastructure statistics](https://www.gov.uk/government/statistical-data-sets/electric-vehicle-charging-infrastructure-statistics-data-tables-evci) (from Zapmap) | Public EV chargers, per 10,000 voters, and rapid (50kW+) share, by constituency | UK | Quarterly |
 | [ONS housing affordability](https://www.ons.gov.uk/peoplepopulationandcommunity/housing/datasets/ratioofhousepricetoworkplacebasedearningslowerquartileandmedian) | Median house price and house price to earnings ratio, by council, averaged over the councils each seat covers | England & Wales | Annual |
 | [MHCLG statutory homelessness](https://www.gov.uk/government/statistical-data-sets/live-tables-on-homelessness) | Households in temporary accommodation and owed a homelessness duty per 1,000, by council, shared out across seats | England | Quarterly |
+| [OHID Fingertips](https://fingertips.phe.org.uk/) life expectancy | Life expectancy at birth (male and female, latest three-year period), by council, averaged over the councils each seat covers | England | Annual |
 | [UK Parliament What's On](https://whatson.parliament.uk/) | Upcoming Commons debates for the Debates panel (next 3 weeks) | UK | Every run |
 | [UK Parliament Members API](https://members-api.parliament.uk/) | Current MP and party (picks up by-elections and defections) | UK | Every run |
 
