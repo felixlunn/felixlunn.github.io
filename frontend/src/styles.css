@@ -270,6 +270,8 @@ select, input { font: inherit; color: var(--text-1); background: var(--surface-1
 .debate.is-mine { box-shadow: inset 0 0 0 2px var(--accent); }
 .debate-mine { font-size: 12px; margin-top: 6px; color: var(--text-2); }
 .debate-mine.on { color: var(--accent); font-weight: 600; }
+.petition-list { list-style: none; margin: 4px 0 10px; padding: 0; }
+.petition-list li { padding: 4px 0; border-bottom: 1px solid var(--surface-3); font-size: 13px; }
 .my-standing { margin: 8px 0; padding: 8px 10px; border-radius: 8px; background: var(--surface-2); }
 .my-standing ul { margin: 4px 0 0; padding-left: 16px; }
 .check { display: flex; gap: 6px; align-items: center; margin: 4px 0 8px; cursor: pointer; }

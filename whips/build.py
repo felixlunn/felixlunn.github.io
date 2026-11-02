@@ -37,6 +37,7 @@ from .sources import debates as debates_src
 from .sources import epc as epc_src
 from .sources import fuel_poverty as fuel_src
 from .sources import nhs as nhs_src
+from .sources import petitions as petitions_src
 from .sources import questions as questions_src
 from .sources import rail as rail_src
 from .sources import schools as schools_src
@@ -49,7 +50,7 @@ log = logging.getLogger("whips.build")
 # Neighbourhood (LSOA) profiles are published for seats held by this party.
 NEIGHBOURHOOD_PARTY = re.compile(r"^(liberal democrats?|lib ?dems?|ld)$", re.I)
 
-SKIPPABLE = ["questions", "rail", "courts", "fuel_poverty", "nhs", "schools", "epc", "imd", "neighbourhoods", "debates", "claimants", "aps", "ashe", "bres", "business", "popest", "police", "elections", "members", "lsoa"]
+SKIPPABLE = ["petitions", "questions", "rail", "courts", "fuel_poverty", "nhs", "schools", "epc", "imd", "neighbourhoods", "debates", "claimants", "aps", "ashe", "bres", "business", "popest", "police", "elections", "members", "lsoa"]
 
 COUNTRY_BY_PREFIX = {"E": "England", "W": "Wales", "S": "Scotland", "N": "Northern Ireland"}
 
@@ -254,6 +255,17 @@ def build(out_dir: Path, skip: set[str] | None = None) -> dict:
         optional("questions", "Written questions (UK Parliament)", questions_src.SOURCE_URL, "Tabled by each current MP",
                  lambda: questions_src.load_questions(s, members), questions_src.QUESTION_METRICS)
 
+    petitions = None
+    if "petitions" not in skip:
+        def load_petitions():
+            nonlocal petitions
+            electorate = frames["turnout"]["den"] if "turnout" in frames else population
+            frame, petitions, detail = petitions_src.load_petitions(s, electorate.dropna())
+            return {"petition_signatures_per_1k": frame}, detail
+        optional("petitions", "Parliament petitions", petitions_src.SOURCE_URL,
+                 "Open petitions with 500+ signatures; per 1,000 on the 2024 electoral register", load_petitions,
+                 petitions_src.PETITION_METRICS)
+
     # 4. Assemble seats + values
     metrics, values = assemble(codes, frames, metas)
     seats = []
@@ -294,11 +306,13 @@ def build(out_dir: Path, skip: set[str] | None = None) -> dict:
         except Exception as exc:  # noqa: BLE001
             log.exception("What's On calendar failed")
             record("debates", "Upcoming Commons debates (UK Parliament What's On)", debates_src.SOURCE_URL, "failed", str(exc))
-    return finish(out_dir, geo, seats, metrics, values, sources, demo=False, debates=debates, neighbourhoods=neighbourhoods)
+    return finish(out_dir, geo, seats, metrics, values, sources, demo=False, debates=debates, neighbourhoods=neighbourhoods,
+                  petitions=petitions)
 
 
 def finish(out_dir: Path, geo: dict, seats: list[dict], metrics: list[dict], values: dict[str, list],
-           sources: list[dict], demo: bool, debates: list[dict] | None = None, neighbourhoods: dict | None = None) -> dict:
+           sources: list[dict], demo: bool, debates: list[dict] | None = None, neighbourhoods: dict | None = None,
+           petitions: dict | None = None) -> dict:
     """Add peer groups and write all output files."""
     ds = engine.Dataset.from_json({"seats": seats, "metrics": metrics, "values": values})
     groups, group_meta = engine.peer_groups(ds)
@@ -317,6 +331,7 @@ def finish(out_dir: Path, geo: dict, seats: list[dict], metrics: list[dict], val
         "debates": debates or [],
         "debate_topics": debates_src.topic_catalogue(),
         "neighbourhoods": neighbourhoods,
+        "petitions": petitions,
     }
     (out_dir / "data.json").write_text(json.dumps(data, separators=(",", ":"), allow_nan=False))
     (out_dir / "boundaries.geojson").write_text(json.dumps(geo, separators=(",", ":")))

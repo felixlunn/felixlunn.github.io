@@ -58,6 +58,8 @@ export default function Dossier({ data, index, onClose, onSelect, onShowMetric, 
     return { total: rows.length, count: worst.length, wards: [...new Set(worst.map((r) => r.l.ward ?? r.l.name))] };
   }, [nbFile, seat.code]);
 
+  const petitions = data.petitions?.by_seat[seat.code] ?? null;
+
   const twins = useMemo(() => {
     const ids = profileMetrics(data.metrics);
     return ids.length ? topN(data, similarity(data, index, ids, "euclidean"), 5, { exclude: index }) : [];
@@ -138,6 +140,25 @@ export default function Dossier({ data, index, onClose, onSelect, onShowMetric, 
               </p>
             )}
             <button className="btn" onClick={onNeighbourhoods}>Explore neighbourhoods (LSOAs)</button>
+          </section>
+        )}
+
+        {petitions && (petitions.top.length > 0 || petitions.local.length > 0) && (
+          <section>
+            <h3>What constituents are signing</h3>
+            <p className="tiny muted">Open Parliament petitions; "×2.1" means signed at 2.1 times the national rate for the size of the electorate.</p>
+            {petitions.local.length > 0 && (
+              <>
+                <div className="small strong">Signed far more here than nationally</div>
+                <ul className="petition-list">
+                  {petitions.local.map(([k, n, ix]) => <PetitionRow key={k} item={data.petitions!.items[k]} n={n} ix={ix} />)}
+                </ul>
+              </>
+            )}
+            <div className="small strong">Most signed here</div>
+            <ul className="petition-list">
+              {petitions.top.map(([k, n, ix]) => <PetitionRow key={k} item={data.petitions!.items[k]} n={n} ix={ix} />)}
+            </ul>
           </section>
         )}
 
@@ -230,5 +251,14 @@ export default function Dossier({ data, index, onClose, onSelect, onShowMetric, 
         </p>
       </div>
     </aside>
+  );
+}
+
+function PetitionRow({ item, n, ix }: { item: { title: string; url: string }; n: number; ix: number }) {
+  return (
+    <li>
+      <a href={item.url} target="_blank" rel="noreferrer">{item.title}</a>
+      <span className="tiny muted"> {n.toLocaleString("en-GB")} signatures · ×{ix.toFixed(1)}</span>
+    </li>
   );
 }
