@@ -47,7 +47,7 @@ TOPICS: dict[str, tuple[str, str, list[str]]] = {
     "cost_of_living": ("Cost of living & work",
                        r"cost of living|economy|economic|jobs?\b|employment|unemploy|wages?|\bpay\b|benefit|universal credit|"
                        r"welfare|poverty|minimum wage|budget|\btax|pensions?|bereavement support|household support",
-                       ["income_deprived", "employment_deprived", "claimant_rate", "imd_most_deprived_20", "aps_inactive",
+                       ["child_poverty_ahc", "income_deprived", "employment_deprived", "claimant_rate", "imd_most_deprived_20", "aps_inactive",
                         "inactive_sick", "never_worked"]),
     "energy": ("Energy & heating",
                r"energy|fuel|heating|heat pump|net zero|climate|electricity|\bgas\b|insulation|solar",
