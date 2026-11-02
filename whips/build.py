@@ -48,6 +48,7 @@ from .sources import schools as schools_src
 from .sources import sewage as sewage_src
 from .sources import imd as imd_src
 from .sources import life_expectancy as life_src
+from .sources import buses as buses_src
 from .sources import cqc as cqc_src
 from .sources import roads as roads_src
 from .sources import housing_stock as housing_stock_src
@@ -60,7 +61,7 @@ log = logging.getLogger("whips.build")
 # Neighbourhood (LSOA) profiles are published for seats held by this party.
 NEIGHBOURHOOD_PARTY = re.compile(r"^(liberal democrats?|lib ?dems?|ld)$", re.I)
 
-SKIPPABLE = ["cqc", "roads", "housing_stock", "child_poverty", "dental", "life_expectancy", "affordability", "homelessness", "ev", "sewage", "petitions", "questions", "rail", "courts", "fuel_poverty", "nhs", "schools", "epc", "imd", "neighbourhoods", "debates", "claimants", "aps", "ashe", "bres", "business", "popest", "police", "elections", "members", "lsoa"]
+SKIPPABLE = ["buses", "cqc", "roads", "housing_stock", "child_poverty", "dental", "life_expectancy", "affordability", "homelessness", "ev", "sewage", "petitions", "questions", "rail", "courts", "fuel_poverty", "nhs", "schools", "epc", "imd", "neighbourhoods", "debates", "claimants", "aps", "ashe", "bres", "business", "popest", "police", "elections", "members", "lsoa"]
 
 COUNTRY_BY_PREFIX = {"E": "England", "W": "Wales", "S": "Scotland", "N": "Northern Ireland"}
 
@@ -319,6 +320,11 @@ def build(out_dir: Path, skip: set[str] | None = None) -> dict:
         optional("cqc", "Care Quality Commission ratings (CQC)", cqc_src.SOURCE_URL,
                  "Active registered services placed by location; England",
                  lambda: cqc_src.load_cqc(s, geo, census["age_65_plus"]["num"] if "age_65_plus" in census else None), cqc_src.CQC_METRICS)
+
+    if "buses" not in skip:
+        optional("buses", "Bus statistics (DfT)", buses_src.SOURCE_URL,
+                 "By local transport authority, averaged over the authorities each seat covers; England",
+                 lambda: buses_src.load_buses(s, council_weights()), buses_src.BUS_METRICS)
 
     petitions = None
     if "petitions" not in skip:
