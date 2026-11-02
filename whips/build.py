@@ -40,6 +40,7 @@ from .sources import councils as councils_src
 from .sources import fuel_poverty as fuel_src
 from .sources import housing as housing_src
 from .sources import nhs as nhs_src
+from .sources import nhsbsa as nhsbsa_src
 from .sources import petitions as petitions_src
 from .sources import questions as questions_src
 from .sources import rail as rail_src
@@ -55,7 +56,7 @@ log = logging.getLogger("whips.build")
 # Neighbourhood (LSOA) profiles are published for seats held by this party.
 NEIGHBOURHOOD_PARTY = re.compile(r"^(liberal democrats?|lib ?dems?|ld)$", re.I)
 
-SKIPPABLE = ["life_expectancy", "affordability", "homelessness", "ev", "sewage", "petitions", "questions", "rail", "courts", "fuel_poverty", "nhs", "schools", "epc", "imd", "neighbourhoods", "debates", "claimants", "aps", "ashe", "bres", "business", "popest", "police", "elections", "members", "lsoa"]
+SKIPPABLE = ["dental", "life_expectancy", "affordability", "homelessness", "ev", "sewage", "petitions", "questions", "rail", "courts", "fuel_poverty", "nhs", "schools", "epc", "imd", "neighbourhoods", "debates", "claimants", "aps", "ashe", "bres", "business", "popest", "police", "elections", "members", "lsoa"]
 
 COUNTRY_BY_PREFIX = {"E": "England", "W": "Wales", "S": "Scotland", "N": "Northern Ireland"}
 
@@ -273,6 +274,10 @@ def build(out_dir: Path, skip: set[str] | None = None) -> dict:
             council_cache["w"] = councils_src.seat_council_weights(lsoa_lookup(), councils_src.lsoa_to_lad(s))
         return council_cache["w"]
 
+    if "dental" not in skip:
+        optional("dental", "NHS dental activity (NHSBSA)", nhsbsa_src.SOURCE_URL,
+                 "Patients seen by dental practices in each seat; England",
+                 lambda: nhsbsa_src.load_dental(s, lsoa_lookup(), population), nhsbsa_src.DENTAL_METRICS)
     if "life_expectancy" not in skip:
         optional("life_expectancy", "Life expectancy at birth (OHID Fingertips)", life_src.SOURCE_URL,
                  "By council, averaged over the councils each seat covers; England",
