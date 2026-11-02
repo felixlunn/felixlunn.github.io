@@ -35,6 +35,7 @@ from .sources import boundaries as bsrc
 from .sources import courts as courts_src
 from .sources import debates as debates_src
 from .sources import epc as epc_src
+from .sources import ev as ev_src
 from .sources import fuel_poverty as fuel_src
 from .sources import nhs as nhs_src
 from .sources import petitions as petitions_src
@@ -51,7 +52,7 @@ log = logging.getLogger("whips.build")
 # Neighbourhood (LSOA) profiles are published for seats held by this party.
 NEIGHBOURHOOD_PARTY = re.compile(r"^(liberal democrats?|lib ?dems?|ld)$", re.I)
 
-SKIPPABLE = ["sewage", "petitions", "questions", "rail", "courts", "fuel_poverty", "nhs", "schools", "epc", "imd", "neighbourhoods", "debates", "claimants", "aps", "ashe", "bres", "business", "popest", "police", "elections", "members", "lsoa"]
+SKIPPABLE = ["ev", "sewage", "petitions", "questions", "rail", "courts", "fuel_poverty", "nhs", "schools", "epc", "imd", "neighbourhoods", "debates", "claimants", "aps", "ashe", "bres", "business", "popest", "police", "elections", "members", "lsoa"]
 
 COUNTRY_BY_PREFIX = {"E": "England", "W": "Wales", "S": "Scotland", "N": "Northern Ireland"}
 
@@ -260,6 +261,11 @@ def build(out_dir: Path, skip: set[str] | None = None) -> dict:
     if members and "questions" not in skip:
         optional("questions", "Written questions (UK Parliament)", questions_src.SOURCE_URL, "Tabled by each current MP",
                  lambda: questions_src.load_questions(s, members), questions_src.QUESTION_METRICS)
+
+    if "ev" not in skip:
+        optional("ev", "EV charging infrastructure statistics (DfT, from Zapmap)", ev_src.SOURCE_URL, "Public chargers by constituency; UK",
+                 lambda: ev_src.load_ev(s, (frames["turnout"]["den"] if "turnout" in frames else population).dropna()),
+                 ev_src.EV_METRICS)
 
     petitions = None
     if "petitions" not in skip:
