@@ -7,6 +7,7 @@ import { partyStyle } from "../lib/parties";
 import { csv, download, fmt, ordinal, rankText, slug } from "../lib/format";
 import { missingFor, missingReason } from "../lib/missing";
 import NoData from "./NoData";
+import SourceLink from "./SourceLink";
 
 interface Props {
   data: DashboardData;
@@ -106,9 +107,9 @@ export default function Dossier({ data, index, onClose, onSelect, onShowMetric, 
           )}
           {seat.mp && <span className="mp-name">{seat.mp}</span>}
           <div className="kpis">
-            {majority !== null && <div className="kpi"><span className="kpi-v">{fmt({ unit: "%", decimals: 1 }, majority)}</span><span className="kpi-l">Majority 2024</span></div>}
-            {turnout !== null && <div className="kpi"><span className="kpi-v">{fmt({ unit: "%", decimals: 1 }, turnout)}</span><span className="kpi-l">Turnout 2024</span></div>}
-            {val("population") !== null && <div className="kpi"><span className="kpi-v">{fmt({ unit: "people", decimals: 0 }, val("population"))}</span><span className="kpi-l">Residents (2021)</span></div>}
+            {majority !== null && <div className="kpi"><span className="kpi-v">{fmt({ unit: "%", decimals: 1 }, majority)}</span><span className="kpi-l">Majority 2024{metricById.get("majority_pct") && <SourceLink metric={metricById.get("majority_pct")!} />}</span></div>}
+            {turnout !== null && <div className="kpi"><span className="kpi-v">{fmt({ unit: "%", decimals: 1 }, turnout)}</span><span className="kpi-l">Turnout 2024{metricById.get("turnout") && <SourceLink metric={metricById.get("turnout")!} />}</span></div>}
+            {val("population") !== null && <div className="kpi"><span className="kpi-v">{fmt({ unit: "people", decimals: 0 }, val("population"))}</span><span className="kpi-l">Residents (2021){metricById.get("population") && <SourceLink metric={metricById.get("population")!} />}</span></div>}
           </div>
           {seat.result_2024 && <div className="small muted">2024: {seat.result_2024}{seat.second_party_2024 ? ` · runner-up ${seat.second_party_2024}` : ""}</div>}
         </section>
@@ -127,6 +128,7 @@ export default function Dossier({ data, index, onClose, onSelect, onShowMetric, 
                         {leading ? "The MP is leading this debate" : null}
                         {leading && top ? " · " : null}
                         {top ? `${top.metric.label} ${fmt(top.metric, top.value)}, ${ordinal(top.rank)} ${top.end === "high" ? "highest" : "lowest"} of ${top.of}` : null}
+                        {top && <SourceLink metric={top.metric} />}
                       </span>
                     </button>
                   </li>
@@ -187,7 +189,7 @@ export default function Dossier({ data, index, onClose, onSelect, onShowMetric, 
                 const w = Math.min(Math.abs(z), 3) / 3 * 50;
                 return (
                   <li key={m.id}>
-                    <button className="link dev-label" onClick={() => onShowMetric(m.id)}>{m.label}</button>
+                    <span className="dev-label"><button className="link" onClick={() => onShowMetric(m.id)}>{m.label}</button><SourceLink metric={m} /></span>
                     <span className="dev-bar" title={`${z >= 0 ? "+" : ""}${z.toFixed(1)} SD`}>
                       <span className="axis" />
                       <span className={z >= 0 ? "pos" : "neg"} style={z >= 0 ? { left: "50%", width: `${w}%` } : { right: "50%", width: `${w}%` }} />
@@ -212,7 +214,7 @@ export default function Dossier({ data, index, onClose, onSelect, onShowMetric, 
                 <div className="small strong">Not available for this seat</div>
                 <ul className="missing-list small">
                   {seatGaps.map(({ metric }) => (
-                    <li key={metric.id}><button className="link" onClick={() => onShowMetric(metric.id)}>{metric.label}</button> <span className="muted">({metric.source})</span></li>
+                    <li key={metric.id}><button className="link" onClick={() => onShowMetric(metric.id)}>{metric.label}</button> <span className="muted">({metric.source})</span><SourceLink metric={metric} /></li>
                   ))}
                 </ul>
               </>
@@ -221,7 +223,7 @@ export default function Dossier({ data, index, onClose, onSelect, onShowMetric, 
               <details>
                 <summary className="small">{nationGaps.length} not published for {seat.country || "this nation"}</summary>
                 <ul className="missing-list small">
-                  {nationGaps.map(({ metric, reason }) => <li key={metric.id}>{metric.label} <span className="muted">— {reason.replace(/^Not published for [^(]+/, "").replace(/[()]/g, "")}</span></li>)}
+                  {nationGaps.map(({ metric, reason }) => <li key={metric.id}>{metric.label}<SourceLink metric={metric} /> <span className="muted">— {reason.replace(/^Not published for [^(]+/, "").replace(/[()]/g, "")}</span></li>)}
                 </ul>
               </details>
             )}
@@ -247,7 +249,7 @@ export default function Dossier({ data, index, onClose, onSelect, onShowMetric, 
                       const why = missingReason(data, m, index);
                       return (
                         <tr key={m.id} onClick={() => onShowMetric(m.id)} title={why ?? rankText(r.rank, r.of)}>
-                          <td>{m.label}<div className="m-rank">{why ?? rankText(r.rank, r.of)}</div></td>
+                          <td>{m.label}<SourceLink metric={m} /><div className="m-rank">{why ?? rankText(r.rank, r.of)}</div></td>
                           <td className="num strong">{why ? <NoData reason={why} /> : fmt(m, r.value)}</td>
                           <td className="num muted">{fmt(m, m.national)}</td>
                           <td className="num muted">{fmt(m, groupMean(data, m.id, seat.peer_group))}</td>

@@ -29,6 +29,7 @@ import pandas as pd
 from . import engine
 from .http import session
 from .metrics import (
+    source_url,
     CENSUS_METRICS, CLAIMANT_METRICS, ELECTION_METRICS, POLICE_METRICS, THEMES, MetricMeta, census_meta,
 )
 from .sources import boundaries as bsrc
@@ -111,7 +112,8 @@ def assemble(codes: list[str], frames: dict[str, pd.DataFrame], metas: list[Metr
         national = official if official is not None else float(num[ok].sum() / den[ok].sum()) if den[ok].sum() else None
         metrics.append({
             "id": meta.id, "label": meta.label, "theme": meta.theme, "unit": meta.unit,
-            "description": meta.description, "source": meta.source, "polarity": meta.polarity,
+            "description": meta.description, "source": meta.source, "source_url": source_url(meta.source),
+            "polarity": meta.polarity,
             "decimals": meta.decimals, "tags": list(meta.tags),
             "national": _clean(national), "coverage": int(ok.sum()),
         })

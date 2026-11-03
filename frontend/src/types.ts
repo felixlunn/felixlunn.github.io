@@ -11,6 +11,8 @@ export interface Metric {
   unit: string;
   description: string;
   source: string;
+  /** The publisher's page for this dataset (for the (i) link). */
+  source_url?: string | null;
   polarity: "higher_worse" | "higher_better" | "neutral";
   decimals: number;
   tags: string[];
@@ -98,6 +100,8 @@ export interface Choropleth {
   highlight?: string[];
   /** Categorical map: each value is an index into this list, coloured as given (e.g. parties). */
   categories?: { label: string; colour: string; count: number }[];
+  /** The metric shown, for the legend's source link. */
+  metric?: Metric;
 }
 
 /** One seat's neighbourhood (LSOA) census profile. Arrays align with `lsoas`. */

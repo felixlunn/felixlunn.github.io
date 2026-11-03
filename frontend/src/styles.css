@@ -338,3 +338,9 @@ select, input { font: inherit; color: var(--text-1); background: var(--surface-1
   color: var(--bad); border: 1px dashed currentColor; white-space: nowrap; }
 .missing-list { margin: .25rem 0 .5rem; padding-left: 1.1rem; }
 .missing-list li { margin: .1rem 0; }
+
+/* (i) source link next to figures */
+.src-link { display: inline-flex; align-items: center; justify-content: center; width: 1.05em; height: 1.05em;
+  margin-left: .3em; border: 1px solid currentColor; border-radius: 50%; font: italic 600 .72em/1 Georgia, serif;
+  color: var(--muted, #6b7280); text-decoration: none; vertical-align: .1em; flex: none; }
+.src-link:hover, .src-link:focus-visible { color: var(--accent, #0b6e4f); }

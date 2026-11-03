@@ -72,7 +72,7 @@ All data are open, refreshed automatically **every two days** by GitHub Actions,
 | [DfE explore education statistics](https://explore-education-statistics.service.gov.uk/) API | Persistent and severe pupil absence (by education authority) and year 11 leavers not in sustained education or work (by district), shared out across seats | England | Annual |
 | [Ofsted school inspection management information](https://www.gov.uk/government/statistical-data-sets/monthly-management-information-ofsteds-school-inspections-outcomes) | Pupils at schools last graded Good or Outstanding, and schools in a category of concern, by constituency | England | Monthly |
 | [Office for Students TUNDRA](https://www.officeforstudents.org.uk/data-and-analysis/young-participation-by-area/about-tundra/) | Share of state-school pupils going on to higher education by 19 (cohorts aged 16 in 2012-16), averaged over neighbourhoods | England | Occasional |
-| [Insolvency Service](https://www.gov.uk/government/collections/individual-insolvency-statistics-by-location-age-and-gender) | Personal insolvencies and debt relief orders per 10,000 adults, by constituency | England & Wales | Annual |
+| [Insolvency Service](https://www.gov.uk/government/collections/individual-insolvency-statistics-releases) | Personal insolvencies and debt relief orders per 10,000 adults, by constituency | England & Wales | Annual |
 | [MHCLG council tax live tables](https://www.gov.uk/government/statistical-data-sets/live-tables-on-council-tax) | Area Band D council tax and this year's rise, by billing authority, averaged across seats | England | Annual |
 | [ONS business demography](https://www.ons.gov.uk/businessindustryandtrade/business/activitysizeandlocation/datasets/businessdemographyreferencetable) | Business start-ups and closures as a share of active businesses, by council, shared out across seats | England & Wales | Annual |
 | [Environment Agency flood monitoring API](https://environment.data.gov.uk/flood-monitoring/doc/reference) | Flood warning areas centred in each seat | England | Live |
@@ -80,6 +80,8 @@ All data are open, refreshed automatically **every two days** by GitHub Actions,
 | [Boiler Upgrade Scheme statistics](https://www.gov.uk/government/collections/boiler-upgrade-scheme-statistics) | Heat pump grants paid since May 2022 per 10,000 households, by constituency | England & Wales | Monthly |
 | [Home Office police workforce](https://www.gov.uk/government/collections/police-workforce-england-and-wales) | Police officers (FTE) per 100,000 people in the seat's police force area | England & Wales | Twice yearly |
 | [Home Office fire statistics](https://www.gov.uk/government/statistical-data-sets/fire-statistics-data-tables) (FIRE1001) | Average response times to dwelling fires and all primary fires, by fire and rescue authority, averaged across seats | England | Quarterly |
+
+Every figure on the dashboard has an (i) link to its publisher's page for the dataset (`SOURCE_LINKS` in `whips/metrics.py`; a test fails if a metric's source has no link).
 
 Census 2021 covers England and Wales only (Scotland's census was 2022 and Northern Ireland's is published by
 NISRA), so census metrics show "No data" for Scottish and Northern Irish seats. Wherever a metric is a ratio,

@@ -6,6 +6,7 @@ import { textOn } from "../lib/colors";
 import { fmt, ordinal } from "../lib/format";
 import { missingFor } from "../lib/missing";
 import NoData from "./NoData";
+import SourceLink from "./SourceLink";
 
 interface Props {
   data: DashboardData;
@@ -124,7 +125,7 @@ function DebateCard({ d, metrics, mine, standouts, leading, flagged, data, mySea
         {flagged && (
           <div className="debate-mine on">
             {leading ? "Your MP is leading this debate" : "Your seat stands out"}
-            {top && <>{leading ? " · " : ": "}{top.metric.label} {fmt(top.metric, top.value)}, {rankPhrase(top)}</>}
+            {top && <>{leading ? " · " : ": "}{top.metric.label} {fmt(top.metric, top.value)}, {rankPhrase(top)}<SourceLink metric={top.metric} /></>}
             {standouts.length > 1 && <span className="muted"> (+{standouts.length - 1} more)</span>}
           </div>
         )}
@@ -151,12 +152,12 @@ function DebateCard({ d, metrics, mine, standouts, leading, flagged, data, mySea
               <ul>
                 {mine.map((h) => (
                   <li key={h.metric.id} className={`small ${standsOut(h) ? "strong" : ""}`}>
-                    {h.metric.label}: {fmt(h.metric, h.value)} <span className="muted">({rankPhrase(h)}; national {fmt(h.metric, h.metric.national)})</span>
+                    {h.metric.label}: {fmt(h.metric, h.value)}<SourceLink metric={h.metric} /> <span className="muted">({rankPhrase(h)}; national {fmt(h.metric, h.metric.national)})</span>
                   </li>
                 ))}
                 {missingFor(data, mySeat, metrics).map(({ metric, reason }) => (
                   <li key={metric.id} className="small">
-                    {metric.label}: <NoData reason={reason} /> <span className="muted">({reason}; not counted)</span>
+                    {metric.label}: <NoData reason={reason} /><SourceLink metric={metric} /> <span className="muted">({reason}; not counted)</span>
                   </li>
                 ))}
               </ul>
