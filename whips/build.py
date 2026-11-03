@@ -48,6 +48,7 @@ from .sources import schools as schools_src
 from .sources import sewage as sewage_src
 from .sources import imd as imd_src
 from .sources import life_expectancy as life_src
+from .sources import heat_pumps as heat_pumps_src
 from .sources import green_space as green_space_src
 from .sources import floods as floods_src
 from .sources import business_demography as business_demography_src
@@ -80,7 +81,7 @@ log = logging.getLogger("whips.build")
 # Neighbourhood (LSOA) profiles are published for seats held by this party.
 NEIGHBOURHOOD_PARTY = re.compile(r"^(liberal democrats?|lib ?dems?|ld)$", re.I)
 
-SKIPPABLE = ["green_space", "floods", "business_demography", "council_tax", "insolvency", "university", "ofsted", "pupils", "pharmacies", "public_health", "income", "asylum", "road_condition", "rents", "energy", "travel", "renewables", "air_pollution", "children", "vehicles", "buses", "cqc", "roads", "housing_stock", "child_poverty", "dental", "life_expectancy", "affordability", "homelessness", "ev", "sewage", "petitions", "questions", "rail", "courts", "fuel_poverty", "nhs", "schools", "epc", "imd", "neighbourhoods", "debates", "claimants", "aps", "ashe", "bres", "business", "popest", "police", "elections", "members", "lsoa"]
+SKIPPABLE = ["heat_pumps", "green_space", "floods", "business_demography", "council_tax", "insolvency", "university", "ofsted", "pupils", "pharmacies", "public_health", "income", "asylum", "road_condition", "rents", "energy", "travel", "renewables", "air_pollution", "children", "vehicles", "buses", "cqc", "roads", "housing_stock", "child_poverty", "dental", "life_expectancy", "affordability", "homelessness", "ev", "sewage", "petitions", "questions", "rail", "courts", "fuel_poverty", "nhs", "schools", "epc", "imd", "neighbourhoods", "debates", "claimants", "aps", "ashe", "bres", "business", "popest", "police", "elections", "members", "lsoa"]
 
 COUNTRY_BY_PREFIX = {"E": "England", "W": "Wales", "S": "Scotland", "N": "Northern Ireland"}
 
@@ -444,6 +445,11 @@ def build(out_dir: Path, skip: set[str] | None = None) -> dict:
         optional("green_space", "Access to gardens and public green space (ONS)", green_space_src.SOURCE_URL,
                  "By neighbourhood (2020); England & Wales",
                  lambda: green_space_src.load_green_space(s, lsoa_lookup()), green_space_src.GREEN_METRICS)
+
+    if "heat_pumps" not in skip:
+        optional("heat_pumps", "Boiler Upgrade Scheme statistics (DESNZ/Ofgem)", heat_pumps_src.SOURCE_URL,
+                 "Heat pump grants paid by constituency; England & Wales",
+                 lambda: heat_pumps_src.load_heat_pumps(s, census["no_car"]["den"] if "no_car" in census else None), heat_pumps_src.HEAT_PUMP_METRICS)
 
     petitions = None
     if "petitions" not in skip:

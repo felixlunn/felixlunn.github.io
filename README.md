@@ -77,6 +77,7 @@ All data are open, refreshed automatically **every two days** by GitHub Actions,
 | [ONS business demography](https://www.ons.gov.uk/businessindustryandtrade/business/activitysizeandlocation/datasets/businessdemographyreferencetable) | Business start-ups and closures as a share of active businesses, by council, shared out across seats | England & Wales | Annual |
 | [Environment Agency flood monitoring API](https://environment.data.gov.uk/flood-monitoring/doc/reference) | Flood warning areas centred in each seat | England | Live |
 | [ONS access to gardens and green space](https://www.ons.gov.uk/economy/environmentalaccounts/datasets/accesstogardensandpublicgreenspaceingreatbritain) | Homes without a garden, and homes within 300m of a park (2020), summed from neighbourhoods | England & Wales | Occasional |
+| [Boiler Upgrade Scheme statistics](https://www.gov.uk/government/collections/boiler-upgrade-scheme-statistics) | Heat pump grants paid since May 2022 per 10,000 households, by constituency | England & Wales | Monthly |
 
 Census 2021 covers England and Wales only (Scotland's census was 2022 and Northern Ireland's is published by
 NISRA), so census metrics show "No data" for Scottish and Northern Irish seats. Wherever a metric is a ratio,
