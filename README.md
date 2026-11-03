@@ -54,6 +54,7 @@ All data are open, refreshed automatically **every two days** by GitHub Actions,
 | [UK Parliament Members API](https://members-api.parliament.uk/) | Current MP and party (picks up by-elections and defections) | UK | Every run |
 | [DWP Children in low income families](https://www.gov.uk/government/collections/children-in-low-income-families-local-area-statistics) | Children in relative low income families, after and before housing costs, by constituency | UK | Annual |
 | [MHCLG Council Taxbase](https://www.gov.uk/government/collections/council-taxbase-statistics) and [Live Table 122](https://www.gov.uk/government/statistical-data-sets/live-tables-on-net-supply-of-housing) | Second homes, homes empty 6+ months, and net new homes a year (3-year average), by council, shared out across seats | England | Annual |
+| [DfT road safety data](https://www.gov.uk/government/statistics/road-safety-data) (STATS19) | Injury and fatal/serious road collisions over five years, placed in seats by neighbourhood or coordinates, per 10,000 voters | Great Britain | Annual |
 
 Census 2021 covers England and Wales only (Scotland's census was 2022 and Northern Ireland's is published by
 NISRA), so census metrics show "No data" for Scottish and Northern Irish seats. Wherever a metric is a ratio,
