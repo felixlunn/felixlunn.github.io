@@ -79,6 +79,7 @@ All data are open, refreshed automatically **every two days** by GitHub Actions,
 | [ONS access to gardens and green space](https://www.ons.gov.uk/economy/environmentalaccounts/datasets/accesstogardensandpublicgreenspaceingreatbritain) | Homes without a garden, and homes within 300m of a park (2020), summed from neighbourhoods | England & Wales | Occasional |
 | [Boiler Upgrade Scheme statistics](https://www.gov.uk/government/collections/boiler-upgrade-scheme-statistics) | Heat pump grants paid since May 2022 per 10,000 households, by constituency | England & Wales | Monthly |
 | [Home Office police workforce](https://www.gov.uk/government/collections/police-workforce-england-and-wales) | Police officers (FTE) per 100,000 people in the seat's police force area | England & Wales | Twice yearly |
+| [Home Office fire statistics](https://www.gov.uk/government/statistical-data-sets/fire-statistics-data-tables) (FIRE1001) | Average response times to dwelling fires and all primary fires, by fire and rescue authority, averaged across seats | England | Quarterly |
 
 Census 2021 covers England and Wales only (Scotland's census was 2022 and Northern Ireland's is published by
 NISRA), so census metrics show "No data" for Scottish and Northern Irish seats. Wherever a metric is a ratio,
