@@ -146,7 +146,7 @@ export default function Dossier({ data, index, onClose, onSelect, onShowMetric, 
         {petitions && (petitions.top.length > 0 || petitions.local.length > 0) && (
           <section>
             <h3>What constituents are signing</h3>
-            <p className="tiny muted">Open Parliament petitions; "×2.1" means signed at 2.1 times the national rate for the size of the electorate.</p>
+            <p className="tiny muted">Open Parliament petitions with more than 100,000 signatures; "×2.1" means signed at 2.1 times the national rate for the size of the electorate.</p>
             {petitions.local.length > 0 && (
               <>
                 <div className="small strong">Signed far more here than nationally</div>
