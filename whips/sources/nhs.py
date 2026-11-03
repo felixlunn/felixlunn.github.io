@@ -57,11 +57,14 @@ GPPS = {
             "Share of GP Patient Survey respondents at practices in the constituency whose needs were met at their last appointment."),
 }
 
+from .nhsbsa import PRESCRIBING_METRICS  # noqa: E402 - defined alongside the prescribing loader
+
 NHS_METRICS = [
     *[MetricMeta(mid, label, "health", "%", QOF_NOTE.format(age=age, what=label.split(" (")[0].lower()),
                  "NHS QOF via OHID Fingertips", pol, 1, ("nhs",)) for mid, label, age, pol in QOF.values()],
     *[MetricMeta(mid, label, "health", "%", desc, "GP Patient Survey via OHID Fingertips", "higher_better", 1, ("nhs",))
       for mid, label, desc in GPPS.values()],
+    *PRESCRIBING_METRICS,
 ]
 METRIC_BY_INDICATOR = {i: v[0] for i, v in {**QOF, **GPPS}.items()}
 
@@ -117,7 +120,7 @@ def seat_frames(rows: pd.DataFrame, where: dict[str, str]) -> dict[str, pd.DataF
     return out
 
 
-def load_nhs(s: requests.Session, workers: int = 4) -> tuple[dict[str, pd.DataFrame], str]:
+def load_nhs(s: requests.Session, workers: int = 4, prescribing: bool = True) -> tuple[dict[str, pd.DataFrame], str]:
     parents = [a["Code"] for a in get_json(s, f"{FINGERTIPS}/areas/by_area_type", params={"area_type_id": SUB_ICB})]
     with ThreadPoolExecutor(workers) as pool:
         parts = list(pool.map(lambda p: fetch_parent(s, p), parents))
@@ -131,4 +134,16 @@ def load_nhs(s: requests.Session, workers: int = 4) -> tuple[dict[str, pd.DataFr
     frames = seat_frames(rows, where)
     qof = periods.get(241) or next(iter(periods.values()), "")
     gpps = periods.get(94126, "")
-    return frames, f"QOF {qof}; GP Patient Survey {gpps}".strip("; ")
+    period = f"QOF {qof}; GP Patient Survey {gpps}".strip("; ")
+    if prescribing:
+        # Prescribing uses the same practices and list sizes (all-ages hypertension register denominators).
+        from .nhsbsa import load_prescribing
+        hyp = rows[rows["Indicator ID"].eq(219)]
+        list_size = pd.Series(hyp["Denominator"].values, index=hyp["Area Code"].values).dropna()
+        try:
+            rx, month = load_prescribing(s, where, list_size)
+            frames.update(rx)
+            period += f"; prescribing {month}"
+        except Exception as exc:  # noqa: BLE001 - keep the rest of the NHS data if prescribing fails
+            log.warning("Prescribing failed: %s", exc)
+    return frames, period
