@@ -48,6 +48,7 @@ from .sources import schools as schools_src
 from .sources import sewage as sewage_src
 from .sources import imd as imd_src
 from .sources import life_expectancy as life_src
+from .sources import rents as rents_src
 from .sources import energy as energy_src
 from .sources import travel as travel_src
 from .sources import air_energy as air_src
@@ -66,7 +67,7 @@ log = logging.getLogger("whips.build")
 # Neighbourhood (LSOA) profiles are published for seats held by this party.
 NEIGHBOURHOOD_PARTY = re.compile(r"^(liberal democrats?|lib ?dems?|ld)$", re.I)
 
-SKIPPABLE = ["energy", "travel", "renewables", "air_pollution", "children", "vehicles", "buses", "cqc", "roads", "housing_stock", "child_poverty", "dental", "life_expectancy", "affordability", "homelessness", "ev", "sewage", "petitions", "questions", "rail", "courts", "fuel_poverty", "nhs", "schools", "epc", "imd", "neighbourhoods", "debates", "claimants", "aps", "ashe", "bres", "business", "popest", "police", "elections", "members", "lsoa"]
+SKIPPABLE = ["rents", "energy", "travel", "renewables", "air_pollution", "children", "vehicles", "buses", "cqc", "roads", "housing_stock", "child_poverty", "dental", "life_expectancy", "affordability", "homelessness", "ev", "sewage", "petitions", "questions", "rail", "courts", "fuel_poverty", "nhs", "schools", "epc", "imd", "neighbourhoods", "debates", "claimants", "aps", "ashe", "bres", "business", "popest", "police", "elections", "members", "lsoa"]
 
 COUNTRY_BY_PREFIX = {"E": "England", "W": "Wales", "S": "Scotland", "N": "Northern Ireland"}
 
@@ -360,6 +361,11 @@ def build(out_dir: Path, skip: set[str] | None = None) -> dict:
         optional("energy", "Sub-national gas and electricity consumption (DESNZ)", energy_src.SOURCE_URL,
                  "Domestic meters and consumption by neighbourhood; England & Wales",
                  lambda: energy_src.load_energy(s, lsoa_lookup()), energy_src.ENERGY_METRICS)
+
+    if "rents" not in skip:
+        optional("rents", "Price Index of Private Rents (ONS)", rents_src.SOURCE_URL,
+                 "By council, averaged over the councils each seat covers; England & Wales",
+                 lambda: rents_src.load_rents(s, council_weights()), rents_src.RENT_METRICS)
 
     petitions = None
     if "petitions" not in skip:

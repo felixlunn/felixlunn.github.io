@@ -63,6 +63,7 @@ All data are open, refreshed automatically **every two days** by GitHub Actions,
 | [DESNZ renewable electricity by local authority](https://www.gov.uk/government/statistics/regional-renewable-statistics) | Solar PV installations per 100 households, by council, shared out across seats | England & Wales | Annual |
 | [DfT journey time statistics](https://www.gov.uk/government/collections/journey-time-statistics) | Minutes to the nearest GP, hospital, secondary school, food store and town centre by public transport or walking (2019), averaged over neighbourhoods | England | Occasional |
 | [DESNZ sub-national energy consumption](https://www.gov.uk/government/statistics/lower-and-middle-super-output-areas-gas-consumption) | Homes off the gas grid (gas vs electricity meters), and average gas and electricity use per home, summed from neighbourhoods | England & Wales | Annual |
+| [ONS Price Index of Private Rents](https://www.ons.gov.uk/economy/inflationandpriceindices/datasets/priceindexofprivaterentsukmonthlypricestatistics) | Average monthly private rent and annual change, by council, averaged across seats | England & Wales | Monthly |
 
 Census 2021 covers England and Wales only (Scotland's census was 2022 and Northern Ireland's is published by
 NISRA), so census metrics show "No data" for Scottish and Northern Irish seats. Wherever a metric is a ratio,
