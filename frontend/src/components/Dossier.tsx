@@ -5,6 +5,8 @@ import { groupMean, profileMetrics, rankOf, similarity, stats, topN } from "../l
 import { textOn } from "../lib/colors";
 import { partyStyle } from "../lib/parties";
 import { csv, download, fmt, ordinal, rankText, slug } from "../lib/format";
+import { missingFor, missingReason } from "../lib/missing";
+import NoData from "./NoData";
 
 interface Props {
   data: DashboardData;
@@ -31,12 +33,14 @@ export default function Dossier({ data, index, onClose, onSelect, onShowMetric, 
     return data.metrics
       .filter((m) => m.theme !== "politics" && m.unit !== "people")
       .map((m) => {
-        const v = data.values[m.id][index];
-        if (v === null) return null;
+        // Missing figures never count as standing out.
+        if (missingReason(data, m, index) !== null) return null;
+        const v = data.values[m.id][index] as number;
         const s = stats(data.values[m.id]);
+        if (!s.sd) return null;
         return { m, v, z: (v - s.mean) / s.sd };
       })
-      .filter((x): x is NonNullable<typeof x> => x !== null)
+      .filter((x): x is NonNullable<typeof x> => x !== null && Number.isFinite(x.z))
       .sort((a, b) => Math.abs(b.z) - Math.abs(a.z))
       .slice(0, 8);
   }, [data, index]);
@@ -48,6 +52,10 @@ export default function Dossier({ data, index, onClose, onSelect, onShowMetric, 
     const leading = leadSeat(data, d) === index;
     return { d, top: hits[0], leading, relevant: leading || (hits.length > 0 && standsOut(hits[0])) };
   }).filter((x) => x.relevant), [data, index]);
+
+  const missing = useMemo(() => missingFor(data, index), [data, index]);
+  const seatGaps = missing.filter((x) => !x.reason.startsWith("Not published"));
+  const nationGaps = missing.filter((x) => x.reason.startsWith("Not published"));
 
   const hasNeighbourhoods = data.neighbourhoods?.seats.includes(seat.code) ?? false;
   const deprived = useMemo(() => {
@@ -66,10 +74,11 @@ export default function Dossier({ data, index, onClose, onSelect, onShowMetric, 
   }, [data, index]);
 
   const exportDossier = () => {
-    const rows: (string | number | null)[][] = [["theme", "metric", "unit", "value", "national", "rank", "of", "peer_group_average", "source"]];
+    const rows: (string | number | null)[][] = [["theme", "metric", "unit", "value", "national", "rank", "of", "peer_group_average", "source", "missing"]];
     for (const m of data.metrics) {
       const r = rankOf(data.values[m.id], index);
-      rows.push([m.theme, m.label, m.unit, r.value, m.national, r.rank, r.of, groupMean(data, m.id, seat.peer_group), m.source]);
+      rows.push([m.theme, m.label, m.unit, r.value, m.national, r.rank, r.of, groupMean(data, m.id, seat.peer_group), m.source,
+        missingReason(data, m, index) ?? ""]);
     }
     download(`dossier-${slug(seat.name)}.csv`, csv([[seat.name, seat.code], [], ...rows]));
   };
@@ -191,14 +200,43 @@ export default function Dossier({ data, index, onClose, onSelect, onShowMetric, 
           </section>
         )}
 
+        {missing.length > 0 && (
+          <section>
+            <h3>Missing data</h3>
+            <p className="small">
+              <NoData reason="Figures with no value for this seat" /> for <strong>{missing.length}</strong> of {data.metrics.length} figures.
+              These are left out of "Where it stands out" and debate flags.
+            </p>
+            {seatGaps.length > 0 && (
+              <>
+                <div className="small strong">Not available for this seat</div>
+                <ul className="missing-list small">
+                  {seatGaps.map(({ metric }) => (
+                    <li key={metric.id}><button className="link" onClick={() => onShowMetric(metric.id)}>{metric.label}</button> <span className="muted">({metric.source})</span></li>
+                  ))}
+                </ul>
+              </>
+            )}
+            {nationGaps.length > 0 && (
+              <details>
+                <summary className="small">{nationGaps.length} not published for {seat.country || "this nation"}</summary>
+                <ul className="missing-list small">
+                  {nationGaps.map(({ metric, reason }) => <li key={metric.id}>{metric.label} <span className="muted">— {reason.replace(/^Not published for [^(]+/, "").replace(/[()]/g, "")}</span></li>)}
+                </ul>
+              </details>
+            )}
+          </section>
+        )}
+
         <section>
           <h3>By theme</h3>
           {data.themes.map((t) => {
             const ms = data.metrics.filter((m) => m.theme === t.id);
             if (!ms.length) return null;
+            const gaps = ms.filter((m) => missingReason(data, m, index) !== null).length;
             return (
               <details key={t.id} className="theme-block">
-                <summary>{t.label}</summary>
+                <summary>{t.label}{gaps > 0 && <span className="tiny muted"> · {gaps} with no data</span>}</summary>
                 <table className="metric-table compact">
                   <thead>
                     <tr><th scope="col">Metric</th><th className="num" scope="col">Seat</th><th className="num" scope="col">National</th><th className="num" scope="col">Peers</th></tr>
@@ -206,10 +244,11 @@ export default function Dossier({ data, index, onClose, onSelect, onShowMetric, 
                   <tbody>
                     {ms.map((m) => {
                       const r = rankOf(data.values[m.id], index);
+                      const why = missingReason(data, m, index);
                       return (
-                        <tr key={m.id} onClick={() => onShowMetric(m.id)} title={rankText(r.rank, r.of)}>
-                          <td>{m.label}<div className="m-rank">{rankText(r.rank, r.of)}</div></td>
-                          <td className="num strong">{fmt(m, r.value)}</td>
+                        <tr key={m.id} onClick={() => onShowMetric(m.id)} title={why ?? rankText(r.rank, r.of)}>
+                          <td>{m.label}<div className="m-rank">{why ?? rankText(r.rank, r.of)}</div></td>
+                          <td className="num strong">{why ? <NoData reason={why} /> : fmt(m, r.value)}</td>
                           <td className="num muted">{fmt(m, m.national)}</td>
                           <td className="num muted">{fmt(m, groupMean(data, m.id, seat.peer_group))}</td>
                         </tr>

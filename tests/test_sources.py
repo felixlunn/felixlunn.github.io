@@ -1,5 +1,6 @@
 """Parsing tests for source adapters, using small fixtures shaped like the real API responses."""
 
+import numpy as np
 import pandas as pd
 import pytest
 from shapely.geometry import Polygon
@@ -367,5 +368,5 @@ def test_parse_api_results_matches_csv_shape():
     assert val("turnout") == pytest.approx(60.0)
     assert val("vote_ld") == pytest.approx(50.0)
     assert val("vote_lab") == pytest.approx(100 / 600 * 100)  # Labour and Labour Co-op combined
-    assert val("vote_snp") == 0
+    assert np.isnan(val("vote_snp"))  # SNP only stands in Scotland: not applicable, not 0%
     assert attrs.loc["E1"].to_dict() == {"first_party": "LD", "second_party": "Con", "result": "LD Gain"}

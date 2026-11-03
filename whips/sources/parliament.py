@@ -30,6 +30,18 @@ GE2024_RESULTS_URL = os.environ.get(
 MEMBERS_API = "https://members-api.parliament.uk/api"
 
 
+# Parties that only stand in one nation: elsewhere their vote share is "not applicable", not 0%.
+NATION_PARTIES = {"SNP": "S", "PC": "W"}
+
+
+def only_where_standing(party: str, frame: pd.DataFrame) -> pd.DataFrame:
+    nation = NATION_PARTIES.get(party)
+    if nation:
+        frame = frame.copy()
+        frame.loc[~frame.index.astype(str).str.startswith(nation), "num"] = np.nan
+    return frame
+
+
 def _col(df: pd.DataFrame, *names: str) -> str | None:
     lookup = {c.strip().lower(): c for c in df.columns}
     for n in names:
@@ -55,7 +67,7 @@ def parse_results(df: pd.DataFrame) -> tuple[dict[str, pd.DataFrame], pd.DataFra
     for col, (mid, _label) in ELECTION_PARTIES.items():
         c = _col(df, col)
         if c:
-            metrics[mid] = pd.DataFrame({"num": num(c).fillna(0) * 100, "den": valid})
+            metrics[mid] = only_where_standing(col, pd.DataFrame({"num": num(c).fillna(0) * 100, "den": valid}))
     attrs = pd.DataFrame(index=df.index)
     for out, names in {
         "region": ("Region name",),
@@ -168,7 +180,7 @@ def parse_api_results(results: dict[str, dict]) -> tuple[dict[str, pd.DataFrame]
     }
     for col, (mid, _label) in ELECTION_PARTIES.items():
         num = pd.Series({code: v.get(col, 0) for code, v in shares.items()}, dtype=float)
-        metrics[mid] = pd.DataFrame({"num": num.reindex(df.index).fillna(0) * 100, "den": valid})
+        metrics[mid] = only_where_standing(col, pd.DataFrame({"num": num.reindex(df.index).fillna(0) * 100, "den": valid}))
     attrs = df[["first_party", "second_party", "result"]].copy()
     return metrics, attrs
 

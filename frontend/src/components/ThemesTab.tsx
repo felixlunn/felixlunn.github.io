@@ -3,6 +3,8 @@ import type { Choropleth, DashboardData, Metric } from "../types";
 import { PARTY_ID, partyStyle } from "../lib/parties";
 import { rankOf } from "../lib/analytics";
 import { csv, download, fmt, rankText, slug } from "../lib/format";
+import { missingReason } from "../lib/missing";
+import NoData from "./NoData";
 import Strip from "./Strip";
 
 interface Props {
@@ -74,14 +76,15 @@ export default function ThemesTab({ data, theme, setTheme, metric, partyMode, pa
           )}
           {themeMetrics.map((m) => {
             const r = selected !== null ? rankOf(data.values[m.id], selected) : null;
+            const why = selected !== null ? missingReason(data, m, selected) : null;
             return (
               <tr key={m.id} className={!partyMode && m.id === metric.id ? "active" : ""} onClick={() => setMetric(m.id)} tabIndex={0}
                 onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && setMetric(m.id)} aria-label={`Show ${m.label} on the map`}>
                 <td>
                   <div className="m-label">{m.label}</div>
-                  {r && <div className="m-rank">{rankText(r.rank, r.of)}</div>}
+                  {r && <div className="m-rank">{why ?? rankText(r.rank, r.of)}</div>}
                 </td>
-                {r && <td className="num strong">{fmt(m, r.value)}</td>}
+                {r && <td className="num strong">{why ? <NoData reason={why} /> : fmt(m, r.value)}</td>}
                 <td className={`num ${r ? "muted" : "strong"}`}>{fmt(m, m.national)}</td>
                 <td>
                   <Strip values={data.values[m.id]} selected={selected} national={m.national}

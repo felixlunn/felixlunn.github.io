@@ -92,17 +92,23 @@ def net_additions(sheet: pd.DataFrame, years: int = 3) -> tuple[pd.Series, str]:
     return pd.Series(vals[keep].mean(axis=1).values, index=code[keep].values), period
 
 
+def reported_share(count: pd.Series, dwellings: pd.Series, weights: pd.DataFrame) -> pd.DataFrame:
+    """Seat share (%) from councils that reported any: a council returning zero hasn't classified these homes
+    (no council has none), so it is left out rather than counted as 0%. Seats covered only by such councils are blank."""
+    ok = count.notna() & count.gt(0)
+    if (~ok).any():
+        log.info("%s: no figures from %s", count.name, sorted(count.index[~ok]))
+    return pd.DataFrame({"num": apportion(count[ok], weights) * 100, "den": apportion(dwellings[ok], weights)})
+
+
 def load_housing_stock(s: requests.Session, weights: pd.DataFrame) -> tuple[dict[str, pd.DataFrame], str]:
     url, title = taxbase_url(s)
     r = s.get(url, timeout=180)
     r.raise_for_status()
     c = taxbase_counts(r.content)
     c = c[c.index.str.match(r"^E0[6-9]\d{6}$")]
-    dwell = apportion(c["dwellings"], weights)
-    frames = {
-        "second_homes": pd.DataFrame({"num": apportion(c["second"], weights) * 100, "den": dwell}),
-        "empty_homes_long_term": pd.DataFrame({"num": apportion(c["empty_6m"], weights) * 100, "den": dwell}),
-    }
+    frames = {mid: reported_share(c[col], c["dwellings"], weights)
+              for mid, col in [("second_homes", "second"), ("empty_homes_long_term", "empty_6m")]}
     period = re.sub(r" in England$", "", title) or "Council Taxbase"
     try:
         r = s.get(supply_url(s), timeout=180)
