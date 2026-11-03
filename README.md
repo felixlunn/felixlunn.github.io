@@ -52,6 +52,7 @@ All data are open, refreshed automatically **every two days** by GitHub Actions,
 | [NHSBSA Open Data](https://opendata.nhsbsa.net/) dental activity | Adults (24 months) and children (12 months) seen by an NHS dentist at practices in the seat, per 1,000 residents | England | Monthly |
 | [UK Parliament What's On](https://whatson.parliament.uk/) | Upcoming Commons debates for the Debates panel (next 3 weeks) | UK | Every run |
 | [UK Parliament Members API](https://members-api.parliament.uk/) | Current MP and party (picks up by-elections and defections) | UK | Every run |
+| [DWP Children in low income families](https://www.gov.uk/government/collections/children-in-low-income-families-local-area-statistics) | Children in relative low income families, after and before housing costs, by constituency | UK | Annual |
 
 Census 2021 covers England and Wales only (Scotland's census was 2022 and Northern Ireland's is published by
 NISRA), so census metrics show "No data" for Scottish and Northern Irish seats. Wherever a metric is a ratio,

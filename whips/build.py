@@ -48,6 +48,7 @@ from .sources import schools as schools_src
 from .sources import sewage as sewage_src
 from .sources import imd as imd_src
 from .sources import life_expectancy as life_src
+from .sources import child_poverty as child_poverty_src
 from .sources import lsoa as lsoa_src
 from .sources import nomis, nomis_extra, parliament, police
 
@@ -56,7 +57,7 @@ log = logging.getLogger("whips.build")
 # Neighbourhood (LSOA) profiles are published for seats held by this party.
 NEIGHBOURHOOD_PARTY = re.compile(r"^(liberal democrats?|lib ?dems?|ld)$", re.I)
 
-SKIPPABLE = ["dental", "life_expectancy", "affordability", "homelessness", "ev", "sewage", "petitions", "questions", "rail", "courts", "fuel_poverty", "nhs", "schools", "epc", "imd", "neighbourhoods", "debates", "claimants", "aps", "ashe", "bres", "business", "popest", "police", "elections", "members", "lsoa"]
+SKIPPABLE = ["child_poverty", "dental", "life_expectancy", "affordability", "homelessness", "ev", "sewage", "petitions", "questions", "rail", "courts", "fuel_poverty", "nhs", "schools", "epc", "imd", "neighbourhoods", "debates", "claimants", "aps", "ashe", "bres", "business", "popest", "police", "elections", "members", "lsoa"]
 
 COUNTRY_BY_PREFIX = {"E": "England", "W": "Wales", "S": "Scotland", "N": "Northern Ireland"}
 
@@ -295,6 +296,11 @@ def build(out_dir: Path, skip: set[str] | None = None) -> dict:
         optional("ev", "EV charging infrastructure statistics (DfT, from Zapmap)", ev_src.SOURCE_URL, "Public chargers by constituency; UK",
                  lambda: ev_src.load_ev(s, (frames["turnout"]["den"] if "turnout" in frames else population).dropna()),
                  ev_src.EV_METRICS)
+
+    if "child_poverty" not in skip:
+        optional("child_poverty", "Children in low income families (DWP)", child_poverty_src.SOURCE_URL,
+                 "By constituency; UK",
+                 lambda: child_poverty_src.load_child_poverty(s), child_poverty_src.CHILD_POVERTY_METRICS)
 
     petitions = None
     if "petitions" not in skip:
