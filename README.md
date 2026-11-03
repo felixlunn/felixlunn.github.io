@@ -57,6 +57,7 @@ All data are open, refreshed automatically **every two days** by GitHub Actions,
 | [DfT road safety data](https://www.gov.uk/government/statistics/road-safety-data) (STATS19) | Injury and fatal/serious road collisions over five years, placed in seats by neighbourhood or coordinates, per 10,000 voters | Great Britain | Annual |
 | [CQC care directory](https://www.cqc.org.uk/about-us/transparency/using-cqc-data) | Share of care homes, home care services and GP practices rated Requires improvement or Inadequate; care home beds per 1,000 aged 65+ | England | Monthly |
 | [DfT bus statistics](https://www.gov.uk/government/statistical-data-sets/bus-statistics-data-tables) | Bus journeys per person (BUS01f) and change in bus service miles since 2010 (BUS02d), by local transport authority, averaged across seats | England | Annual |
+| [DfT vehicle licensing statistics](https://www.gov.uk/government/statistical-data-sets/vehicle-licensing-statistics-data-files) | Privately kept cars per household and plug-in share of private cars, summed from neighbourhoods (VEH0125, VEH0145) | England & Wales | Quarterly |
 
 Census 2021 covers England and Wales only (Scotland's census was 2022 and Northern Ireland's is published by
 NISRA), so census metrics show "No data" for Scottish and Northern Irish seats. Wherever a metric is a ratio,

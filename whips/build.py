@@ -48,6 +48,7 @@ from .sources import schools as schools_src
 from .sources import sewage as sewage_src
 from .sources import imd as imd_src
 from .sources import life_expectancy as life_src
+from .sources import vehicles as vehicles_src
 from .sources import buses as buses_src
 from .sources import cqc as cqc_src
 from .sources import roads as roads_src
@@ -61,7 +62,7 @@ log = logging.getLogger("whips.build")
 # Neighbourhood (LSOA) profiles are published for seats held by this party.
 NEIGHBOURHOOD_PARTY = re.compile(r"^(liberal democrats?|lib ?dems?|ld)$", re.I)
 
-SKIPPABLE = ["buses", "cqc", "roads", "housing_stock", "child_poverty", "dental", "life_expectancy", "affordability", "homelessness", "ev", "sewage", "petitions", "questions", "rail", "courts", "fuel_poverty", "nhs", "schools", "epc", "imd", "neighbourhoods", "debates", "claimants", "aps", "ashe", "bres", "business", "popest", "police", "elections", "members", "lsoa"]
+SKIPPABLE = ["vehicles", "buses", "cqc", "roads", "housing_stock", "child_poverty", "dental", "life_expectancy", "affordability", "homelessness", "ev", "sewage", "petitions", "questions", "rail", "courts", "fuel_poverty", "nhs", "schools", "epc", "imd", "neighbourhoods", "debates", "claimants", "aps", "ashe", "bres", "business", "popest", "police", "elections", "members", "lsoa"]
 
 COUNTRY_BY_PREFIX = {"E": "England", "W": "Wales", "S": "Scotland", "N": "Northern Ireland"}
 
@@ -325,6 +326,11 @@ def build(out_dir: Path, skip: set[str] | None = None) -> dict:
         optional("buses", "Bus statistics (DfT)", buses_src.SOURCE_URL,
                  "By local transport authority, averaged over the authorities each seat covers; England",
                  lambda: buses_src.load_buses(s, council_weights()), buses_src.BUS_METRICS)
+
+    if "vehicles" not in skip:
+        optional("vehicles", "Vehicle licensing statistics (DfT)", vehicles_src.SOURCE_URL,
+                 "Privately kept cars and plug-in vehicles by neighbourhood; England & Wales",
+                 lambda: vehicles_src.load_vehicles(s, lsoa_lookup(), census["no_car"]["den"] if "no_car" in census else None), vehicles_src.VEHICLE_METRICS)
 
     petitions = None
     if "petitions" not in skip:
