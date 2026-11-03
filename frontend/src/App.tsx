@@ -14,7 +14,7 @@ import NeighbourhoodsTab, { pctLabel } from "./components/NeighbourhoodsTab";
 import { useColours, type Overlay } from "./components/MapView";
 import { classify } from "./lib/colors";
 import { dataUrl } from "./lib/dataUrl";
-import { debateMetrics, flagSeats, partyOf } from "./lib/debates";
+import { debateMetrics } from "./lib/debates";
 
 const MapView = lazy(() => import("./components/MapView"));
 
@@ -55,16 +55,12 @@ export default function App({ data, geo }: { data: DashboardData; geo: GeoJSON.F
   const [theme, setTheme] = useState(partyMode ? "politics" : metric.theme);
   const partyMap = useMemo(() => partyChoropleth(data.seats), [data]);
 
-  // Debates: which debate is open, which of its metrics shades the map, and whose MPs to flag.
-  const [debateParty, setDebatePartyState] = useState(() => stored("whips.party") || (mySeat !== null && partyOf(data, mySeat)) || "Lib Dem");
-  const setDebateParty = useCallback((p: string) => { setDebatePartyState(p); store("whips.party", p); }, []);
   const setMySeat = useCallback((i: number | null) => {
     setMySeatState(i);
     store("whips.mySeat", i === null ? null : data.seats[i].code);
-    const p = i === null ? null : partyOf(data, i);
-    if (p) setDebateParty(p); // an office flags its own party's MPs by default
     if (i !== null) setFocus((f) => ({ code: data.seats[i].code, n: (f?.n ?? 0) + 1 }));
-  }, [data, setDebateParty]);
+  }, [data]);
+  // Debates: which debate is open, and which of its metrics shades the map.
   const [debateId, setDebateId] = useState<number | null>(null);
   const [debateMetricId, setDebateMetricId] = useState<string | null>(null);
   const activeDebate = data.debates?.find((d) => d.id === debateId) ?? null;
@@ -195,13 +191,11 @@ export default function App({ data, geo }: { data: DashboardData; geo: GeoJSON.F
     if (tab === "debates") {
       const m = activeDebate && debateMetricId ? data.metrics.find((x) => x.id === debateMetricId) : null;
       if (!activeDebate || !m) return partyMap;
-      const flagged = flagSeats(data, [m], debateParty).map((f) => data.seats[f.seat].code);
       return {
         title: m.label + unitSuffix(m),
         subtitle: activeDebate.title,
         values: data.values[m.id],
         format: (v) => fmt(m, v),
-        highlight: flagged,
       };
     }
     if (partyMode) return partyMap;
@@ -211,7 +205,7 @@ export default function App({ data, geo }: { data: DashboardData; geo: GeoJSON.F
       values: data.values[metric.id],
       format: (v) => fmt(metric, v),
     };
-  }, [tab, twinScores, twinResults, twinIds, twinSettings, baseSeat, indexScores, indexRanking, weights, metric, data, partyMode, partyMap, nbActive, activeDebate, debateMetricId, debateParty]);
+  }, [tab, twinScores, twinResults, twinIds, twinSettings, baseSeat, indexScores, indexRanking, weights, metric, data, partyMode, partyMap, nbActive, activeDebate, debateMetricId]);
 
   const generated = new Date(data.generated_at);
   const failed = data.sources.filter((s) => s.status === "failed");
@@ -250,8 +244,8 @@ export default function App({ data, geo }: { data: DashboardData; geo: GeoJSON.F
         </div>
         {panelOpen && (
           <>
-            {tab === "debates" && <DebatesTab data={data} party={debateParty} setParty={setDebateParty} mySeat={mySeat} active={debateId} setActive={openDebate}
-              mapMetric={debateMetricId} setMapMetric={setDebateMetricId} selected={selected} onSelect={(i) => select(i)} />}
+            {tab === "debates" && <DebatesTab data={data} mySeat={mySeat} active={debateId} setActive={openDebate}
+              mapMetric={debateMetricId} setMapMetric={setDebateMetricId} onSelect={(i) => select(i)} />}
             {tab === "neighbourhoods" && <NeighbourhoodsTab data={data} seat={baseSeat} file={nbFile?.seat === nbSeatCode ? nbFile : null} status={nbStatus}
               metricId={nbMetric?.id ?? null} setMetricId={setNbMetricId} />}
             {tab === "themes" && <ThemesTab data={data} theme={theme} setTheme={(t) => { setTheme(t); const first = t === "politics" ? PARTY_ID : data.metrics.find((m) => m.theme === t)?.id; if (first) setMetricId(first); }} metric={metric} partyMode={partyMode} parties={partyMap} setMetric={setMetricId} selected={baseSeat} onSelect={(i) => select(i)} />}

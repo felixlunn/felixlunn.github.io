@@ -28,12 +28,27 @@ interface Props {
 }
 
 /**
- * Base map: OpenFreeMap (open-source vector tiles from OpenStreetMap; no API key, no usage limits).
- * "Positron" is a pale style made to sit under data; the dark style matches dark mode.
- * Our layers go beneath its labels, so place names stay readable over the shading.
+ * Base map: the standard OpenStreetMap tiles (no API key). Use follows the OSM tile usage policy:
+ * attribution is shown and the browser sends its normal Referer. Dimmed in dark mode.
+ * If tiles can't load, the plain background underneath simply shows through.
  */
-const BASEMAP_URL = (dark: boolean) => `https://tiles.openfreemap.org/styles/${dark ? "dark" : "positron"}`;
-const PLAIN: maplibregl.StyleSpecification = { version: 8, sources: {}, layers: [] };
+function baseStyle(): maplibregl.StyleSpecification {
+  const dark = isDark();
+  return {
+    version: 8,
+    sources: {
+      osm: {
+        type: "raster", tileSize: 256, maxzoom: 19,
+        tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],
+        attribution: '© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">OpenStreetMap</a> contributors',
+      },
+    },
+    layers: [{
+      id: "osm", type: "raster", source: "osm",
+      paint: dark ? { "raster-brightness-max": 0.55, "raster-saturation": -0.4 } : { "raster-saturation": -0.15 },
+    }],
+  };
+}
 
 /** Fill opacity: lets the base map show through as you zoom in; solid without one. */
 function fillOpacity(hover: number, solid: number, zoomed: number, baseMap: boolean): maplibregl.DataDrivenPropertyValueSpecification<number> {
@@ -107,7 +122,7 @@ export default function MapView({ geo, seats, choropleth, selected, mine = null,
     if (!el.current) return;
     const m = new maplibregl.Map({
       container: el.current,
-      style: BASEMAP_URL(isDark()),
+      style: baseStyle(),
       bounds: UK_BOUNDS,
       fitBoundsOptions: { padding: 20 },
       attributionControl: false,
@@ -119,19 +134,10 @@ export default function MapView({ geo, seats, choropleth, selected, mine = null,
     m.touchZoomRotate.disableRotation();
     m.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");
     m.addControl(new maplibregl.AttributionControl({ compact: true, customAttribution: "Boundaries: ONS (OGL), Contains OS data © Crown copyright" }));
-    // If the base map can't load (offline, blocked), carry on with a plain background.
-    let fellBack = false;
-    m.on("error", (e) => {
-      if (!fellBack && !m.isStyleLoaded() && !baseLayers.current.length) {
-        fellBack = true;
-        console.warn("Base map unavailable; using a plain background", e.error);
-        m.setStyle(PLAIN);
-      }
-    });
     m.on("load", () => {
       const styleLayers = m.getStyle().layers ?? [];
       baseLayers.current = styleLayers.map((l) => l.id);
-      const labels = styleLayers.find((l) => l.type === "symbol")?.id; // our layers go just beneath the labels
+      const labels = styleLayers.find((l) => l.type === "symbol")?.id; // vector styles: our layers go beneath labels
       const on = baseMapRef.current && baseLayers.current.length > 0;
       for (const id of baseLayers.current) m.setLayoutProperty(id, "visibility", on ? "visible" : "none");
       m.addLayer({ id: "bg", type: "background", layout: { visibility: on ? "none" : "visible" }, paint: { "background-color": cssVar("--map-sea") } }, styleLayers[0]?.id);
