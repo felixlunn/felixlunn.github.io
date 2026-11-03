@@ -4,6 +4,8 @@ import { debateMetrics, leadSeat, standing, standsOut, type Hit } from "../lib/d
 import { partyStyle } from "../lib/parties";
 import { textOn } from "../lib/colors";
 import { fmt, ordinal } from "../lib/format";
+import { missingFor } from "../lib/missing";
+import NoData from "./NoData";
 
 interface Props {
   data: DashboardData;
@@ -116,6 +118,9 @@ function DebateCard({ d, metrics, mine, standouts, leading, flagged, data, mySea
           })}
           {topicLabels.map((t) => <span key={t} className="topic">{t}</span>)}
         </div>
+        {!flagged && mySeat !== null && metrics.length > 0 && mine.length === 0 && (
+          <div className="debate-mine"><NoData reason="Your seat has no data on any figure this debate touches" /> <span className="tiny muted">for your seat on these figures</span></div>
+        )}
         {flagged && (
           <div className="debate-mine on">
             {leading ? "Your MP is leading this debate" : "Your seat stands out"}
@@ -140,13 +145,18 @@ function DebateCard({ d, metrics, mine, standouts, leading, flagged, data, mySea
               </div>
             </>
           )}
-          {mySeat !== null && mine.length > 0 && (
+          {mySeat !== null && (mine.length > 0 || missingFor(data, mySeat, metrics).length > 0) && (
             <div className="my-standing">
               <div className="tiny muted">{data.seats[mySeat].name} on these figures (bold: in the most extreme tenth of seats)</div>
               <ul>
                 {mine.map((h) => (
                   <li key={h.metric.id} className={`small ${standsOut(h) ? "strong" : ""}`}>
                     {h.metric.label}: {fmt(h.metric, h.value)} <span className="muted">({rankPhrase(h)}; national {fmt(h.metric, h.metric.national)})</span>
+                  </li>
+                ))}
+                {missingFor(data, mySeat, metrics).map(({ metric, reason }) => (
+                  <li key={metric.id} className="small">
+                    {metric.label}: <NoData reason={reason} /> <span className="muted">({reason}; not counted)</span>
                   </li>
                 ))}
               </ul>

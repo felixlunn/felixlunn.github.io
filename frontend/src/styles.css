@@ -332,3 +332,9 @@ select, input { font: inherit; color: var(--text-1); background: var(--surface-1
   .dossier-body { overflow: visible; }
   .theme-block { break-inside: avoid; }
 }
+
+/* Missing data: always flagged, never shown as a figure */
+.nodata-flag { display: inline-block; padding: 0 .4em; border-radius: 3px; font-size: .78em; font-weight: 600;
+  color: var(--bad); border: 1px dashed currentColor; white-space: nowrap; }
+.missing-list { margin: .25rem 0 .5rem; padding-left: 1.1rem; }
+.missing-list li { margin: .1rem 0; }

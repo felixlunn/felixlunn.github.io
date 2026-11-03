@@ -36,6 +36,14 @@ CHARGED_KEYWORDS = (
 )
 NO_SUSPECT = "investigation complete; no suspect identified"
 UNRESOLVED = {"under investigation", "status update unavailable"}
+# A seat whose crime rate is below this share of the median seat's is covered by a force that isn't publishing
+# to police.uk (e.g. Greater Manchester Police since 2019): its few crimes are spill-over from neighbouring forces.
+UNPUBLISHED_SHARE = 0.15
+
+
+def unpublished(rate: pd.Series) -> list[str]:
+    """Seats whose crimes per 1,000 residents are implausibly low: no data, not low crime."""
+    return sorted(rate[rate < rate.median() * UNPUBLISHED_SHARE].index)
 
 
 class _RateLimiter:
@@ -168,6 +176,10 @@ def load_police(s: requests.Session, boundaries: dict, population: pd.Series, mo
     df = pd.DataFrame(totals).T.fillna(0)
     annualise = 12 / len(month_list)
     pop = population.reindex(df.index)
+    missing = unpublished((df.get("all-crime", 0) * 1000 / pop).dropna())
+    if missing:
+        log.warning("police.uk: no data published for %d seats (left blank): %s", len(missing), missing)
+        df, pop = df.drop(index=missing), pop.drop(index=missing)
     out: dict[str, pd.DataFrame] = {}
     for cat, (mid, _label) in POLICE_CATEGORIES.items():
         num = df.get(cat, pd.Series(0, index=df.index)) * annualise * 1000
