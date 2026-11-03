@@ -65,6 +65,7 @@ All data are open, refreshed automatically **every two days** by GitHub Actions,
 | [DESNZ sub-national energy consumption](https://www.gov.uk/government/statistics/lower-and-middle-super-output-areas-gas-consumption) | Homes off the gas grid (gas vs electricity meters), and average gas and electricity use per home, summed from neighbourhoods | England & Wales | Annual |
 | [ONS Price Index of Private Rents](https://www.ons.gov.uk/economy/inflationandpriceindices/datasets/priceindexofprivaterentsukmonthlypricestatistics) | Average monthly private rent and annual change, by council, averaged across seats | England & Wales | Monthly |
 | [DfT road condition statistics](https://www.gov.uk/government/statistical-data-sets/road-condition-statistics-data-tables-rdc) | Share of A, B/C and unclassified council roads needing repair (red), by highway authority, averaged across seats | England | Annual |
+| [Home Office immigration statistics](https://www.gov.uk/government/statistical-data-sets/immigration-system-statistics-regional-and-local-authority-data) | People in asylum support (and in contingency accommodation such as hotels), and Homes for Ukraine arrivals, per 10,000 residents, by council | England & Wales | Quarterly |
 
 Census 2021 covers England and Wales only (Scotland's census was 2022 and Northern Ireland's is published by
 NISRA), so census metrics show "No data" for Scottish and Northern Irish seats. Wherever a metric is a ratio,
