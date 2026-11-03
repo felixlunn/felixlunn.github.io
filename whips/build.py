@@ -48,6 +48,7 @@ from .sources import schools as schools_src
 from .sources import sewage as sewage_src
 from .sources import imd as imd_src
 from .sources import life_expectancy as life_src
+from .sources import pharmacies as pharmacies_src
 from .sources import public_health as public_health_src
 from .sources import income as income_src
 from .sources import asylum as asylum_src
@@ -71,7 +72,7 @@ log = logging.getLogger("whips.build")
 # Neighbourhood (LSOA) profiles are published for seats held by this party.
 NEIGHBOURHOOD_PARTY = re.compile(r"^(liberal democrats?|lib ?dems?|ld)$", re.I)
 
-SKIPPABLE = ["public_health", "income", "asylum", "road_condition", "rents", "energy", "travel", "renewables", "air_pollution", "children", "vehicles", "buses", "cqc", "roads", "housing_stock", "child_poverty", "dental", "life_expectancy", "affordability", "homelessness", "ev", "sewage", "petitions", "questions", "rail", "courts", "fuel_poverty", "nhs", "schools", "epc", "imd", "neighbourhoods", "debates", "claimants", "aps", "ashe", "bres", "business", "popest", "police", "elections", "members", "lsoa"]
+SKIPPABLE = ["pharmacies", "public_health", "income", "asylum", "road_condition", "rents", "energy", "travel", "renewables", "air_pollution", "children", "vehicles", "buses", "cqc", "roads", "housing_stock", "child_poverty", "dental", "life_expectancy", "affordability", "homelessness", "ev", "sewage", "petitions", "questions", "rail", "courts", "fuel_poverty", "nhs", "schools", "epc", "imd", "neighbourhoods", "debates", "claimants", "aps", "ashe", "bres", "business", "popest", "police", "elections", "members", "lsoa"]
 
 COUNTRY_BY_PREFIX = {"E": "England", "W": "Wales", "S": "Scotland", "N": "Northern Ireland"}
 
@@ -390,6 +391,11 @@ def build(out_dir: Path, skip: set[str] | None = None) -> dict:
         optional("public_health", "Public health indicators (OHID Fingertips)", public_health_src.SOURCE_URL,
                  "By council, averaged over the councils each seat covers; England",
                  lambda: public_health_src.load_public_health(s, council_weights()), public_health_src.PUBLIC_HEALTH_METRICS)
+
+    if "pharmacies" not in skip:
+        optional("pharmacies", "Consolidated pharmaceutical list (NHSBSA)", pharmacies_src.SOURCE_URL,
+                 "Community pharmacies placed by postcode; England",
+                 lambda: pharmacies_src.load_pharmacies(s, population), pharmacies_src.PHARMACY_METRICS)
 
     petitions = None
     if "petitions" not in skip:

@@ -68,6 +68,7 @@ All data are open, refreshed automatically **every two days** by GitHub Actions,
 | [Home Office immigration statistics](https://www.gov.uk/government/statistical-data-sets/immigration-system-statistics-regional-and-local-authority-data) | People in asylum support (and in contingency accommodation such as hotels), and Homes for Ukraine arrivals, per 10,000 residents, by council | England & Wales | Quarterly |
 | [HMRC income and tax by constituency](https://www.gov.uk/government/statistics/income-and-tax-by-parliamentary-constituency-2010-to-2011) (Table 3.15) | Median taxpayer income and share paying higher or additional rate, by constituency | UK | Annual |
 | [OHID Fingertips](https://fingertips.phe.org.uk/) public health | MMR vaccination by age 5, Year 6 obesity, adult smoking, alcohol-related admissions and suicide rate, by council, averaged across seats | England | Annual |
+| [NHSBSA consolidated pharmaceutical list](https://opendata.nhsbsa.net/dataset/consolidated-pharmaceutical-list) | Community pharmacies per 10,000 residents, and change since 2022, placed by postcode | England | Quarterly |
 
 Census 2021 covers England and Wales only (Scotland's census was 2022 and Northern Ireland's is published by
 NISRA), so census metrics show "No data" for Scottish and Northern Irish seats. Wherever a metric is a ratio,
