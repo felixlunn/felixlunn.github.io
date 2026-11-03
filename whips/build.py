@@ -48,6 +48,7 @@ from .sources import schools as schools_src
 from .sources import sewage as sewage_src
 from .sources import imd as imd_src
 from .sources import life_expectancy as life_src
+from .sources import business_demography as business_demography_src
 from .sources import council_tax as council_tax_src
 from .sources import insolvency as insolvency_src
 from .sources import university as university_src
@@ -77,7 +78,7 @@ log = logging.getLogger("whips.build")
 # Neighbourhood (LSOA) profiles are published for seats held by this party.
 NEIGHBOURHOOD_PARTY = re.compile(r"^(liberal democrats?|lib ?dems?|ld)$", re.I)
 
-SKIPPABLE = ["council_tax", "insolvency", "university", "ofsted", "pupils", "pharmacies", "public_health", "income", "asylum", "road_condition", "rents", "energy", "travel", "renewables", "air_pollution", "children", "vehicles", "buses", "cqc", "roads", "housing_stock", "child_poverty", "dental", "life_expectancy", "affordability", "homelessness", "ev", "sewage", "petitions", "questions", "rail", "courts", "fuel_poverty", "nhs", "schools", "epc", "imd", "neighbourhoods", "debates", "claimants", "aps", "ashe", "bres", "business", "popest", "police", "elections", "members", "lsoa"]
+SKIPPABLE = ["business_demography", "council_tax", "insolvency", "university", "ofsted", "pupils", "pharmacies", "public_health", "income", "asylum", "road_condition", "rents", "energy", "travel", "renewables", "air_pollution", "children", "vehicles", "buses", "cqc", "roads", "housing_stock", "child_poverty", "dental", "life_expectancy", "affordability", "homelessness", "ev", "sewage", "petitions", "questions", "rail", "courts", "fuel_poverty", "nhs", "schools", "epc", "imd", "neighbourhoods", "debates", "claimants", "aps", "ashe", "bres", "business", "popest", "police", "elections", "members", "lsoa"]
 
 COUNTRY_BY_PREFIX = {"E": "England", "W": "Wales", "S": "Scotland", "N": "Northern Ireland"}
 
@@ -426,6 +427,11 @@ def build(out_dir: Path, skip: set[str] | None = None) -> dict:
         optional("council_tax", "Council tax statistics (MHCLG)", council_tax_src.SOURCE_URL,
                  "Band D by billing authority, averaged over the councils each seat covers; England",
                  lambda: council_tax_src.load_council_tax(s, council_weights()), council_tax_src.COUNCIL_TAX_METRICS)
+
+    if "business_demography" not in skip:
+        optional("business_demography", "Business demography (ONS)", business_demography_src.SOURCE_URL,
+                 "Business births and deaths by council, shared out across the seats each council covers; England & Wales",
+                 lambda: business_demography_src.load_business_demography(s, council_weights()), business_demography_src.BUSINESS_DEMOGRAPHY_METRICS)
 
     petitions = None
     if "petitions" not in skip:
