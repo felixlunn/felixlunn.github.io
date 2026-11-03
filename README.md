@@ -56,6 +56,7 @@ All data are open, refreshed automatically **every two days** by GitHub Actions,
 | [MHCLG Council Taxbase](https://www.gov.uk/government/collections/council-taxbase-statistics) and [Live Table 122](https://www.gov.uk/government/statistical-data-sets/live-tables-on-net-supply-of-housing) | Second homes, homes empty 6+ months, and net new homes a year (3-year average), by council, shared out across seats | England | Annual |
 | [DfT road safety data](https://www.gov.uk/government/statistics/road-safety-data) (STATS19) | Injury and fatal/serious road collisions over five years, placed in seats by neighbourhood or coordinates, per 10,000 voters | Great Britain | Annual |
 | [CQC care directory](https://www.cqc.org.uk/about-us/transparency/using-cqc-data) | Share of care homes, home care services and GP practices rated Requires improvement or Inadequate; care home beds per 1,000 aged 65+ | England | Monthly |
+| [DfT bus statistics](https://www.gov.uk/government/statistical-data-sets/bus-statistics-data-tables) | Bus journeys per person (BUS01f) and change in bus service miles since 2010 (BUS02d), by local transport authority, averaged across seats | England | Annual |
 
 Census 2021 covers England and Wales only (Scotland's census was 2022 and Northern Ireland's is published by
 NISRA), so census metrics show "No data" for Scottish and Northern Irish seats. Wherever a metric is a ratio,

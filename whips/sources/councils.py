@@ -67,3 +67,28 @@ def averaged(values: pd.Series, weights: pd.DataFrame) -> pd.DataFrame:
     """Council values -> seat num/den: the average of the seat's councils, weighted by its LSOAs in each."""
     w = weights.assign(v=weights["lad"].map(values)).dropna(subset=["v"])
     return pd.DataFrame({"num": (w["v"] * w["n"]).groupby(w["pcon"]).sum(), "den": w.groupby("pcon")["n"].sum()})
+
+
+
+COUNTY_PATTERN = re.compile(r"^LAD(\d{2})_CTY\d{2}_EN_LU", re.I)
+
+
+def lad_to_county(s: requests.Session) -> dict[str, str]:
+    """District code -> county code (non-metropolitan E10 and metropolitan E11), from the latest ONS lookup.
+
+    Unitary councils and London boroughs are not in it."""
+    names = [n for n in _services(s) if COUNTY_PATTERN.match(n)]
+    if not names:
+        raise LookupError("No district to county lookup found on the ONS portal")
+    latest = max(names, key=lambda n: (int(COUNTY_PATTERN.match(n).group(1)), n))
+    rows = arcgis_rows(s, f"{ARCGIS_ROOT}/{latest}/FeatureServer/0")
+    return {column(r, r"LAD\d{2}CD"): column(r, r"CTY\d{2}CD") for r in rows}
+
+
+def regrouped_weights(weights: pd.DataFrame, mapping: dict[str, str]) -> pd.DataFrame:
+    """Seat x council weights regrouped to larger areas (e.g. counties); councils not in ``mapping`` stay as they are."""
+    w = weights.assign(lad=weights["lad"].map(lambda c: mapping.get(c, c)))
+    w = w.groupby(["pcon", "lad"], as_index=False)["n"].sum()
+    w["of_seat"] = w["n"] / w.groupby("pcon")["n"].transform("sum")
+    w["of_council"] = w["n"] / w.groupby("lad")["n"].transform("sum")
+    return w
