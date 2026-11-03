@@ -92,3 +92,9 @@ def regrouped_weights(weights: pd.DataFrame, mapping: dict[str, str]) -> pd.Data
     w["of_seat"] = w["n"] / w.groupby("pcon")["n"].transform("sum")
     w["of_council"] = w["n"] / w.groupby("lad")["n"].transform("sum")
     return w
+
+
+def upper_tier_weights(weights: pd.DataFrame, county: dict[str, str]) -> pd.DataFrame:
+    """Seat x council weights for upper-tier councils (education, highways, social care): districts join their
+    county (E10); unitary councils, metropolitan districts and London boroughs stand alone."""
+    return regrouped_weights(weights, {lad: c for lad, c in county.items() if str(c).startswith("E10")})
