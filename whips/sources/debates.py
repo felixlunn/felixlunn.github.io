@@ -63,10 +63,10 @@ TOPICS: dict[str, tuple[str, str, list[str]]] = {
     "immigration": ("Immigration & asylum",
                     r"asylum|immigra|migrant|migration|refugee|small boats?|visa|resettlement|hotels? for",
                     ["asylum_supported_per_10k", "asylum_contingency_per_10k", "homes_for_ukraine_per_10k", "born_outside_uk"]),
-    "water": ("Water, sewage & air",
+    "water": ("Water, flooding & air",
               r"sewage|water compan|water bill|rivers?\b|bathing water|storm overflow|ofwat|pollution|chalk stream|\bwater\b|"
-              r"air quality|clean air|emissions zone|\bulez\b",
-              ["sewage_spills", "sewage_hours", "air_pollution_deaths"]),
+              r"air quality|clean air|emissions zone|\bulez\b|flood",
+              ["sewage_spills", "sewage_hours", "flood_warning_areas", "air_pollution_deaths"]),
     "rural": ("Rural & farming",
               r"farm|agricultur|rural|countryside|fishing|fisheries|food security|coastal|national park",
               ["jobs_agriculture", "heat_oil", "commute_30km_plus"]),
