@@ -38,7 +38,7 @@ TOPICS: dict[str, tuple[str, str, list[str]]] = {
                r"social care|care homes?|care quality|carers?\b|disab|dementia|stroke|nurs|gynaecolog|menopaus|endometriosis|maternity|medic|dentist|dental|"
                r"prescri|opioid|antidepressant|life expectancy",
                ["gp_contact_good", "gp_wait_ok", "care_homes_poor", "care_home_beds_per_1k_65", "dental_adults_per_1k", "life_expectancy_male", "nhs_diabetes",
-                "nhs_depression", "nhs_dementia", "rx_antidepressants", "rx_opioids", "bad_health", "carers_50h"]),
+                "nhs_depression", "nhs_dementia", "suicide_rate", "alcohol_admissions", "vacc_mmr2_age5", "rx_antidepressants", "rx_opioids", "bad_health", "carers_50h"]),
     "housing": ("Housing",
                 r"housing|\bhomes?\b|planning|\brent(ers?|ed|ing|s)?\b|leasehold|homeless|landlord|mortgage|council tax|"
                 r"stamp duty|temporary accommodation|second homes?|empty homes?|housebuilding|new homes",
