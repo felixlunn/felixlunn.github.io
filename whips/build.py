@@ -48,6 +48,7 @@ from .sources import schools as schools_src
 from .sources import sewage as sewage_src
 from .sources import imd as imd_src
 from .sources import life_expectancy as life_src
+from .sources import pupils as pupils_src
 from .sources import pharmacies as pharmacies_src
 from .sources import public_health as public_health_src
 from .sources import income as income_src
@@ -72,7 +73,7 @@ log = logging.getLogger("whips.build")
 # Neighbourhood (LSOA) profiles are published for seats held by this party.
 NEIGHBOURHOOD_PARTY = re.compile(r"^(liberal democrats?|lib ?dems?|ld)$", re.I)
 
-SKIPPABLE = ["pharmacies", "public_health", "income", "asylum", "road_condition", "rents", "energy", "travel", "renewables", "air_pollution", "children", "vehicles", "buses", "cqc", "roads", "housing_stock", "child_poverty", "dental", "life_expectancy", "affordability", "homelessness", "ev", "sewage", "petitions", "questions", "rail", "courts", "fuel_poverty", "nhs", "schools", "epc", "imd", "neighbourhoods", "debates", "claimants", "aps", "ashe", "bres", "business", "popest", "police", "elections", "members", "lsoa"]
+SKIPPABLE = ["pupils", "pharmacies", "public_health", "income", "asylum", "road_condition", "rents", "energy", "travel", "renewables", "air_pollution", "children", "vehicles", "buses", "cqc", "roads", "housing_stock", "child_poverty", "dental", "life_expectancy", "affordability", "homelessness", "ev", "sewage", "petitions", "questions", "rail", "courts", "fuel_poverty", "nhs", "schools", "epc", "imd", "neighbourhoods", "debates", "claimants", "aps", "ashe", "bres", "business", "popest", "police", "elections", "members", "lsoa"]
 
 COUNTRY_BY_PREFIX = {"E": "England", "W": "Wales", "S": "Scotland", "N": "Northern Ireland"}
 
@@ -396,6 +397,11 @@ def build(out_dir: Path, skip: set[str] | None = None) -> dict:
         optional("pharmacies", "Consolidated pharmaceutical list (NHSBSA)", pharmacies_src.SOURCE_URL,
                  "Community pharmacies placed by postcode; England",
                  lambda: pharmacies_src.load_pharmacies(s, population), pharmacies_src.PHARMACY_METRICS)
+
+    if "pupils" not in skip:
+        optional("pupils", "Pupil absence and KS4 destinations (DfE explore education statistics)", pupils_src.SOURCE_URL,
+                 "By council, shared out across the seats each council covers; England",
+                 lambda: pupils_src.load_pupils(s, council_weights()), pupils_src.PUPIL_METRICS)
 
     petitions = None
     if "petitions" not in skip:
