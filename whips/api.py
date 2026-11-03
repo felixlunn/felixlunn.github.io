@@ -20,7 +20,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from . import engine
 
-app = FastAPI(title="Whips Dashboard API", version="0.1.0",
+app = FastAPI(title="Data Dashboard API", version="0.1.0",
               description="Constituency statistics, rankings, twin seats, and custom indices.")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["GET", "POST"], allow_headers=["*"])
 

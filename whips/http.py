@@ -11,7 +11,7 @@ from urllib3.util.retry import Retry
 
 log = logging.getLogger(__name__)
 
-USER_AGENT = "WhipsDashboard/0.1 (+https://github.com/felixlunnLD/Whips-Dashboard)"
+USER_AGENT = "DataDashboard/0.1 (+https://github.com/felixlunnLD/Whips-Dashboard)"
 
 
 def session(pool: int = 16) -> requests.Session:
