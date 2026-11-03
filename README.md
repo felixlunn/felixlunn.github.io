@@ -61,6 +61,7 @@ All data are open, refreshed automatically **every two days** by GitHub Actions,
 | [DfE explore education statistics](https://explore-education-statistics.service.gov.uk/) API | Pupils with EHC plans and on SEN support (by constituency); EHC plans issued within 20 weeks and funded childcare take-up by eligible 2-year-olds (by council, shared out across seats) | England | Annual |
 | [OHID Fingertips](https://fingertips.phe.org.uk/) air pollution | Share of adult deaths attributable to PM2.5 air pollution, by council, averaged across seats | England | Annual |
 | [DESNZ renewable electricity by local authority](https://www.gov.uk/government/statistics/regional-renewable-statistics) | Solar PV installations per 100 households, by council, shared out across seats | England & Wales | Annual |
+| [DfT journey time statistics](https://www.gov.uk/government/collections/journey-time-statistics) | Minutes to the nearest GP, hospital, secondary school, food store and town centre by public transport or walking (2019), averaged over neighbourhoods | England | Occasional |
 
 Census 2021 covers England and Wales only (Scotland's census was 2022 and Northern Ireland's is published by
 NISRA), so census metrics show "No data" for Scottish and Northern Irish seats. Wherever a metric is a ratio,

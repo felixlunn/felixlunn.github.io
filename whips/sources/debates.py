@@ -55,7 +55,7 @@ TOPICS: dict[str, tuple[str, str, list[str]]] = {
     "transport": ("Transport",
                   r"transport|electric vehicle|\bev\b|charg(ing|ers?) point|chargepoint|\bbus(es)?\b|\brail|\btrains?\b|\broads?\b|pothole|road safety|speed limit|collision|cycl|motorist|driving|car park|travel|airport",
                   ["no_car", "commute_bus", "commute_train", "rail_journeys_per_resident", "commute_car", "commute_30km_plus",
-                   "ev_chargers_per_10k", "road_ksi_per_10k", "bus_miles_change", "bus_journeys_per_head", "plugin_share_private"]),
+                   "ev_chargers_per_10k", "road_ksi_per_10k", "bus_miles_change", "bus_journeys_per_head", "travel_hospital", "travel_gp", "plugin_share_private"]),
     "education": ("Education & children",
                   r"school|education|teacher|\bsend\b|special educational|universit|students?|skills|apprentice|"
                   r"childcare|nurser|children|young people|learning",

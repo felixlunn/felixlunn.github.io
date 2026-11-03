@@ -48,6 +48,7 @@ from .sources import schools as schools_src
 from .sources import sewage as sewage_src
 from .sources import imd as imd_src
 from .sources import life_expectancy as life_src
+from .sources import travel as travel_src
 from .sources import air_energy as air_src
 from .sources import children as children_src
 from .sources import vehicles as vehicles_src
@@ -64,7 +65,7 @@ log = logging.getLogger("whips.build")
 # Neighbourhood (LSOA) profiles are published for seats held by this party.
 NEIGHBOURHOOD_PARTY = re.compile(r"^(liberal democrats?|lib ?dems?|ld)$", re.I)
 
-SKIPPABLE = ["renewables", "air_pollution", "children", "vehicles", "buses", "cqc", "roads", "housing_stock", "child_poverty", "dental", "life_expectancy", "affordability", "homelessness", "ev", "sewage", "petitions", "questions", "rail", "courts", "fuel_poverty", "nhs", "schools", "epc", "imd", "neighbourhoods", "debates", "claimants", "aps", "ashe", "bres", "business", "popest", "police", "elections", "members", "lsoa"]
+SKIPPABLE = ["travel", "renewables", "air_pollution", "children", "vehicles", "buses", "cqc", "roads", "housing_stock", "child_poverty", "dental", "life_expectancy", "affordability", "homelessness", "ev", "sewage", "petitions", "questions", "rail", "courts", "fuel_poverty", "nhs", "schools", "epc", "imd", "neighbourhoods", "debates", "claimants", "aps", "ashe", "bres", "business", "popest", "police", "elections", "members", "lsoa"]
 
 COUNTRY_BY_PREFIX = {"E": "England", "W": "Wales", "S": "Scotland", "N": "Northern Ireland"}
 
@@ -348,6 +349,11 @@ def build(out_dir: Path, skip: set[str] | None = None) -> dict:
         optional("renewables", "Renewable electricity by local authority (DESNZ)", air_src.RENEWABLES_URL,
                  "Solar PV installations by council, shared out across the seats each council covers; England & Wales",
                  lambda: air_src.load_renewables(s, council_weights()), air_src.RENEWABLE_METRICS)
+
+    if "travel" not in skip:
+        optional("travel", "Journey time statistics (DfT)", travel_src.SOURCE_URL,
+                 "Travel times by public transport or walking, by neighbourhood (2019); England",
+                 lambda: travel_src.load_travel(s, lsoa_lookup()), travel_src.TRAVEL_METRICS)
 
     petitions = None
     if "petitions" not in skip:
