@@ -26,7 +26,7 @@ THEMES: list[dict[str, str]] = [
     {"id": "health", "label": "Health & care", "description": "Self-reported health, disability and unpaid care (Census 2021)."},
     {"id": "education", "label": "Education & skills", "description": "Adult qualification levels and students (Census 2021)."},
     {"id": "transport", "label": "Transport", "description": "How and how far people travel to work, and car access (Census 2021)."},
-    {"id": "environment", "label": "Environment", "description": "Sewage spills from storm overflows (water companies' Event Duration Monitoring returns)."},
+    {"id": "environment", "label": "Environment", "description": "Sewage spills from storm overflows (water companies' Event Duration Monitoring returns), air pollution and solar panels."},
     {"id": "policing", "label": "Policing & justice", "description": "Recorded street-level crime and investigation outcomes (police.uk), and the Crown Court backlog in the seat's police force area (MoJ)."},
     {"id": "politics", "label": "Politics", "description": "2024 general election result, turnout and vote shares (House of Commons Library)."},
 ]
@@ -327,3 +327,77 @@ def census_meta(m: CensusMetric) -> MetricMeta:
         decimals=0 if m.is_count else 1,
         tags=("census",),
     )
+
+
+# Where each metric's figures come from: the publisher's page for the dataset, so offices can cite it.
+# Keyed by MetricMeta.source; Census tables link to their own Nomis page (see source_url).
+GOV = "https://www.gov.uk/government"
+SOURCE_LINKS: dict[str, str] = {
+    "Boiler Upgrade Scheme statistics": f"{GOV}/collections/boiler-upgrade-scheme-statistics",
+    "CQC ratings": "https://www.cqc.org.uk/about-us/transparency/using-cqc-data",
+    "DESNZ renewable electricity by local authority": f"{GOV}/statistics/regional-renewable-statistics",
+    "DESNZ sub-national energy consumption": f"{GOV}/statistics/lower-and-middle-super-output-areas-gas-consumption",
+    "DESNZ sub-regional fuel poverty": f"{GOV}/collections/fuel-poverty-sub-regional-statistics",
+    "DWP Children in low income families": f"{GOV}/collections/children-in-low-income-families-local-area-statistics",
+    "DfE Get Information about Schools": "https://get-information-schools.service.gov.uk/",
+    "DfE Key stage 4 performance": "https://explore-education-statistics.service.gov.uk/find-statistics/key-stage-4-performance",
+    "DfE education, health and care plans": "https://explore-education-statistics.service.gov.uk/find-statistics/education-health-and-care-plans",
+    "DfE funded early education": "https://explore-education-statistics.service.gov.uk/find-statistics/education-provision-children-under-5",
+    "DfE key stage 4 destinations": "https://explore-education-statistics.service.gov.uk/find-statistics/key-stage-4-destination-measures",
+    "DfE pupil absence": "https://explore-education-statistics.service.gov.uk/find-statistics/pupil-absence-in-schools-in-england",
+    "DfE special educational needs": "https://explore-education-statistics.service.gov.uk/find-statistics/special-educational-needs-in-england",
+    "DfT EV charging infrastructure statistics": f"{GOV}/statistical-data-sets/electric-vehicle-charging-infrastructure-statistics-data-tables-evci",
+    "DfT bus statistics": f"{GOV}/statistical-data-sets/bus-statistics-data-tables",
+    "DfT journey time statistics": f"{GOV}/collections/journey-time-statistics",
+    "DfT road condition statistics": f"{GOV}/statistical-data-sets/road-condition-statistics-data-tables-rdc",
+    "DfT road safety data": f"{GOV}/statistics/road-safety-data",
+    "DfT vehicle licensing statistics": f"{GOV}/statistical-data-sets/vehicle-licensing-statistics-data-files",
+    "Energy Performance Certificates (MHCLG)": "https://get-energy-performance-data.communities.gov.uk/",
+    "English Indices of Deprivation 2025 (MHCLG)": f"{GOV}/collections/english-indices-of-deprivation",
+    "Environment Agency EDM annual returns": "https://www.data.gov.uk/dataset/19f6064d-7356-466f-844e-d20ea10ae9fd/event-duration-monitoring-storm-overflows-annual-returns",
+    "Environment Agency flood monitoring": "https://check-for-flooding.service.gov.uk/",
+    "GP Patient Survey via OHID Fingertips": "https://fingertips.phe.org.uk/profile/general-practice",
+    "HMRC income and tax by constituency": f"{GOV}/statistics/income-and-tax-by-parliamentary-constituency-2010-to-2011",
+    "Home Office fire statistics": f"{GOV}/statistical-data-sets/fire-statistics-data-tables",
+    "Home Office immigration statistics": f"{GOV}/statistical-data-sets/immigration-system-statistics-regional-and-local-authority-data",
+    "Home Office police workforce": f"{GOV}/collections/police-workforce-england-and-wales",
+    "House of Commons Library": "https://commonslibrary.parliament.uk/research-briefings/cbp-10009/",
+    "Insolvency Service": f"{GOV}/collections/individual-insolvency-statistics-releases",
+    "MHCLG Council Taxbase": f"{GOV}/collections/council-taxbase-statistics",
+    "MHCLG council tax statistics": f"{GOV}/statistical-data-sets/live-tables-on-council-tax",
+    "MHCLG housing supply": f"{GOV}/statistical-data-sets/live-tables-on-net-supply-of-housing",
+    "MHCLG statutory homelessness": f"{GOV}/statistical-data-sets/live-tables-on-homelessness",
+    "MoJ criminal court statistics": f"{GOV}/collections/criminal-court-statistics",
+    "NHS QOF via OHID Fingertips": "https://fingertips.phe.org.uk/profile/general-practice",
+    "NHS cancer screening via OHID Fingertips": "https://fingertips.phe.org.uk/profile/cancerservices",
+    "NHSBSA English Prescribing Dataset": "https://opendata.nhsbsa.net/dataset/english-prescribing-dataset-epd-with-snomed-code",
+    "NHSBSA dental activity": "https://opendata.nhsbsa.net/dataset/english-contractor-monthly-general-dental-activity",
+    "NHSBSA pharmaceutical list": "https://opendata.nhsbsa.net/dataset/consolidated-pharmaceutical-list",
+    "OHID Fingertips": "https://fingertips.phe.org.uk/",
+    "ONS ASHE (Nomis)": "https://www.nomisweb.co.uk/sources/ashe",
+    "ONS Annual Population Survey (Nomis)": "https://www.nomisweb.co.uk/sources/aps",
+    "ONS BRES (Nomis)": "https://www.nomisweb.co.uk/sources/bres",
+    "ONS BRES and APS (Nomis)": "https://www.nomisweb.co.uk/sources/bres",
+    "ONS Claimant Count (Nomis)": "https://www.nomisweb.co.uk/sources/cc",
+    "ONS UK Business Counts (Nomis)": "https://www.nomisweb.co.uk/sources/ukbc",
+    "ONS access to gardens and green space": "https://www.ons.gov.uk/economy/environmentalaccounts/datasets/accesstogardensandpublicgreenspaceingreatbritain",
+    "ONS business demography": "https://www.ons.gov.uk/businessindustryandtrade/business/activitysizeandlocation/datasets/businessdemographyreferencetable",
+    "ONS housing affordability": "https://www.ons.gov.uk/peoplepopulationandcommunity/housing/datasets/ratioofhousepricetoworkplacebasedearningslowerquartileandmedian",
+    "ONS population estimates (Nomis)": "https://www.nomisweb.co.uk/sources/pest",
+    "ONS private rents": "https://www.ons.gov.uk/economy/inflationandpriceindices/datasets/priceindexofprivaterentsukmonthlypricestatistics",
+    "ORR estimates of station usage": "https://dataportal.orr.gov.uk/statistics/usage/estimates-of-station-usage/",
+    "Office for Students TUNDRA": "https://www.officeforstudents.org.uk/data-and-analysis/young-participation-by-area/about-tundra/",
+    "Ofsted school inspections": f"{GOV}/statistical-data-sets/monthly-management-information-ofsteds-school-inspections-outcomes",
+    "UK Parliament petitions": "https://petition.parliament.uk/",
+    "UK Parliament written questions API": "https://questions-statements.parliament.uk/",
+    "police.uk": "https://data.police.uk/",
+}
+
+
+def source_url(source: str) -> str | None:
+    """Link for a metric's source: its Census table on Nomis, or the dataset page in SOURCE_LINKS."""
+    import re
+    m = re.match(r"Census 2021 (TS\d{3}[A-Z]?)\b", source)
+    if m:
+        return f"https://www.nomisweb.co.uk/datasets/c2021{m.group(1).lower()}"
+    return SOURCE_LINKS.get(source)

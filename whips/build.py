@@ -29,6 +29,7 @@ import pandas as pd
 from . import engine
 from .http import session
 from .metrics import (
+    source_url,
     CENSUS_METRICS, CLAIMANT_METRICS, ELECTION_METRICS, POLICE_METRICS, THEMES, MetricMeta, census_meta,
 )
 from .sources import boundaries as bsrc
@@ -48,6 +49,26 @@ from .sources import schools as schools_src
 from .sources import sewage as sewage_src
 from .sources import imd as imd_src
 from .sources import life_expectancy as life_src
+from .sources import fire as fire_src
+from .sources import police_workforce as police_workforce_src
+from .sources import heat_pumps as heat_pumps_src
+from .sources import green_space as green_space_src
+from .sources import floods as floods_src
+from .sources import business_demography as business_demography_src
+from .sources import council_tax as council_tax_src
+from .sources import insolvency as insolvency_src
+from .sources import university as university_src
+from .sources import ofsted as ofsted_src
+from .sources import pupils as pupils_src
+from .sources import pharmacies as pharmacies_src
+from .sources import public_health as public_health_src
+from .sources import income as income_src
+from .sources import asylum as asylum_src
+from .sources import road_condition as road_condition_src
+from .sources import rents as rents_src
+from .sources import energy as energy_src
+from .sources import travel as travel_src
+from .sources import air_energy as air_src
 from .sources import children as children_src
 from .sources import vehicles as vehicles_src
 from .sources import buses as buses_src
@@ -63,7 +84,7 @@ log = logging.getLogger("whips.build")
 # Neighbourhood (LSOA) profiles are published for seats held by this party.
 NEIGHBOURHOOD_PARTY = re.compile(r"^(liberal democrats?|lib ?dems?|ld)$", re.I)
 
-SKIPPABLE = ["children", "vehicles", "buses", "cqc", "roads", "housing_stock", "child_poverty", "dental", "life_expectancy", "affordability", "homelessness", "ev", "sewage", "petitions", "questions", "rail", "courts", "fuel_poverty", "nhs", "schools", "epc", "imd", "neighbourhoods", "debates", "claimants", "aps", "ashe", "bres", "business", "popest", "police", "elections", "members", "lsoa"]
+SKIPPABLE = ["fire", "police_workforce", "heat_pumps", "green_space", "floods", "business_demography", "council_tax", "insolvency", "university", "ofsted", "pupils", "pharmacies", "public_health", "income", "asylum", "road_condition", "rents", "energy", "travel", "renewables", "air_pollution", "children", "vehicles", "buses", "cqc", "roads", "housing_stock", "child_poverty", "dental", "life_expectancy", "affordability", "homelessness", "ev", "sewage", "petitions", "questions", "rail", "courts", "fuel_poverty", "nhs", "schools", "epc", "imd", "neighbourhoods", "debates", "claimants", "aps", "ashe", "bres", "business", "popest", "police", "elections", "members", "lsoa"]
 
 COUNTRY_BY_PREFIX = {"E": "England", "W": "Wales", "S": "Scotland", "N": "Northern Ireland"}
 
@@ -91,7 +112,8 @@ def assemble(codes: list[str], frames: dict[str, pd.DataFrame], metas: list[Metr
         national = official if official is not None else float(num[ok].sum() / den[ok].sum()) if den[ok].sum() else None
         metrics.append({
             "id": meta.id, "label": meta.label, "theme": meta.theme, "unit": meta.unit,
-            "description": meta.description, "source": meta.source, "polarity": meta.polarity,
+            "description": meta.description, "source": meta.source, "source_url": source_url(meta.source),
+            "polarity": meta.polarity,
             "decimals": meta.decimals, "tags": list(meta.tags),
             "national": _clean(national), "coverage": int(ok.sum()),
         })
@@ -337,6 +359,111 @@ def build(out_dir: Path, skip: set[str] | None = None) -> dict:
         optional("children", "SEND and early years (DfE explore education statistics)", children_src.SOURCE_URL,
                  "SEN pupils by constituency; EHC plan timeliness and 2-year-old childcare take-up by council; England",
                  lambda: children_src.load_children(s, council_weights()), children_src.CHILDREN_METRICS)
+
+    if "air_pollution" not in skip:
+        optional("air_pollution", "Air pollution mortality (OHID Fingertips)", air_src.SOURCE_URL,
+                 "By council, averaged over the councils each seat covers; England",
+                 lambda: air_src.load_air(s, council_weights()), air_src.AIR_METRICS)
+
+    if "renewables" not in skip:
+        optional("renewables", "Renewable electricity by local authority (DESNZ)", air_src.RENEWABLES_URL,
+                 "Solar PV installations by council, shared out across the seats each council covers; England & Wales",
+                 lambda: air_src.load_renewables(s, council_weights()), air_src.RENEWABLE_METRICS)
+
+    if "travel" not in skip:
+        optional("travel", "Journey time statistics (DfT)", travel_src.SOURCE_URL,
+                 "Travel times by public transport or walking, by neighbourhood (2019); England",
+                 lambda: travel_src.load_travel(s, lsoa_lookup()), travel_src.TRAVEL_METRICS)
+
+    if "energy" not in skip:
+        optional("energy", "Sub-national gas and electricity consumption (DESNZ)", energy_src.SOURCE_URL,
+                 "Domestic meters and consumption by neighbourhood; England & Wales",
+                 lambda: energy_src.load_energy(s, lsoa_lookup()), energy_src.ENERGY_METRICS)
+
+    if "rents" not in skip:
+        optional("rents", "Price Index of Private Rents (ONS)", rents_src.SOURCE_URL,
+                 "By council, averaged over the councils each seat covers; England & Wales",
+                 lambda: rents_src.load_rents(s, council_weights()), rents_src.RENT_METRICS)
+
+    if "road_condition" not in skip:
+        optional("road_condition", "Road condition statistics (DfT)", road_condition_src.SOURCE_URL,
+                 "By highway authority, averaged over the authorities each seat covers; England",
+                 lambda: road_condition_src.load_road_condition(s, council_weights()), road_condition_src.ROAD_CONDITION_METRICS)
+
+    if "asylum" not in skip:
+        optional("asylum", "Immigration system statistics: local authority data (Home Office)", asylum_src.SOURCE_URL,
+                 "Asylum support and resettlement by council, shared out across the seats each council covers; England & Wales",
+                 lambda: asylum_src.load_asylum(s, council_weights()), asylum_src.ASYLUM_METRICS)
+
+    if "income" not in skip:
+        optional("income", "Income and tax by constituency (HMRC)", income_src.SOURCE_URL,
+                 "Survey of Personal Incomes, Table 3.15; UK",
+                 lambda: income_src.load_income(s), income_src.INCOME_METRICS)
+
+    if "public_health" not in skip:
+        optional("public_health", "Public health indicators (OHID Fingertips)", public_health_src.SOURCE_URL,
+                 "By council, averaged over the councils each seat covers; England",
+                 lambda: public_health_src.load_public_health(s, council_weights()), public_health_src.PUBLIC_HEALTH_METRICS)
+
+    if "pharmacies" not in skip:
+        optional("pharmacies", "Consolidated pharmaceutical list (NHSBSA)", pharmacies_src.SOURCE_URL,
+                 "Community pharmacies placed by postcode; England",
+                 lambda: pharmacies_src.load_pharmacies(s, population), pharmacies_src.PHARMACY_METRICS)
+
+    if "pupils" not in skip:
+        optional("pupils", "Pupil absence and KS4 destinations (DfE explore education statistics)", pupils_src.SOURCE_URL,
+                 "By council, shared out across the seats each council covers; England",
+                 lambda: pupils_src.load_pupils(s, council_weights()), pupils_src.PUPIL_METRICS)
+
+    if "ofsted" not in skip:
+        optional("ofsted", "School inspection outcomes (Ofsted)", ofsted_src.SOURCE_URL,
+                 "State-funded schools by constituency; England",
+                 lambda: ofsted_src.load_ofsted(s, geo), ofsted_src.OFSTED_METRICS)
+
+    if "university" not in skip:
+        optional("university", "TUNDRA young participation (Office for Students)", university_src.SOURCE_URL,
+                 "Progression to higher education by neighbourhood; England",
+                 lambda: university_src.load_university(s, lsoa_lookup()), university_src.UNIVERSITY_METRICS)
+
+    if "insolvency" not in skip:
+        optional("insolvency", "Individual insolvencies by constituency (Insolvency Service)", insolvency_src.SOURCE_URL,
+                 "Latest year; England & Wales",
+                 lambda: insolvency_src.load_insolvency(s), insolvency_src.INSOLVENCY_METRICS)
+
+    if "council_tax" not in skip:
+        optional("council_tax", "Council tax statistics (MHCLG)", council_tax_src.SOURCE_URL,
+                 "Band D by billing authority, averaged over the councils each seat covers; England",
+                 lambda: council_tax_src.load_council_tax(s, council_weights()), council_tax_src.COUNCIL_TAX_METRICS)
+
+    if "business_demography" not in skip:
+        optional("business_demography", "Business demography (ONS)", business_demography_src.SOURCE_URL,
+                 "Business births and deaths by council, shared out across the seats each council covers; England & Wales",
+                 lambda: business_demography_src.load_business_demography(s, council_weights()), business_demography_src.BUSINESS_DEMOGRAPHY_METRICS)
+
+    if "floods" not in skip:
+        optional("floods", "Flood warning areas (Environment Agency)", floods_src.SOURCE_URL,
+                 "Warning areas placed by their centre; England",
+                 lambda: floods_src.load_floods(s, geo), floods_src.FLOOD_METRICS)
+
+    if "green_space" not in skip:
+        optional("green_space", "Access to gardens and public green space (ONS)", green_space_src.SOURCE_URL,
+                 "By neighbourhood (2020); England & Wales",
+                 lambda: green_space_src.load_green_space(s, lsoa_lookup()), green_space_src.GREEN_METRICS)
+
+    if "heat_pumps" not in skip:
+        optional("heat_pumps", "Boiler Upgrade Scheme statistics (DESNZ/Ofgem)", heat_pumps_src.SOURCE_URL,
+                 "Heat pump grants paid by constituency; England & Wales",
+                 lambda: heat_pumps_src.load_heat_pumps(s, census["no_car"]["den"] if "no_car" in census else None), heat_pumps_src.HEAT_PUMP_METRICS)
+
+    if "police_workforce" not in skip:
+        optional("police_workforce", "Police workforce (Home Office)", police_workforce_src.SOURCE_URL,
+                 "Officers per 100,000 people by police force area; England & Wales",
+                 lambda: police_workforce_src.load_police_workforce(s, lsoa_lookup(), population), police_workforce_src.POLICE_WORKFORCE_METRICS)
+
+    if "fire" not in skip:
+        optional("fire", "Fire statistics: response times (Home Office)", fire_src.SOURCE_URL,
+                 "By fire and rescue authority, averaged over each seat's councils; England",
+                 lambda: fire_src.load_fire(s, council_weights()), fire_src.FIRE_METRICS)
 
     petitions = None
     if "petitions" not in skip:

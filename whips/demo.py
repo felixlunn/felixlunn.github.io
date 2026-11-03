@@ -29,6 +29,26 @@ from .sources.schools import KS4_METRICS, SCHOOL_METRICS
 from .sources.sewage import SEWAGE_METRICS
 from .sources.imd import IMD_METRICS
 from .sources.life_expectancy import LIFE_METRICS
+from .sources.fire import FIRE_METRICS
+from .sources.police_workforce import POLICE_WORKFORCE_METRICS
+from .sources.heat_pumps import HEAT_PUMP_METRICS
+from .sources.green_space import GREEN_METRICS
+from .sources.floods import FLOOD_METRICS
+from .sources.business_demography import BUSINESS_DEMOGRAPHY_METRICS
+from .sources.council_tax import COUNCIL_TAX_METRICS
+from .sources.insolvency import INSOLVENCY_METRICS
+from .sources.university import UNIVERSITY_METRICS
+from .sources.ofsted import OFSTED_METRICS
+from .sources.pupils import PUPIL_METRICS
+from .sources.pharmacies import PHARMACY_METRICS
+from .sources.public_health import PUBLIC_HEALTH_METRICS
+from .sources.income import INCOME_METRICS
+from .sources.asylum import ASYLUM_METRICS
+from .sources.road_condition import ROAD_CONDITION_METRICS
+from .sources.rents import RENT_METRICS
+from .sources.energy import ENERGY_METRICS
+from .sources.travel import TRAVEL_METRICS
+from .sources.air_energy import AIR_METRICS, RENEWABLE_METRICS
 from .sources.children import CHILDREN_METRICS
 from .sources.vehicles import VEHICLE_METRICS
 from .sources.buses import BUS_METRICS
@@ -92,7 +112,7 @@ def build_demo(out_dir: Path, n: int = 650, seed: int = 42) -> dict:
         base = 40 if m.unit == "per 1,000" else 20
         val = np.clip(base * np.exp(0.3 * (depriv + 0.5 * urban) + rng.normal(scale=0.4, size=n)), 0.1, 99)
         frames[m.id] = pd.DataFrame({"num": val, "den": 1.0}, index=codes)
-    extra = APS_METRICS + ASHE_METRICS + BRES_METRICS + BUSINESS_METRICS + POPEST_METRICS + IMD_METRICS + EPC_METRICS + SCHOOL_METRICS + KS4_METRICS + NHS_METRICS + FUEL_POVERTY_METRICS + COURT_METRICS + RAIL_METRICS + QUESTION_METRICS + PETITION_METRICS + SEWAGE_METRICS + EV_METRICS + AFFORDABILITY_METRICS + HOMELESS_METRICS + LIFE_METRICS + DENTAL_METRICS + CHILDREN_METRICS + VEHICLE_METRICS + BUS_METRICS + CQC_METRICS + ROAD_METRICS + HOUSING_STOCK_METRICS + CHILD_POVERTY_METRICS
+    extra = APS_METRICS + ASHE_METRICS + BRES_METRICS + BUSINESS_METRICS + POPEST_METRICS + IMD_METRICS + EPC_METRICS + SCHOOL_METRICS + KS4_METRICS + NHS_METRICS + FUEL_POVERTY_METRICS + COURT_METRICS + RAIL_METRICS + QUESTION_METRICS + PETITION_METRICS + SEWAGE_METRICS + EV_METRICS + AFFORDABILITY_METRICS + HOMELESS_METRICS + LIFE_METRICS + DENTAL_METRICS + FIRE_METRICS + POLICE_WORKFORCE_METRICS + HEAT_PUMP_METRICS + GREEN_METRICS + FLOOD_METRICS + BUSINESS_DEMOGRAPHY_METRICS + COUNCIL_TAX_METRICS + INSOLVENCY_METRICS + UNIVERSITY_METRICS + OFSTED_METRICS + PUPIL_METRICS + PHARMACY_METRICS + PUBLIC_HEALTH_METRICS + INCOME_METRICS + ASYLUM_METRICS + ROAD_CONDITION_METRICS + RENT_METRICS + ENERGY_METRICS + TRAVEL_METRICS + AIR_METRICS + RENEWABLE_METRICS + CHILDREN_METRICS + VEHICLE_METRICS + BUS_METRICS + CQC_METRICS + ROAD_METRICS + HOUSING_STOCK_METRICS + CHILD_POVERTY_METRICS
     for m in extra:
         base = {"£": 30000 if "annual" in m.id else 750, "ratio": 0.8, "per 1,000": 75}.get(m.unit, 3 if m.id == "pop_change" else 15)
         val = base * np.exp(0.15 * (urban - depriv) + rng.normal(scale=0.15, size=n))
