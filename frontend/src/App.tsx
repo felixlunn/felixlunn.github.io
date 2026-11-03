@@ -216,7 +216,7 @@ export default function App({ data, geo }: { data: DashboardData; geo: GeoJSON.F
         <div className="brand">
           <svg viewBox="0 0 32 32" width="26" height="26" aria-hidden="true"><rect width="32" height="32" rx="6" fill="var(--accent)" /><path d="M7 22l5-12 4 8 4-6 5 10" stroke="#fff" strokeWidth="3" fill="none" strokeLinejoin="round" /></svg>
           <div>
-            <h1>Whips Dashboard</h1>
+            <h1>Data Dashboard</h1>
             <div className="tiny muted">Constituency analytics · {data.seats.length} seats</div>
           </div>
         </div>

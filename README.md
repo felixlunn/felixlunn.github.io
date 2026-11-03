@@ -1,4 +1,4 @@
-# Whips Dashboard
+# Data Dashboard
 
 Constituency analytics for MPs' offices, researchers and political consultancies. Open the map, pick a seat
 (click it, or search by name, MP or postcode) and see how it compares with every other seat in the country,
