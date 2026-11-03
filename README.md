@@ -73,6 +73,7 @@ All data are open, refreshed automatically **every two days** by GitHub Actions,
 | [Ofsted school inspection management information](https://www.gov.uk/government/statistical-data-sets/monthly-management-information-ofsteds-school-inspections-outcomes) | Pupils at schools last graded Good or Outstanding, and schools in a category of concern, by constituency | England | Monthly |
 | [Office for Students TUNDRA](https://www.officeforstudents.org.uk/data-and-analysis/young-participation-by-area/about-tundra/) | Share of state-school pupils going on to higher education by 19 (cohorts aged 16 in 2012-16), averaged over neighbourhoods | England | Occasional |
 | [Insolvency Service](https://www.gov.uk/government/collections/individual-insolvency-statistics-by-location-age-and-gender) | Personal insolvencies and debt relief orders per 10,000 adults, by constituency | England & Wales | Annual |
+| [MHCLG council tax live tables](https://www.gov.uk/government/statistical-data-sets/live-tables-on-council-tax) | Area Band D council tax and this year's rise, by billing authority, averaged across seats | England | Annual |
 
 Census 2021 covers England and Wales only (Scotland's census was 2022 and Northern Ireland's is published by
 NISRA), so census metrics show "No data" for Scottish and Northern Irish seats. Wherever a metric is a ratio,

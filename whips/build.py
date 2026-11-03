@@ -48,6 +48,7 @@ from .sources import schools as schools_src
 from .sources import sewage as sewage_src
 from .sources import imd as imd_src
 from .sources import life_expectancy as life_src
+from .sources import council_tax as council_tax_src
 from .sources import insolvency as insolvency_src
 from .sources import university as university_src
 from .sources import ofsted as ofsted_src
@@ -76,7 +77,7 @@ log = logging.getLogger("whips.build")
 # Neighbourhood (LSOA) profiles are published for seats held by this party.
 NEIGHBOURHOOD_PARTY = re.compile(r"^(liberal democrats?|lib ?dems?|ld)$", re.I)
 
-SKIPPABLE = ["insolvency", "university", "ofsted", "pupils", "pharmacies", "public_health", "income", "asylum", "road_condition", "rents", "energy", "travel", "renewables", "air_pollution", "children", "vehicles", "buses", "cqc", "roads", "housing_stock", "child_poverty", "dental", "life_expectancy", "affordability", "homelessness", "ev", "sewage", "petitions", "questions", "rail", "courts", "fuel_poverty", "nhs", "schools", "epc", "imd", "neighbourhoods", "debates", "claimants", "aps", "ashe", "bres", "business", "popest", "police", "elections", "members", "lsoa"]
+SKIPPABLE = ["council_tax", "insolvency", "university", "ofsted", "pupils", "pharmacies", "public_health", "income", "asylum", "road_condition", "rents", "energy", "travel", "renewables", "air_pollution", "children", "vehicles", "buses", "cqc", "roads", "housing_stock", "child_poverty", "dental", "life_expectancy", "affordability", "homelessness", "ev", "sewage", "petitions", "questions", "rail", "courts", "fuel_poverty", "nhs", "schools", "epc", "imd", "neighbourhoods", "debates", "claimants", "aps", "ashe", "bres", "business", "popest", "police", "elections", "members", "lsoa"]
 
 COUNTRY_BY_PREFIX = {"E": "England", "W": "Wales", "S": "Scotland", "N": "Northern Ireland"}
 
@@ -420,6 +421,11 @@ def build(out_dir: Path, skip: set[str] | None = None) -> dict:
         optional("insolvency", "Individual insolvencies by constituency (Insolvency Service)", insolvency_src.SOURCE_URL,
                  "Latest year; England & Wales",
                  lambda: insolvency_src.load_insolvency(s), insolvency_src.INSOLVENCY_METRICS)
+
+    if "council_tax" not in skip:
+        optional("council_tax", "Council tax statistics (MHCLG)", council_tax_src.SOURCE_URL,
+                 "Band D by billing authority, averaged over the councils each seat covers; England",
+                 lambda: council_tax_src.load_council_tax(s, council_weights()), council_tax_src.COUNCIL_TAX_METRICS)
 
     petitions = None
     if "petitions" not in skip:
