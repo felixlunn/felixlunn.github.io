@@ -346,7 +346,7 @@ def build(out_dir: Path, skip: set[str] | None = None) -> dict:
             frame, petitions, detail = petitions_src.load_petitions(s, electorate.dropna())
             return {"petition_signatures_per_1k": frame}, detail
         optional("petitions", "Parliament petitions", petitions_src.SOURCE_URL,
-                 "Open petitions with 500+ signatures; per 1,000 on the 2024 electoral register", load_petitions,
+                 "Open petitions with more than 100,000 signatures; per 1,000 on the 2024 electoral register", load_petitions,
                  petitions_src.PETITION_METRICS)
 
     # 4. Assemble seats + values

@@ -1,8 +1,8 @@
 """Parliament petitions: what each constituency is signing (petition.parliament.uk).
 
 Every petition's JSON includes its signatures by constituency (July 2024
-codes). We take open petitions with at least ``MIN_SIGNATURES`` signatures,
-which cover almost all signatures, and produce:
+codes). We take open petitions with more than ``MIN_SIGNATURES`` signatures
+(the big national campaigns), and produce:
 
 * a metric: signatures to open petitions per 1,000 registered voters (2024
   electorate, so it covers the whole UK);
@@ -26,7 +26,7 @@ log = logging.getLogger(__name__)
 API = "https://petition.parliament.uk/petitions.json"
 PETITION = "https://petition.parliament.uk/petitions/{id}"
 SOURCE_URL = "https://petition.parliament.uk/"
-MIN_SIGNATURES = 500
+MIN_SIGNATURES = 100_000  # only petitions with more than this many signatures
 TOP = 5            # most-signed petitions kept per seat
 LOCAL = 3          # petitions most over-represented in the seat
 LOCAL_MIN = 50     # ...with at least this many signatures there
@@ -34,7 +34,7 @@ LOCAL_INDEX = 1.5  # ...and at least this multiple of the national signing rate
 
 PETITION_METRICS = [
     MetricMeta("petition_signatures_per_1k", "Petition signatures per 1,000 voters", "politics", "per 1,000",
-               "Signatures from the constituency to open Parliament petitions (those with 500+ signatures), per 1,000 people "
+               "Signatures from the constituency to open Parliament petitions (those with more than 100,000 signatures), per 1,000 people "
                "on the 2024 electoral register.", "UK Parliament petitions", "neutral", 0, ("petitions",)),
 ]
 
@@ -48,7 +48,7 @@ def list_open(s: requests.Session) -> list[dict]:
         params = None  # the "next" link already carries the query
         for p in data.get("data", []):
             a = p["attributes"]
-            if a.get("signature_count", 0) >= MIN_SIGNATURES:
+            if a.get("signature_count", 0) > MIN_SIGNATURES:
                 out.append({"id": p["id"], "title": a.get("action", ""), "signatures": a["signature_count"]})
         url = (data.get("links") or {}).get("next")
     return out
@@ -88,5 +88,5 @@ def load_petitions(s: requests.Session, electorate: pd.Series, workers: int = 6)
     with ThreadPoolExecutor(workers) as pool:
         counts = dict(zip((p["id"] for p in petitions), pool.map(lambda p: by_constituency(s, p["id"]), petitions)))
     frame, briefing = summarise(petitions, counts, electorate)
-    log.info("Petitions: %d open petitions with %d+ signatures", len(petitions), MIN_SIGNATURES)
-    return frame, briefing, f"{len(petitions)} open petitions"
+    log.info("Petitions: %d open petitions with more than %d signatures", len(petitions), MIN_SIGNATURES)
+    return frame, briefing, f"{len(petitions)} open petitions with more than 100,000 signatures"
