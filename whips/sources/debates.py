@@ -42,7 +42,7 @@ TOPICS: dict[str, tuple[str, str, list[str]]] = {
     "housing": ("Housing",
                 r"housing|\bhomes?\b|planning|\brent(ers?|ed|ing|s)?\b|leasehold|homeless|landlord|mortgage|council tax|"
                 r"stamp duty|temporary accommodation|second homes?|empty homes?|housebuilding|new homes",
-                ["temp_accommodation_per_1k", "homeless_duty_per_1k", "affordability_ratio", "second_homes", "net_new_homes_per_1k", "private_rented", "social_rented",
+                ["temp_accommodation_per_1k", "homeless_duty_per_1k", "rent_monthly", "rent_change", "affordability_ratio", "second_homes", "net_new_homes_per_1k", "private_rented", "social_rented",
                  "overcrowded"]),
     "cost_of_living": ("Cost of living & work",
                        r"cost of living|economy|economic|jobs?\b|employment|unemploy|wages?|\bpay\b|benefit|universal credit|"
@@ -55,7 +55,7 @@ TOPICS: dict[str, tuple[str, str, list[str]]] = {
     "transport": ("Transport",
                   r"transport|electric vehicle|\bev\b|charg(ing|ers?) point|chargepoint|\bbus(es)?\b|\brail|\btrains?\b|\broads?\b|pothole|road safety|speed limit|collision|cycl|motorist|driving|car park|travel|airport",
                   ["no_car", "commute_bus", "commute_train", "rail_journeys_per_resident", "commute_car", "commute_30km_plus",
-                   "ev_chargers_per_10k", "road_ksi_per_10k", "bus_miles_change", "bus_journeys_per_head", "travel_hospital", "travel_gp", "plugin_share_private"]),
+                   "ev_chargers_per_10k", "road_ksi_per_10k", "bus_miles_change", "bus_journeys_per_head", "travel_hospital", "travel_gp", "roads_red_unclassified", "plugin_share_private"]),
     "education": ("Education & children",
                   r"school|education|teacher|\bsend\b|special educational|universit|students?|skills|apprentice|"
                   r"childcare|nurser|children|young people|learning",
