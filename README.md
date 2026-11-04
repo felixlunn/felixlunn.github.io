@@ -70,6 +70,7 @@ All data are open, refreshed automatically **every two days** by GitHub Actions,
 | [OHID Fingertips](https://fingertips.phe.org.uk/) public health | MMR vaccination by age 5, Year 6 obesity, adult smoking, alcohol-related admissions and suicide rate, by council, averaged across seats | England | Annual |
 | [NHSBSA consolidated pharmaceutical list](https://opendata.nhsbsa.net/dataset/consolidated-pharmaceutical-list) | Community pharmacies per 10,000 residents, and change since 2022, placed by postcode | England | Quarterly |
 | [DfE explore education statistics](https://explore-education-statistics.service.gov.uk/) API | Persistent and severe pupil absence (by education authority) and year 11 leavers not in sustained education or work (by district), shared out across seats | England | Annual |
+| [Ofsted school inspection management information](https://www.gov.uk/government/statistical-data-sets/monthly-management-information-ofsteds-school-inspections-outcomes) | Pupils at schools last graded Good or Outstanding, and schools in a category of concern, by constituency | England | Monthly |
 
 Census 2021 covers England and Wales only (Scotland's census was 2022 and Northern Ireland's is published by
 NISRA), so census metrics show "No data" for Scottish and Northern Irish seats. Wherever a metric is a ratio,

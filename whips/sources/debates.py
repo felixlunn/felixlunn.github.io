@@ -58,8 +58,8 @@ TOPICS: dict[str, tuple[str, str, list[str]]] = {
                    "ev_chargers_per_10k", "road_ksi_per_10k", "bus_miles_change", "bus_journeys_per_head", "travel_hospital", "travel_gp", "roads_red_unclassified", "plugin_share_private"]),
     "education": ("Education & children",
                   r"school|education|teacher|\bsend\b|special educational|universit|students?|skills|apprentice|"
-                  r"childcare|nurser|children|young people|learning",
-                  ["gcse_em4", "school_fsm", "persistent_absence", "ks4_not_sustained", "pupils_ehc_plan", "ehc_within_20_weeks", "early_years_2yo_takeup", "child_poverty_ahc", "idaci", "no_qualifications", "age_0_14", "hh_dependent_children"]),
+                  r"childcare|nurser|children|young people|learning|ofsted",
+                  ["gcse_em4", "ofsted_good_pupils", "school_fsm", "persistent_absence", "ks4_not_sustained", "pupils_ehc_plan", "ehc_within_20_weeks", "early_years_2yo_takeup", "child_poverty_ahc", "idaci", "no_qualifications", "age_0_14", "hh_dependent_children"]),
     "immigration": ("Immigration & asylum",
                     r"asylum|immigra|migrant|migration|refugee|small boats?|visa|resettlement|hotels? for",
                     ["asylum_supported_per_10k", "asylum_contingency_per_10k", "homes_for_ukraine_per_10k", "born_outside_uk"]),

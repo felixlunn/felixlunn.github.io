@@ -48,6 +48,7 @@ from .sources import schools as schools_src
 from .sources import sewage as sewage_src
 from .sources import imd as imd_src
 from .sources import life_expectancy as life_src
+from .sources import ofsted as ofsted_src
 from .sources import pupils as pupils_src
 from .sources import pharmacies as pharmacies_src
 from .sources import public_health as public_health_src
@@ -73,7 +74,7 @@ log = logging.getLogger("whips.build")
 # Neighbourhood (LSOA) profiles are published for seats held by this party.
 NEIGHBOURHOOD_PARTY = re.compile(r"^(liberal democrats?|lib ?dems?|ld)$", re.I)
 
-SKIPPABLE = ["pupils", "pharmacies", "public_health", "income", "asylum", "road_condition", "rents", "energy", "travel", "renewables", "air_pollution", "children", "vehicles", "buses", "cqc", "roads", "housing_stock", "child_poverty", "dental", "life_expectancy", "affordability", "homelessness", "ev", "sewage", "petitions", "questions", "rail", "courts", "fuel_poverty", "nhs", "schools", "epc", "imd", "neighbourhoods", "debates", "claimants", "aps", "ashe", "bres", "business", "popest", "police", "elections", "members", "lsoa"]
+SKIPPABLE = ["ofsted", "pupils", "pharmacies", "public_health", "income", "asylum", "road_condition", "rents", "energy", "travel", "renewables", "air_pollution", "children", "vehicles", "buses", "cqc", "roads", "housing_stock", "child_poverty", "dental", "life_expectancy", "affordability", "homelessness", "ev", "sewage", "petitions", "questions", "rail", "courts", "fuel_poverty", "nhs", "schools", "epc", "imd", "neighbourhoods", "debates", "claimants", "aps", "ashe", "bres", "business", "popest", "police", "elections", "members", "lsoa"]
 
 COUNTRY_BY_PREFIX = {"E": "England", "W": "Wales", "S": "Scotland", "N": "Northern Ireland"}
 
@@ -402,6 +403,11 @@ def build(out_dir: Path, skip: set[str] | None = None) -> dict:
         optional("pupils", "Pupil absence and KS4 destinations (DfE explore education statistics)", pupils_src.SOURCE_URL,
                  "By council, shared out across the seats each council covers; England",
                  lambda: pupils_src.load_pupils(s, council_weights()), pupils_src.PUPIL_METRICS)
+
+    if "ofsted" not in skip:
+        optional("ofsted", "School inspection outcomes (Ofsted)", ofsted_src.SOURCE_URL,
+                 "State-funded schools by constituency; England",
+                 lambda: ofsted_src.load_ofsted(s, geo), ofsted_src.OFSTED_METRICS)
 
     petitions = None
     if "petitions" not in skip:
