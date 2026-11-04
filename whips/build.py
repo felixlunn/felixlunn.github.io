@@ -48,6 +48,7 @@ from .sources import schools as schools_src
 from .sources import sewage as sewage_src
 from .sources import imd as imd_src
 from .sources import life_expectancy as life_src
+from .sources import fire as fire_src
 from .sources import police_workforce as police_workforce_src
 from .sources import heat_pumps as heat_pumps_src
 from .sources import green_space as green_space_src
@@ -82,7 +83,7 @@ log = logging.getLogger("whips.build")
 # Neighbourhood (LSOA) profiles are published for seats held by this party.
 NEIGHBOURHOOD_PARTY = re.compile(r"^(liberal democrats?|lib ?dems?|ld)$", re.I)
 
-SKIPPABLE = ["police_workforce", "heat_pumps", "green_space", "floods", "business_demography", "council_tax", "insolvency", "university", "ofsted", "pupils", "pharmacies", "public_health", "income", "asylum", "road_condition", "rents", "energy", "travel", "renewables", "air_pollution", "children", "vehicles", "buses", "cqc", "roads", "housing_stock", "child_poverty", "dental", "life_expectancy", "affordability", "homelessness", "ev", "sewage", "petitions", "questions", "rail", "courts", "fuel_poverty", "nhs", "schools", "epc", "imd", "neighbourhoods", "debates", "claimants", "aps", "ashe", "bres", "business", "popest", "police", "elections", "members", "lsoa"]
+SKIPPABLE = ["fire", "police_workforce", "heat_pumps", "green_space", "floods", "business_demography", "council_tax", "insolvency", "university", "ofsted", "pupils", "pharmacies", "public_health", "income", "asylum", "road_condition", "rents", "energy", "travel", "renewables", "air_pollution", "children", "vehicles", "buses", "cqc", "roads", "housing_stock", "child_poverty", "dental", "life_expectancy", "affordability", "homelessness", "ev", "sewage", "petitions", "questions", "rail", "courts", "fuel_poverty", "nhs", "schools", "epc", "imd", "neighbourhoods", "debates", "claimants", "aps", "ashe", "bres", "business", "popest", "police", "elections", "members", "lsoa"]
 
 COUNTRY_BY_PREFIX = {"E": "England", "W": "Wales", "S": "Scotland", "N": "Northern Ireland"}
 
@@ -456,6 +457,11 @@ def build(out_dir: Path, skip: set[str] | None = None) -> dict:
         optional("police_workforce", "Police workforce (Home Office)", police_workforce_src.SOURCE_URL,
                  "Officers per 100,000 people by police force area; England & Wales",
                  lambda: police_workforce_src.load_police_workforce(s, lsoa_lookup(), population), police_workforce_src.POLICE_WORKFORCE_METRICS)
+
+    if "fire" not in skip:
+        optional("fire", "Fire statistics: response times (Home Office)", fire_src.SOURCE_URL,
+                 "By fire and rescue authority, averaged over each seat's councils; England",
+                 lambda: fire_src.load_fire(s, council_weights()), fire_src.FIRE_METRICS)
 
     petitions = None
     if "petitions" not in skip:
