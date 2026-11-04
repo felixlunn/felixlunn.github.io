@@ -57,6 +57,16 @@ GPPS = {
             "Share of GP Patient Survey respondents at practices in the constituency whose needs were met at their last appointment."),
 }
 
+# Cancer screening coverage (practice level): eligible patients screened within the recommended interval.
+SCREENING = {
+    92600: ("screen_bowel", "Bowel cancer screening coverage",
+            "Patients aged 60-74 at practices in the constituency screened for bowel cancer in the last 2.5 years (NHS cancer screening)."),
+    93717: ("screen_cervical", "Cervical screening coverage (25-49)",
+            "Women aged 25-49 at practices in the constituency with a cervical screening record in the last 3.5 years."),
+    93718: ("screen_cervical_50", "Cervical screening coverage (50-64)",
+            "Women aged 50-64 at practices in the constituency with a cervical screening record in the last 5.5 years."),
+}
+
 from .nhsbsa import PRESCRIBING_METRICS  # noqa: E402 - defined alongside the prescribing loader
 
 NHS_METRICS = [
@@ -64,9 +74,11 @@ NHS_METRICS = [
                  "NHS QOF via OHID Fingertips", pol, 1, ("nhs",)) for mid, label, age, pol in QOF.values()],
     *[MetricMeta(mid, label, "health", "%", desc, "GP Patient Survey via OHID Fingertips", "higher_better", 1, ("nhs",))
       for mid, label, desc in GPPS.values()],
+    *[MetricMeta(mid, label, "health", "%", desc, "NHS cancer screening via OHID Fingertips", "higher_better", 1, ("screening",))
+      for mid, label, desc in SCREENING.values()],
     *PRESCRIBING_METRICS,
 ]
-METRIC_BY_INDICATOR = {i: v[0] for i, v in {**QOF, **GPPS}.items()}
+METRIC_BY_INDICATOR = {i: v[0] for i, v in {**QOF, **GPPS, **SCREENING}.items()}
 
 
 def fetch_parent(s: requests.Session, parent: str) -> pd.DataFrame:

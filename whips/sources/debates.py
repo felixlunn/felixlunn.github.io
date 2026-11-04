@@ -47,7 +47,7 @@ TOPICS: dict[str, tuple[str, str, list[str]]] = {
     "cost_of_living": ("Cost of living & work",
                        r"cost of living|economy|economic|jobs?\b|employment|unemploy|wages?|\bpay\b|benefit|universal credit|"
                        r"welfare|poverty|minimum wage|budget|\btax|pensions?|bereavement support|household support",
-                       ["child_poverty_ahc", "income_deprived", "employment_deprived", "claimant_rate", "imd_most_deprived_20", "aps_inactive",
+                       ["child_poverty_ahc", "taxpayer_income_median", "income_deprived", "employment_deprived", "claimant_rate", "imd_most_deprived_20", "aps_inactive",
                         "inactive_sick", "never_worked"]),
     "energy": ("Energy & heating",
                r"energy|fuel|heating|heat pump|net zero|climate|electricity|\bgas\b|insulation|solar",
@@ -60,6 +60,9 @@ TOPICS: dict[str, tuple[str, str, list[str]]] = {
                   r"school|education|teacher|\bsend\b|special educational|universit|students?|skills|apprentice|"
                   r"childcare|nurser|children|young people|learning",
                   ["gcse_em4", "school_fsm", "pupils_ehc_plan", "ehc_within_20_weeks", "early_years_2yo_takeup", "child_poverty_ahc", "idaci", "no_qualifications", "age_0_14", "hh_dependent_children"]),
+    "immigration": ("Immigration & asylum",
+                    r"asylum|immigra|migrant|migration|refugee|small boats?|visa|resettlement|hotels? for",
+                    ["asylum_supported_per_10k", "asylum_contingency_per_10k", "homes_for_ukraine_per_10k", "born_outside_uk"]),
     "water": ("Water, sewage & air",
               r"sewage|water compan|water bill|rivers?\b|bathing water|storm overflow|ofwat|pollution|chalk stream|\bwater\b|"
               r"air quality|clean air|emissions zone|\bulez\b",

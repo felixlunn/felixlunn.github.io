@@ -48,6 +48,8 @@ from .sources import schools as schools_src
 from .sources import sewage as sewage_src
 from .sources import imd as imd_src
 from .sources import life_expectancy as life_src
+from .sources import income as income_src
+from .sources import asylum as asylum_src
 from .sources import road_condition as road_condition_src
 from .sources import rents as rents_src
 from .sources import energy as energy_src
@@ -68,7 +70,7 @@ log = logging.getLogger("whips.build")
 # Neighbourhood (LSOA) profiles are published for seats held by this party.
 NEIGHBOURHOOD_PARTY = re.compile(r"^(liberal democrats?|lib ?dems?|ld)$", re.I)
 
-SKIPPABLE = ["road_condition", "rents", "energy", "travel", "renewables", "air_pollution", "children", "vehicles", "buses", "cqc", "roads", "housing_stock", "child_poverty", "dental", "life_expectancy", "affordability", "homelessness", "ev", "sewage", "petitions", "questions", "rail", "courts", "fuel_poverty", "nhs", "schools", "epc", "imd", "neighbourhoods", "debates", "claimants", "aps", "ashe", "bres", "business", "popest", "police", "elections", "members", "lsoa"]
+SKIPPABLE = ["income", "asylum", "road_condition", "rents", "energy", "travel", "renewables", "air_pollution", "children", "vehicles", "buses", "cqc", "roads", "housing_stock", "child_poverty", "dental", "life_expectancy", "affordability", "homelessness", "ev", "sewage", "petitions", "questions", "rail", "courts", "fuel_poverty", "nhs", "schools", "epc", "imd", "neighbourhoods", "debates", "claimants", "aps", "ashe", "bres", "business", "popest", "police", "elections", "members", "lsoa"]
 
 COUNTRY_BY_PREFIX = {"E": "England", "W": "Wales", "S": "Scotland", "N": "Northern Ireland"}
 
@@ -372,6 +374,16 @@ def build(out_dir: Path, skip: set[str] | None = None) -> dict:
         optional("road_condition", "Road condition statistics (DfT)", road_condition_src.SOURCE_URL,
                  "By highway authority, averaged over the authorities each seat covers; England",
                  lambda: road_condition_src.load_road_condition(s, council_weights()), road_condition_src.ROAD_CONDITION_METRICS)
+
+    if "asylum" not in skip:
+        optional("asylum", "Immigration system statistics: local authority data (Home Office)", asylum_src.SOURCE_URL,
+                 "Asylum support and resettlement by council, shared out across the seats each council covers; England & Wales",
+                 lambda: asylum_src.load_asylum(s, council_weights()), asylum_src.ASYLUM_METRICS)
+
+    if "income" not in skip:
+        optional("income", "Income and tax by constituency (HMRC)", income_src.SOURCE_URL,
+                 "Survey of Personal Incomes, Table 3.15; UK",
+                 lambda: income_src.load_income(s), income_src.INCOME_METRICS)
 
     petitions = None
     if "petitions" not in skip:
