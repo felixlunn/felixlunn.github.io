@@ -76,6 +76,9 @@ All data are open, refreshed automatically **every two days** by GitHub Actions,
 | [MHCLG council tax live tables](https://www.gov.uk/government/statistical-data-sets/live-tables-on-council-tax) | Area Band D council tax and this year's rise, by billing authority, averaged across seats | England | Annual |
 | [ONS business demography](https://www.ons.gov.uk/businessindustryandtrade/business/activitysizeandlocation/datasets/businessdemographyreferencetable) | Business start-ups and closures as a share of active businesses, by council, shared out across seats | England & Wales | Annual |
 | [Environment Agency flood monitoring API](https://environment.data.gov.uk/flood-monitoring/doc/reference) | Flood warning areas centred in each seat | England | Live |
+| [ONS access to gardens and green space](https://www.ons.gov.uk/economy/environmentalaccounts/datasets/accesstogardensandpublicgreenspaceingreatbritain) | Homes without a garden, and homes within 300m of a park (2020), summed from neighbourhoods | England & Wales | Occasional |
+| [Boiler Upgrade Scheme statistics](https://www.gov.uk/government/collections/boiler-upgrade-scheme-statistics) | Heat pump grants paid since May 2022 per 10,000 households, by constituency | England & Wales | Monthly |
+| [Home Office police workforce](https://www.gov.uk/government/collections/police-workforce-england-and-wales) | Police officers (FTE) per 100,000 people in the seat's police force area | England & Wales | Twice yearly |
 
 Census 2021 covers England and Wales only (Scotland's census was 2022 and Northern Ireland's is published by
 NISRA), so census metrics show "No data" for Scottish and Northern Irish seats. Wherever a metric is a ratio,

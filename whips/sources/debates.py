@@ -32,7 +32,7 @@ TOPICS: dict[str, tuple[str, str, list[str]]] = {
                  r"police|policing|crime|criminal|knife|anti-?social|burglar|shoplift|theft|drug|county lines|"
                  r"violence|abuse|assault|strangulation|fraud|victims|justice|prison|sentenc|stalking|vawg|off-road bikes",
                  ["crime_rate", "crime_violence", "crime_asb", "crime_burglary", "crime_shoplifting", "crime_vehicle",
-                  "crime_drugs", "outcome_no_suspect", "court_open_per_1k", "court_backlog_change"]),
+                  "crime_drugs", "outcome_no_suspect", "police_officers_per_100k", "court_open_per_1k", "court_backlog_change"]),
     "health": ("Health & care",
                r"\bnhs\b|health|hospital|\bgps?\b|general practi|dent(al|ist)|cancer|ambulance|hospice|patients?|"
                r"social care|care homes?|care quality|carers?\b|disab|dementia|stroke|nurs|gynaecolog|menopaus|endometriosis|maternity|medic|dentist|dental|"
@@ -51,7 +51,7 @@ TOPICS: dict[str, tuple[str, str, list[str]]] = {
                         "inactive_sick", "never_worked"]),
     "energy": ("Energy & heating",
                r"energy|fuel|heating|heat pump|net zero|climate|electricity|\bgas\b|insulation|solar",
-               ["fuel_poverty", "off_gas_grid", "epc_f_g", "solar_pv_per_100_hh", "heat_oil", "heat_electric", "no_central_heating"]),
+               ["fuel_poverty", "off_gas_grid", "heat_pump_grants_per_10k", "epc_f_g", "solar_pv_per_100_hh", "heat_oil", "heat_electric", "no_central_heating"]),
     "transport": ("Transport",
                   r"transport|electric vehicle|\bev\b|charg(ing|ers?) point|chargepoint|\bbus(es)?\b|\brail|\btrains?\b|\broads?\b|pothole|road safety|speed limit|collision|cycl|motorist|driving|car park|travel|airport",
                   ["no_car", "commute_bus", "commute_train", "rail_journeys_per_resident", "commute_car", "commute_30km_plus",
