@@ -31,9 +31,17 @@ WARD_PATTERN = re.compile(r"^LSOA21_WD(\d{2})_LAD(\d{2})_EW_LU", re.I)
 BATCH = 150  # LSOA codes per ArcGIS "IN (...)" query
 
 
+_SERVICE_CACHE: set[str] = set()
+LISTINGS = 3  # the portal's service listing occasionally leaves a few services out, so combine several
+
+
 def _services(s: requests.Session) -> list[str]:
-    data = get_json(s, ARCGIS_ROOT, params={"f": "json"})
-    return [svc["name"] for svc in data.get("services", []) if svc.get("type") == "FeatureServer"]
+    """Names of the ONS portal's feature services (fetched a few times and combined, then cached)."""
+    if not _SERVICE_CACHE:
+        for _ in range(LISTINGS):
+            data = get_json(s, ARCGIS_ROOT, params={"f": "json"})
+            _SERVICE_CACHE.update(svc["name"] for svc in data.get("services", []) if svc.get("type") == "FeatureServer")
+    return sorted(_SERVICE_CACHE)
 
 
 def find_boundary_service(names: list[str]) -> str:
