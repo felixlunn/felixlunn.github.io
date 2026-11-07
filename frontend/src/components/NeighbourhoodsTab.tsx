@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import type { DashboardData, Metric, NeighbourhoodFile } from "../types";
+import SourceLink from "./SourceLink";
 import { csv, download, fmt, slug } from "../lib/format";
 
 interface Props {
@@ -78,7 +79,7 @@ export default function NeighbourhoodsTab({ data, seat, file, status, metricId, 
       {metric && (
         <section className="card">
           <div className="rank-head">
-            <h3>{metric.label}</h3>
+            <h3>{metric.label}<SourceLink metric={metric} /></h3>
             <button className="link small" onClick={exportCsv}>Download all (CSV)</button>
           </div>
           <p className="tiny muted">

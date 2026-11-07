@@ -1,5 +1,6 @@
 import type { Choropleth } from "../types";
 import { useColours } from "./MapView";
+import SourceLink from "./SourceLink";
 
 export default function Legend({ ch }: { ch: Choropleth }) {
   const { breaks, pick, classes } = useColours(ch);
@@ -9,7 +10,7 @@ export default function Legend({ ch }: { ch: Choropleth }) {
   const missing = ch.values.length - vals.length;
   return (
     <div className={`legend ${ch.categories ? "wide" : ""}`} aria-label="Map legend">
-      <div className="legend-title">{ch.title}</div>
+      <div className="legend-title">{ch.title}{ch.metric && <SourceLink metric={ch.metric} />}</div>
       {ch.subtitle && <div className="legend-sub">{ch.subtitle}</div>}
       {ch.categories && (
         <ul className="legend-cats">

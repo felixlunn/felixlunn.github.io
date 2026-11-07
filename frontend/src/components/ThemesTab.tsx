@@ -5,6 +5,7 @@ import { rankOf } from "../lib/analytics";
 import { csv, download, fmt, rankText, slug } from "../lib/format";
 import { missingReason } from "../lib/missing";
 import NoData from "./NoData";
+import SourceLink from "./SourceLink";
 import Strip from "./Strip";
 
 interface Props {
@@ -81,7 +82,7 @@ export default function ThemesTab({ data, theme, setTheme, metric, partyMode, pa
               <tr key={m.id} className={!partyMode && m.id === metric.id ? "active" : ""} onClick={() => setMetric(m.id)} tabIndex={0}
                 onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && setMetric(m.id)} aria-label={`Show ${m.label} on the map`}>
                 <td>
-                  <div className="m-label">{m.label}</div>
+                  <div className="m-label">{m.label}<SourceLink metric={m} /></div>
                   {r && <div className="m-rank">{why ?? rankText(r.rank, r.of)}</div>}
                 </td>
                 {r && <td className="num strong">{why ? <NoData reason={why} /> : fmt(m, r.value)}</td>}
@@ -112,10 +113,10 @@ export default function ThemesTab({ data, theme, setTheme, metric, partyMode, pa
         </section>
       ) : (
       <section className="card">
-        <h3>{metric.label}</h3>
+        <h3>{metric.label}<SourceLink metric={metric} /></h3>
         <p className="small">{metric.description}</p>
         <p className="small muted">
-          Source: {metric.source} · {metric.coverage} seats with data · national {fmt(metric, metric.national)}
+          Source: {metric.source_url ? <a href={metric.source_url} target="_blank" rel="noopener noreferrer">{metric.source}</a> : metric.source} · {metric.coverage} seats with data · national {fmt(metric, metric.national)}
           {!["%", "people", "£", "ratio"].includes(metric.unit) ? ` ${metric.unit}` : ""}
         </p>
         <div className="rank-head">

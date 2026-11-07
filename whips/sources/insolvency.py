@@ -21,7 +21,7 @@ log = logging.getLogger(__name__)
 
 SEARCH = "https://www.gov.uk/api/search.json"
 CONTENT = "https://www.gov.uk/api/content"
-SOURCE_URL = "https://www.gov.uk/government/collections/individual-insolvency-statistics-by-location-age-and-gender"
+SOURCE_URL = "https://www.gov.uk/government/collections/individual-insolvency-statistics-releases"
 
 INSOLVENCY_METRICS = [
     MetricMeta("insolvency_per_10k", "Personal insolvencies per 10,000 adults", "economy", "per 10,000",

@@ -194,6 +194,7 @@ export default function App({ data, geo }: { data: DashboardData; geo: GeoJSON.F
       return {
         title: m.label + unitSuffix(m),
         subtitle: activeDebate.title,
+        metric: m,
         values: data.values[m.id],
         format: (v) => fmt(m, v),
       };
@@ -202,6 +203,7 @@ export default function App({ data, geo }: { data: DashboardData; geo: GeoJSON.F
     return {
       title: metric.label + unitSuffix(metric),
       subtitle: metric.source,
+      metric,
       values: data.values[metric.id],
       format: (v) => fmt(metric, v),
     };
