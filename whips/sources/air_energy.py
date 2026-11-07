@@ -25,6 +25,7 @@ log = logging.getLogger(__name__)
 
 FINGERTIPS = "https://fingertips.phe.org.uk/api/all_data/csv/by_indicator_id"
 AIR_URL = "https://fingertips.phe.org.uk/search/air%20pollution"
+SOURCE_URL = AIR_URL  # build.py links each source step by SOURCE_URL
 AIR_INDICATOR, COUNCILS, ENGLAND = 93861, 501, 15
 RENEWABLES = "https://www.gov.uk/api/content/government/statistics/regional-renewable-statistics"
 RENEWABLES_URL = "https://www.gov.uk/government/statistics/regional-renewable-statistics"
