@@ -12,6 +12,7 @@ import logging
 import pandas as pd
 import requests
 
+from ..history import council_periods
 from ..metrics import MetricMeta
 from .councils import averaged
 
@@ -49,14 +50,29 @@ def parse(text: str) -> tuple[dict[str, pd.Series], dict[str, float], str]:
     return values, national, period
 
 
+def periods(text: str, sex: str) -> list[tuple[str, pd.Series, float | None]]:
+    """[(three-year period, council values, England value)] for one sex, oldest first."""
+    d = pd.read_csv(io.StringIO(text), low_memory=False)
+    d = d[d["Category Type"].isna() & d["Time period"].astype(str).str.contains(" - ") & d["Sex"].eq(sex)]
+    out = []
+    for _, g in sorted(d.groupby("Time period Sortable"), key=lambda x: x[0]):
+        g = g.drop_duplicates(["Area Code"])
+        councils = g[~g["Area Type"].eq("England")]
+        eng = g.loc[g["Area Type"].eq("England"), "Value"]
+        v = pd.Series(pd.to_numeric(councils["Value"], errors="coerce").values, index=councils["Area Code"].astype(str)).dropna()
+        if len(v):
+            out.append((str(g["Time period"].iloc[0]), v, float(eng.iloc[0]) if len(eng) and pd.notna(eng.iloc[0]) else None))
+    return out
+
+
 def load_life_expectancy(s: requests.Session, weights: pd.DataFrame) -> tuple[dict[str, pd.DataFrame], str]:
     r = s.get(FINGERTIPS, timeout=300, params={"indicator_ids": INDICATOR, "child_area_type_id": COUNCILS,
                                               "parent_area_type_id": ENGLAND})
     r.raise_for_status()
-    values, national, period = parse(r.text)
+    _, _, period = parse(r.text)
     frames = {}
-    for sex, v in values.items():
-        f = averaged(v, weights)
-        f.attrs["national"] = national[sex]
-        frames[f"life_expectancy_{sex.lower()}"] = f
+    for sex in ("Male", "Female"):
+        ps = periods(r.text, sex)
+        ps = [p for p in ps if len(p[1]) >= 0.8 * len(ps[-1][1])]
+        frames[f"life_expectancy_{sex.lower()}"] = council_periods(ps, averaged, weights)
     return frames, period

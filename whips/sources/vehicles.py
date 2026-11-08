@@ -16,6 +16,9 @@ import pandas as pd
 import requests
 
 from ..http import get_json
+from ..history import MAX_PERIODS, with_history
+
+MAX_SUPPRESSED = 0.10
 from ..metrics import MetricMeta
 
 log = logging.getLogger(__name__)
@@ -56,6 +59,20 @@ def latest_counts(csv: bytes, filters: dict[str, str]) -> tuple[pd.Series, str]:
     return counts.groupby(d["LSOA21CD"].values).sum(), quarter
 
 
+def quarter_counts(csv: bytes, filters: dict[str, str]) -> pd.DataFrame:
+    """Counts by LSOA for the latest quarter and the same quarter in earlier years (columns oldest first)."""
+    header = pd.read_csv(io.BytesIO(csv), nrows=0).columns
+    quarters = [c for c in header if c[:4].isdigit() and " Q" in c]
+    same = [c for c in quarters if c.endswith(quarters[0][-2:])][:MAX_PERIODS][::-1]
+    d = pd.read_csv(io.BytesIO(csv), usecols=["LSOA21CD", *filters, *same], dtype=str)
+    for col, value in filters.items():
+        d = d[d[col].eq(value)]
+    counts = d[same].apply(pd.to_numeric, errors="coerce").fillna(0)
+    out = counts.groupby(d["LSOA21CD"].values).sum()
+    out.attrs["suppressed"] = {q: float(d[q].eq("[c]").mean()) for q in same}  # share of "[c]" (small counts hidden)
+    return out
+
+
 def seat_frames(cars: pd.Series, plugins: pd.Series, lsoa_to_pcon: dict[str, str], households: pd.Series | None) -> dict[str, pd.DataFrame]:
     to_seat = lambda v: v.groupby(v.index.map(lsoa_to_pcon)).sum()  # noqa: E731 (unmapped LSOAs drop out)
     c, p = to_seat(cars), to_seat(plugins).reindex(to_seat(cars).index).fillna(0)
@@ -72,6 +89,14 @@ def load_vehicles(s: requests.Session, lsoa_to_pcon: dict[str, str], households:
         r = s.get(urls[key], timeout=600)
         r.raise_for_status()
         got[key] = r.content
-    cars, quarter = latest_counts(got["VEH0125"], {"BodyType": "Cars", "Keepership": "Private", "LicenceStatus": "Licensed"})
-    plugins, _ = latest_counts(got["VEH0145"], {"Fuel": "Total", "Keepership": "Private"})
-    return seat_frames(cars, plugins, lsoa_to_pcon, households), quarter
+    car_filter = {"BodyType": "Cars", "Keepership": "Private", "LicenceStatus": "Licensed"}
+    cars_q = quarter_counts(got["VEH0125"], car_filter)
+    plug_q = quarter_counts(got["VEH0145"], {"Fuel": "Total", "Keepership": "Private"})
+    quarter = cars_q.columns[-1]
+    frames = seat_frames(cars_q[quarter], plug_q.get(quarter, pd.Series(dtype=float)), lsoa_to_pcon, households)
+    # Plug-in share in the same quarter of each earlier year.
+    # Years when many small counts were suppressed would understate the share: only use well-covered quarters.
+    ok = [q for q in cars_q.columns if q in plug_q.columns and plug_q.attrs.get("suppressed", {}).get(q, 1) < MAX_SUPPRESSED]
+    past = [(q, seat_frames(cars_q[q], plug_q[q], lsoa_to_pcon, None)["plugin_share_private"]) for q in ok]
+    with_history(frames["plugin_share_private"], [(q, f, None) for q, f in past])
+    return frames, quarter

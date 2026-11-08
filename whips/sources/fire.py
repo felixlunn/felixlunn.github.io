@@ -16,6 +16,7 @@ import pandas as pd
 import requests
 
 from ..http import get_json
+from ..history import council_periods
 from ..metrics import MetricMeta
 from .boundaries import ARCGIS_ROOT
 from .councils import arcgis_rows, averaged, column, regrouped_weights
@@ -53,17 +54,28 @@ def find_file(s: requests.Session) -> str:
     raise LookupError("No FIRE1001 table found")
 
 
-def response_times(d: pd.DataFrame, fire_type: str) -> tuple[pd.Series, float | None, str]:
-    """Minutes by authority key for the latest year with data; England's figure; the year."""
+def response_years(d: pd.DataFrame, fire_type: str) -> list[tuple[str, pd.Series, float | None]]:
+    """[(year, minutes by authority key, England's figure)] for every full year, oldest first."""
     d = d[d["FIRE_TYPE"].astype(str).str.strip().str.lower().eq(fire_type)]
     d = d[pd.to_numeric(d["TOTAL_RESPONSE_TIME"], errors="coerce").notna()]
-    # The newest "year" can be a part year with authorities missing: take the latest with full coverage.
+    # The newest "year" can be a part year with authorities missing: stop at the latest with full coverage.
     per_year = d.groupby("FINANCIAL_YEAR").size()
-    year = max(y for y, n in per_year.items() if n >= per_year.max())
-    d = d[d["FINANCIAL_YEAR"].eq(year)]
-    minutes = pd.to_numeric(d["TOTAL_RESPONSE_TIME"], errors="coerce") * 24 * 60  # stored as fractions of a day
-    s = pd.Series(minutes.values, index=d["LOCATION_CATEGORY"].map(key).values).dropna()
-    return s, (float(s["england"]) if "england" in s else None), str(year)
+    last = max(y for y, n in per_year.items() if n >= per_year.max())
+    out = []
+    for year, g in sorted(d.groupby("FINANCIAL_YEAR"), key=lambda x: str(x[0])):
+        if str(year) > str(last):
+            continue
+        minutes = pd.to_numeric(g["TOTAL_RESPONSE_TIME"], errors="coerce") * 24 * 60  # stored as fractions of a day
+        s = pd.Series(minutes.values, index=g["LOCATION_CATEGORY"].map(key).values).dropna()
+        s = s[~s.index.duplicated()]
+        out.append((str(year), s, float(s["england"]) if "england" in s else None))
+    return out
+
+
+def response_times(d: pd.DataFrame, fire_type: str) -> tuple[pd.Series, float | None, str]:
+    """Minutes by authority key for the latest full year; England's figure; the year."""
+    year, s, national = response_years(d, fire_type)[-1]
+    return s, national, year
 
 
 def lad_to_fra(s: requests.Session) -> dict[str, str]:
@@ -79,11 +91,10 @@ def load_fire(s: requests.Session, weights: pd.DataFrame) -> tuple[dict[str, pd.
     fw = regrouped_weights(weights, lad_to_fra(s))
     frames, year = {}, ""
     for mid, ft in [("fire_response_dwelling", "dwellings"), ("fire_response_primary", "primary")]:
-        values, national, year = response_times(d, ft)
+        years = response_years(d, ft)
+        year, values, _ = years[-1]
         missing = sorted(set(fw["lad"]) - set(values.index))
         if missing:
             log.info("%s: no figures for %s", mid, missing[:10])
-        f = averaged(values, fw)
-        f.attrs["national"] = national
-        frames[mid] = f
+        frames[mid] = council_periods(years, averaged, fw)
     return frames, f"Financial year {year}"

@@ -130,9 +130,11 @@ def sen(ds: DataSet) -> tuple[dict[str, pd.DataFrame], str]:
     return frames, period["period"].replace("/", "-")
 
 
-def by_council(ds: DataSet, filters: list[str], num: str, den: str, picks: dict[str, str] | None = None) -> tuple[pd.DataFrame, dict]:
-    """Council and national counts for indicator(s); ``picks`` maps a filter id to {option id: column name}."""
-    period = ds.latest_period()
+def by_council(ds: DataSet, filters: list[str], num: str, den: str, picks: dict[str, str] | None = None,
+               period: dict | None = None) -> tuple[pd.DataFrame, dict]:
+    """Council and national counts for indicator(s) in a period (default the latest); ``picks`` maps a filter id to
+    {option id: column name}."""
+    period = period or ds.latest_period()
     rows = ds.query(["LA", "NAT"], filters, sorted({num, den} - {None}), period)
     recs = []
     for r in rows:
@@ -150,9 +152,15 @@ def by_council(ds: DataSet, filters: list[str], num: str, den: str, picks: dict[
     return d, period
 
 
-def councils_frame(d: pd.DataFrame, weights: pd.DataFrame, min_den: float = 0) -> pd.DataFrame:
+def councils_frame(d: pd.DataFrame, weights: pd.DataFrame, min_den: float = 0, past: bool = False) -> pd.DataFrame:
     la = d.loc["LA"].dropna(subset=["num", "den"])
     la = la[la["den"] >= max(min_den, 1e-9)]
+    if past:  # earlier years: councils created since 2019 take their predecessors' rate
+        from ..history import fill_successors
+        la = la[~la.index.duplicated()]
+        rate = fill_successors(la["num"] / la["den"])
+        den = la["den"].reindex(rate.index).fillna(1.0)
+        la = pd.DataFrame({"num": rate * den, "den": den})
     f = pd.DataFrame({"num": apportion(la["num"], weights) * 100, "den": apportion(la["den"], weights)})
     if "NAT" in d.index.get_level_values(0):
         nat = d.loc["NAT"].iloc[0]

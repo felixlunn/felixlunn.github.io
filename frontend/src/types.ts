@@ -13,6 +13,8 @@ export interface Metric {
   source: string;
   /** The publisher's page for this dataset (for the (i) link). */
   source_url?: string | null;
+  /** Number of periods in history.json, when the source publishes earlier years. */
+  history?: number;
   polarity: "higher_worse" | "higher_better" | "neutral";
   decimals: number;
   tags: string[];

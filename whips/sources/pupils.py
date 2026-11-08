@@ -15,12 +15,14 @@ import logging
 import pandas as pd
 import requests
 
+from ..history import with_history
 from ..metrics import MetricMeta
 from .children import DataSet, by_council, councils_frame, education_weights, find_dataset, number
 from .councils import apportion, lad_to_county
 
 log = logging.getLogger(__name__)
 
+HISTORY_YEARS = 8
 SOURCE_URL = "https://explore-education-statistics.service.gov.uk/find-statistics/pupil-absence-in-schools-in-england"
 ABS_PUB, ABS_SET = "Pupil absence in schools in England", r"persistent and severe absentees"
 KS4_PUB, KS4_SET = "Key stage 4 destination measures", r"Key stage 4 leavers destinations"
@@ -44,11 +46,22 @@ def absence(ds: DataSet, weights: pd.DataFrame) -> tuple[dict[str, pd.DataFrame]
     school = ds.option("School type", "Total")
     kind = ds.filter_id("Absence type")
     frames = {}
+    latest_period = ds.meta["timePeriods"][-1]["period"]
     for mid, label in [("persistent_absence", "Persistent absence"), ("severe_absence", "Severe absence")]:
         picks = (kind, {ds.option("Absence type", label): "num", ds.option("Absence type", "Total pupils"): "den"})
-        d, period = by_council(ds, [school], ds.indicator("Count of pupil enrolments"), None, picks)
-        frames[mid] = councils_frame(d, weights)
-    return frames, period["period"].replace("/", "-")
+        past = []
+        for p in ds.meta["timePeriods"][-HISTORY_YEARS:]:  # oldest first, ending with the latest
+            period = {"period": p["period"], "code": p["code"]}
+            try:
+                d, _ = by_council(ds, [school], ds.indicator("Count of pupil enrolments"), None, picks, period)
+                f = councils_frame(d, weights, past=p["period"] != latest_period)
+            except Exception as exc:  # noqa: BLE001 - a missing past year shouldn't drop the latest
+                log.info("%s %s: %s", mid, p["period"], exc)
+                continue
+            past.append((p["period"].replace("/", "-"), f, f.attrs.get("national")))
+        label, latest, _ = past[-1]
+        frames[mid] = with_history(latest, past)
+    return frames, label
 
 
 def headline_rows(ds: DataSet, rows: list[dict]) -> list[dict]:

@@ -15,6 +15,7 @@ import pandas as pd
 import requests
 
 from ..http import get_json
+from ..history import council_periods, year_columns as history_years
 from ..metrics import MetricMeta
 from ..ods import find_table, read_ods
 from .councils import averaged, lad_to_county, regrouped_weights
@@ -68,6 +69,12 @@ def journeys_per_head(sheet: pd.DataFrame) -> tuple[pd.Series, float | None, str
     return pd.Series(v[keep].values, index=code[keep].values), (float(england.iloc[0]) if len(england) else None), year
 
 
+def journeys_by_year(sheet: pd.DataFrame) -> list[tuple[str, pd.Series, float | None]]:
+    t = find_table(sheet, "Local Authority")
+    code, name = t.iloc[:, 0].astype(str).str.strip(), t.iloc[:, 1].astype(str).str.strip()
+    return history_years(t, code, year_columns(t), code.str.match(r"^E(06|10|11|12)\d{6}$"), name.eq("England"))
+
+
 def miles_change(sheet: pd.DataFrame) -> tuple[pd.Series, float | None, str]:
     t = find_table(sheet, "LA Code")
     t = t[t["Service type"].astype(str).str.strip().eq("Total")]
@@ -101,9 +108,13 @@ def load_buses(s: requests.Session, weights: pd.DataFrame) -> tuple[dict[str, pd
         r = s.get(urls[key], timeout=120)
         r.raise_for_status()
         sheets = read_ods(r.content)
-        values, nat, year = fn(next(v for k, v in sheets.items() if k.startswith(sheet)))
-        f = averaged(values, upper_weights)
-        f.attrs["national"] = nat
-        out[mid] = f
+        table = next(v for k, v in sheets.items() if k.startswith(sheet))
+        values, nat, year = fn(table)
+        if mid == "bus_journeys_per_head":  # every year since 2010 is published
+            out[mid] = council_periods(journeys_by_year(table), averaged, upper_weights)
+        else:  # already a change since 2010
+            f = averaged(values, upper_weights)
+            f.attrs["national"] = nat
+            out[mid] = f
         years.append(year)
     return out, f"Year ending March {max(years)}"

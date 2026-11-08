@@ -14,6 +14,7 @@ import pandas as pd
 import requests
 
 from ..http import get_json
+from ..history import with_history
 from ..metrics import MetricMeta
 from ..ods import find_table, read_ods
 
@@ -57,6 +58,22 @@ def counts(sheet: pd.DataFrame) -> tuple[pd.Series, str]:
     return pd.Series(values[keep].values, index=codes[keep].values), re.sub(r"\s*\[.*?\]", "", col).strip()
 
 
+def yearly_counts(sheet: pd.DataFrame) -> list[tuple[str, pd.Series]]:
+    """[(year, chargers by seat)] using the latest count in each year, oldest first."""
+    table = find_table(sheet, "Code")
+    codes = table["Code"].astype(str).str.strip()
+    keep = codes.str.match(r"^(E14|S14|W07|N05)\d{6}$")
+    when = {c: pd.to_datetime(re.sub(r"\s*\[.*?\]", "", c).strip(), dayfirst=True, errors="coerce")
+            for c in table.columns if re.search(r"\b(19|20)\d{2}\b", c)}
+    when = {c: d for c, d in when.items() if pd.notna(d)}
+    out = []
+    for year in sorted({d.year for d in when.values()}):
+        col = max((c for c, d in when.items() if d.year == year), key=when.get)
+        v = pd.to_numeric(table[col], errors="coerce")
+        out.append((str(year), pd.Series(v[keep].values, index=codes[keep].values)))
+    return out
+
+
 def load_ev(s: requests.Session, electorate: pd.Series) -> tuple[dict[str, pd.DataFrame], str]:
     r = s.get(find_file(s), timeout=120)
     r.raise_for_status()
@@ -64,8 +81,15 @@ def load_ev(s: requests.Session, electorate: pd.Series) -> tuple[dict[str, pd.Da
     allc, when = counts(next(v for k, v in sheets.items() if k.lower().endswith("0103a")))
     rapid, _ = counts(next(v for k, v in sheets.items() if k.lower().endswith("0103b")))
     elec = electorate.reindex(allc.index)
-    return {
+    frames = {
         "ev_chargers": pd.DataFrame({"num": allc, "den": 1.0}),
         "ev_chargers_per_10k": pd.DataFrame({"num": allc * 10_000, "den": elec}),
         "ev_rapid_share": pd.DataFrame({"num": rapid.reindex(allc.index) * 100, "den": allc.where(allc > 0)}),
-    }, f"Chargers at {when}"
+    }
+    # Change over time: the latest count each year (per 10,000 voters on today's register).
+    sheet_a = next(v for k, v in sheets.items() if k.lower().endswith("0103a"))
+    years = yearly_counts(sheet_a)
+    with_history(frames["ev_chargers_per_10k"], [(y, pd.DataFrame({"num": c * 10_000, "den": electorate.reindex(c.index)}), None)
+                                                 for y, c in years])
+    with_history(frames["ev_chargers"], [(y, pd.DataFrame({"num": c, "den": 1.0}), None) for y, c in years])
+    return frames, f"Chargers at {when}"

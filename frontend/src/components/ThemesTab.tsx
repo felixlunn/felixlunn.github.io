@@ -6,6 +6,8 @@ import { csv, download, fmt, rankText, slug } from "../lib/format";
 import { missingReason } from "../lib/missing";
 import NoData from "./NoData";
 import SourceLink from "./SourceLink";
+import { ChangeBadge, Sparkline, TrendChart } from "./Trend";
+import { seriesFor, type History } from "../lib/history";
 import Strip from "./Strip";
 
 interface Props {
@@ -18,9 +20,12 @@ interface Props {
   setMetric: (id: string) => void;
   selected: number | null;
   onSelect: (i: number) => void;
+  history: History | null;
+  changeMode: boolean;
+  setChangeMode: (on: boolean) => void;
 }
 
-export default function ThemesTab({ data, theme, setTheme, metric, partyMode, parties, setMetric, selected, onSelect }: Props) {
+export default function ThemesTab({ data, theme, setTheme, metric, partyMode, parties, setMetric, selected, onSelect, history, changeMode, setChangeMode }: Props) {
   const themeMetrics = data.metrics.filter((m) => m.theme === theme);
   const hasParties = !!parties.categories?.length;
   const themesWithData = data.themes.filter((t) => data.metrics.some((m) => m.theme === t.id) || (t.id === "politics" && hasParties));
@@ -84,6 +89,10 @@ export default function ThemesTab({ data, theme, setTheme, metric, partyMode, pa
                 <td>
                   <div className="m-label">{m.label}<SourceLink metric={m} /></div>
                   {r && <div className="m-rank">{why ?? rankText(r.rank, r.of)}</div>}
+                  {selected !== null && !why && (() => {
+                    const s = seriesFor(history, m.id, selected);
+                    return s && <div className="m-rank"><ChangeBadge metric={m} series={s} /><Sparkline series={s} /></div>;
+                  })()}
                 </td>
                 {r && <td className="num strong">{why ? <NoData reason={why} /> : fmt(m, r.value)}</td>}
                 <td className={`num ${r ? "muted" : "strong"}`}>{fmt(m, m.national)}</td>
@@ -115,6 +124,20 @@ export default function ThemesTab({ data, theme, setTheme, metric, partyMode, pa
       <section className="card">
         <h3>{metric.label}<SourceLink metric={metric} /></h3>
         <p className="small">{metric.description}</p>
+        {!!metric.history && (
+          <div className="seg small" role="group" aria-label="Map shows">
+            <span className="muted">Map:</span>
+            <button className={`chip ${!changeMode ? "on" : ""}`} onClick={() => setChangeMode(false)}>Latest figure</button>
+            <button className={`chip ${changeMode ? "on" : ""}`} onClick={() => setChangeMode(true)}>
+              Change since {history?.metrics[metric.id]?.periods[0] ?? "first year"}
+            </button>
+          </div>
+        )}
+        {selected !== null && (() => {
+          const s = seriesFor(history, metric.id, selected);
+          return s ? <TrendChart metric={metric} series={s} seatName={data.seats[selected].name} />
+            : metric.history ? <p className="tiny muted">{history ? "No earlier figures for this seat." : "Loading earlier figures…"}</p> : null;
+        })()}
         <p className="small muted">
           Source: {metric.source_url ? <a href={metric.source_url} target="_blank" rel="noopener noreferrer">{metric.source}</a> : metric.source} · {metric.coverage} seats with data · national {fmt(metric, metric.national)}
           {!["%", "people", "£", "ratio"].includes(metric.unit) ? ` ${metric.unit}` : ""}

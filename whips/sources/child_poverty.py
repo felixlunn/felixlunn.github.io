@@ -15,6 +15,7 @@ import pandas as pd
 import requests
 
 from ..http import get_json
+from ..history import with_history
 from ..metrics import MetricMeta
 from ..ods import find_table, read_ods
 
@@ -46,20 +47,31 @@ def find_file(s: requests.Session) -> str:
     raise LookupError("No children in low income families local area tables found")
 
 
-def seat_table(sheet: pd.DataFrame) -> tuple[pd.DataFrame, float, str]:
-    """(num/den frame of children in low income families by seat, UK share, year label) for the latest year."""
+def seat_years(sheet: pd.DataFrame) -> list[tuple[str, pd.DataFrame, float | None]]:
+    """[(FYE label, num/den frame by seat, UK share)] for every year in the table, oldest first."""
     t = find_table(sheet, "Westminster Parliamentary Constituency")
     year = lambda c: re.search(r"FYE (\d{4})", c)  # noqa: E731
-    pct = max((c for c in t.columns if c.lower().startswith("percentage") and year(c)), key=lambda c: year(c).group(1))
-    fye = year(pct).group(1)
-    num = next(c for c in t.columns if c.lower().startswith("number") and f"FYE {fye}" in c)
     code = t["Area Code"].astype(str).str.strip()
-    n, p = pd.to_numeric(t[num], errors="coerce"), pd.to_numeric(t[pct], errors="coerce")
-    uk = float(p[code.eq("K02000001")].iloc[0]) * 100 if code.eq("K02000001").any() else None
-    keep = code.str.match(r"^(E14|S14|W07|N05)\d{6}$") & n.notna() & p.gt(0)
-    frame = pd.DataFrame({"num": (n * 100)[keep].values, "den": (n / p)[keep].values}, index=code[keep].values)
+    out = []
+    for pct in sorted((c for c in t.columns if c.lower().startswith("percentage") and year(c)), key=lambda c: year(c).group(1)):
+        fye = year(pct).group(1)
+        num = next(c for c in t.columns if c.lower().startswith("number") and f"FYE {fye}" in c)
+        n, p = pd.to_numeric(t[num], errors="coerce"), pd.to_numeric(t[pct], errors="coerce")
+        uk = float(p[code.eq("K02000001")].iloc[0]) * 100 if code.eq("K02000001").any() else None
+        keep = code.str.match(r"^(E14|S14|W07|N05)\d{6}$") & n.notna() & p.gt(0)
+        out.append((f"FYE {fye}", pd.DataFrame({"num": (n * 100)[keep].values, "den": (n / p)[keep].values},
+                                              index=code[keep].values), uk))
+    return out
+
+
+def seat_table(sheet: pd.DataFrame) -> tuple[pd.DataFrame, float, str]:
+    """(num/den frame of children in low income families by seat, UK share, year label) for the latest year,
+    carrying the earlier years as history."""
+    years = seat_years(sheet)
+    label, frame, uk = years[-1]
+    frame = frame.copy()
     frame.attrs["national"] = uk
-    return frame, uk, f"FYE {fye}"
+    return with_history(frame, years), uk, label
 
 
 def load_child_poverty(s: requests.Session) -> tuple[dict[str, pd.DataFrame], str]:

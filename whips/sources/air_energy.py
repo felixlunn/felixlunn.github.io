@@ -18,6 +18,7 @@ import pandas as pd
 import requests
 
 from ..http import get_json
+from ..history import council_periods
 from ..metrics import MetricMeta
 from .councils import apportion, averaged
 
@@ -61,9 +62,9 @@ def load_air(s: requests.Session, weights: pd.DataFrame) -> tuple[dict[str, pd.D
                                               "parent_area_type_id": ENGLAND})
     r.raise_for_status()
     values, national, period = parse_air(r.text)
-    f = averaged(values, weights)
-    f.attrs["national"] = national
-    return {"air_pollution_deaths": f}, period
+    from .public_health import parse_periods  # same Fingertips layout (persons, all periods)
+    ps = [p for p in parse_periods(r.text) if len(p[1]) >= 0.8 * len(values)]
+    return {"air_pollution_deaths": council_periods(ps, averaged, weights)}, period
 
 
 # --- renewables ------------------------------------------------------------------------------------

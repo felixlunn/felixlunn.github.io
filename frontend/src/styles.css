@@ -342,5 +342,29 @@ select, input { font: inherit; color: var(--text-1); background: var(--surface-1
 /* (i) source link next to figures */
 .src-link { display: inline-flex; align-items: center; justify-content: center; width: 1.05em; height: 1.05em;
   margin-left: .3em; border: 1px solid currentColor; border-radius: 50%; font: italic 600 .72em/1 Georgia, serif;
-  color: var(--muted, #6b7280); text-decoration: none; vertical-align: .1em; flex: none; }
-.src-link:hover, .src-link:focus-visible { color: var(--accent, #0b6e4f); }
+  color: var(--text-3); text-decoration: none; vertical-align: .1em; flex: none; }
+.src-link:hover, .src-link:focus-visible { color: var(--accent); }
+
+/* Change over time */
+.chg { white-space: nowrap; font-size: .82em; font-weight: 600; }
+.chg.good { color: var(--ok); }
+.chg.bad { color: var(--bad); }
+.chg.neutral { color: var(--text-3); }
+.chg .muted { font-weight: 400; }
+.spark { vertical-align: middle; margin-left: .35em; overflow: visible; }
+.spark-seat { fill: none; stroke: var(--accent); stroke-width: 1.5; }
+.spark-nat { fill: none; stroke: var(--text-3); stroke-width: 1; stroke-dasharray: 2 2; }
+.spark-dot { fill: var(--accent); }
+.trend { margin: .75rem 0; }
+.trend svg { width: 100%; max-width: 360px; height: auto; display: block; }
+.trend-seat { fill: none; stroke: var(--accent); stroke-width: 2; }
+.trend-nat { fill: none; stroke: var(--text-3); stroke-width: 1.5; stroke-dasharray: 4 3; }
+.trend-dot { fill: var(--accent); }
+.trend-axis { font-size: 9px; fill: var(--text-3); }
+.trend-key .key-seat, .trend-key .key-nat { display: inline-block; width: 14px; border-top: 2px solid var(--accent); vertical-align: middle; margin: 0 .2em 0 .6em; }
+.trend-key .key-nat { border-top: 2px dashed var(--text-3); }
+.quote { background: var(--surface-2); padding: .4rem .55rem; border-radius: 4px; }
+.changed-list { list-style: none; padding: 0; margin: .3rem 0; }
+.changed-list li { display: flex; flex-wrap: wrap; align-items: baseline; gap: .1rem .5rem; padding: .25rem 0; border-bottom: 1px solid var(--border); }
+.changed-list .dev-label { flex: 1 1 100%; }
+.seg { display: flex; flex-wrap: wrap; align-items: center; gap: .35rem; margin: .4rem 0; }

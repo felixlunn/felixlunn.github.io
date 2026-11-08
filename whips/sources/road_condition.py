@@ -15,6 +15,7 @@ import pandas as pd
 import requests
 
 from ..http import get_json
+from ..history import council_periods, year_columns
 from ..metrics import MetricMeta
 from ..ods import find_table, read_ods
 from .councils import averaged, lad_to_county, upper_tier_weights
@@ -61,6 +62,14 @@ def latest_by_authority(sheet: pd.DataFrame) -> tuple[pd.Series, str]:
     return s, year
 
 
+def years_by_authority(sheet: pd.DataFrame) -> list[tuple[str, pd.Series, float | None]]:
+    t = find_table(sheet, "ONS Area Code")
+    cols = [c for c in t.columns if re.match(r"FYE \d{4}", c)]
+    code = t["ONS Area Code"].astype(str).str.strip()
+    england = code.eq("E92000001") | t["Local Authority"].astype(str).str.strip().str.lower().eq("england")
+    return year_columns(t, code, cols, code.str.match(r"^E(06|08|09|10)\d{6}$"), england)
+
+
 def load_road_condition(s: requests.Session, weights: pd.DataFrame) -> tuple[dict[str, pd.DataFrame], str]:
     urls = find_files(s)
     uw = upper_tier_weights(weights, lad_to_county(s))
@@ -73,11 +82,9 @@ def load_road_condition(s: requests.Session, weights: pd.DataFrame) -> tuple[dic
             r.raise_for_status()
             books[table] = read_ods(r.content)
         sheet = next(v for k, v in books[table].items() if re.search(pattern, k))
-        values, year = latest_by_authority(sheet)
-        f = averaged(values, uw)
-        f.attrs["national"] = values.attrs.get("national")
-        frames[mid] = f
-        years.add(year)
+        ys = years_by_authority(sheet)
+        frames[mid] = council_periods(ys, averaged, uw, label=lambda c: re.search(r"FYE \d{4}", c).group(0))
+        years.add(re.search(r"FYE \d{4}", ys[-1][0]).group(0))
     if not frames:
         raise LookupError("No road condition tables found")
     return frames, ", ".join(sorted(years))

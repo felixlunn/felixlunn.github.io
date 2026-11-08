@@ -463,10 +463,22 @@ def parse_claimants(df: pd.DataFrame) -> tuple[pd.DataFrame, str]:
     return pd.DataFrame({"num": count * 100, "den": den}), period
 
 
+CLAIMANT_YEARS = 10  # the same month in each of the previous years, for change over time
+
+
 def load_claimants(s: requests.Session) -> tuple[pd.DataFrame, str]:
     geo_type = find_pcon_type(s, CLAIMANT_DATASET)
+    dates = ",".join(["latest"] + [f"latestMINUS{12 * k}" for k in range(1, CLAIMANT_YEARS + 1)])
     df = fetch_csv(s, CLAIMANT_DATASET, {
-        "geography": geo_type, "date": "latest", "gender": "0", "age": "0",
+        "geography": geo_type, "date": dates, "gender": "0", "age": "0",
         "measure": "1,2", "measures": "20100",
     })
-    return parse_claimants(df)
+    if "DATE" not in df.columns:
+        return parse_claimants(df)
+    from ..history import with_history
+    periods = []
+    for date, g in sorted(df.groupby("DATE"), key=lambda x: str(x[0])):
+        frame, label = parse_claimants(g)
+        periods.append((label, frame, None))
+    label, latest, _ = periods[-1]
+    return with_history(latest.copy(), periods), label
