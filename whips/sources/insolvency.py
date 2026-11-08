@@ -15,6 +15,7 @@ import pandas as pd
 import requests
 
 from ..http import get_json
+from ..history import with_history
 from ..metrics import MetricMeta
 
 log = logging.getLogger(__name__)
@@ -48,30 +49,46 @@ def find_file(s: requests.Session) -> str:
     raise LookupError("No insolvencies by parliamentary constituency workbook found")
 
 
-def table(book: pd.ExcelFile, name: str) -> tuple[pd.Series, str, float | None]:
+def table_years(book: pd.ExcelFile, name: str) -> dict[str, tuple[pd.Series, float | None]]:
+    """{year: (values by seat, England & Wales value)} for every year in the table."""
     raw = pd.read_excel(book, sheet_name=name, header=None)
     header = next(i for i in range(15) if str(raw.iloc[i, 0]).strip() == "Code")
     t = raw.iloc[header + 1:].copy()
     t.columns = [str(c).strip().removesuffix(".0") for c in raw.iloc[header]]
-    year = max(c for c in t.columns if re.fullmatch(r"\d{4}", c))
-    v = pd.to_numeric(t[year], errors="coerce")
     code = t["Code"].astype(str).str.strip()
     seat = code.str.match(r"^(E14|W07)\d{6}$")
-    ew = v[code.eq("K04000001")]
-    return pd.Series(v[seat].values, index=code[seat].values), year, (float(ew.iloc[0]) if len(ew) else None)
+    out = {}
+    for year in sorted(c for c in t.columns if re.fullmatch(r"\d{4}", c)):
+        v = pd.to_numeric(t[year], errors="coerce")
+        ew = v[code.eq("K04000001")]
+        out[year] = (pd.Series(v[seat].values, index=code[seat].values), float(ew.iloc[0]) if len(ew) and pd.notna(ew.iloc[0]) else None)
+    return out
+
+
+def table(book: pd.ExcelFile, name: str) -> tuple[pd.Series, str, float | None]:
+    years = table_years(book, name)
+    year = max(years)
+    return years[year][0], year, years[year][1]
+
+
+def rate_frame(n: pd.Series, rate: pd.Series) -> pd.DataFrame:
+    adults = (n / rate * 10_000).where(rate > 0)
+    f = pd.DataFrame({"num": n * 10_000, "den": adults})
+    f.loc[rate.eq(0), ["num", "den"]] = [0.0, 1.0]  # no cases: rate 0
+    return f
 
 
 def load_insolvency(s: requests.Session) -> tuple[dict[str, pd.DataFrame], str]:
     r = s.get(find_file(s), timeout=120)
     r.raise_for_status()
     book = pd.ExcelFile(io.BytesIO(r.content))
-    frames = {}
+    frames, year = {}, ""
     for mid, counts, rates in [("insolvency_per_10k", "Table_1a", "Table_1b"), ("dro_per_10k", "Table_3a", "Table_3b")]:
-        n, year, _ = table(book, counts)
-        rate, _, national = table(book, rates)
-        adults = (n / rate * 10_000).where(rate > 0)
-        f = pd.DataFrame({"num": n * 10_000, "den": adults})
-        f.loc[rate.eq(0), ["num", "den"]] = [0.0, 1.0]  # no cases: rate 0
-        f.attrs["national"] = national
-        frames[mid] = f
+        n_years, r_years = table_years(book, counts), table_years(book, rates)
+        years = sorted(set(n_years) & set(r_years))
+        year = years[-1]
+        periods = [(y, rate_frame(n_years[y][0], r_years[y][0]), r_years[y][1]) for y in years]
+        f = periods[-1][1].copy()
+        f.attrs["national"] = periods[-1][2]
+        frames[mid] = with_history(f, periods)
     return frames, year

@@ -27,6 +27,7 @@ import numpy as np
 import pandas as pd
 
 from . import engine
+from .history import assemble_history
 from .http import session
 from .metrics import (
     source_url,
@@ -478,6 +479,8 @@ def build(out_dir: Path, skip: set[str] | None = None) -> dict:
 
     # 4. Assemble seats + values
     metrics, values = assemble(codes, frames, metas)
+    history = assemble_history(codes, frames, metrics)
+    log.info("History: %d metrics with past periods", len(history["metrics"]))
     seats = []
     for code in codes:
         a = attrs.loc[code].to_dict() if code in attrs.index else {}
@@ -517,12 +520,12 @@ def build(out_dir: Path, skip: set[str] | None = None) -> dict:
             log.exception("What's On calendar failed")
             record("debates", "Upcoming Commons debates (UK Parliament What's On)", debates_src.SOURCE_URL, "failed", str(exc))
     return finish(out_dir, geo, seats, metrics, values, sources, demo=False, debates=debates, neighbourhoods=neighbourhoods,
-                  petitions=petitions)
+                  petitions=petitions, history=history)
 
 
 def finish(out_dir: Path, geo: dict, seats: list[dict], metrics: list[dict], values: dict[str, list],
            sources: list[dict], demo: bool, debates: list[dict] | None = None, neighbourhoods: dict | None = None,
-           petitions: dict | None = None) -> dict:
+           petitions: dict | None = None, history: dict | None = None) -> dict:
     """Add peer groups and write all output files."""
     ds = engine.Dataset.from_json({"seats": seats, "metrics": metrics, "values": values})
     groups, group_meta = engine.peer_groups(ds)
@@ -543,7 +546,12 @@ def finish(out_dir: Path, geo: dict, seats: list[dict], metrics: list[dict], val
         "neighbourhoods": neighbourhoods,
         "petitions": petitions,
     }
+    hist = (history or {}).get("metrics", {})
+    for m in metrics:
+        if m["id"] in hist:
+            m["history"] = len(hist[m["id"]]["periods"])  # periods available in history.json
     (out_dir / "data.json").write_text(json.dumps(data, separators=(",", ":"), allow_nan=False))
+    (out_dir / "history.json").write_text(json.dumps({"metrics": hist}, separators=(",", ":"), allow_nan=False))
     (out_dir / "boundaries.geojson").write_text(json.dumps(geo, separators=(",", ":")))
     wide = pd.DataFrame({"code": [s["code"] for s in seats], "name": [s["name"] for s in seats],
                          "country": [s["country"] for s in seats], "region": [s["region"] for s in seats],

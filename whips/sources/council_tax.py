@@ -14,6 +14,7 @@ import pandas as pd
 import requests
 
 from ..http import get_json
+from ..history import council_periods, year_columns
 from ..metrics import MetricMeta
 from ..ods import find_table, read_ods
 from .councils import averaged
@@ -50,14 +51,20 @@ def latest(sheet: pd.DataFrame) -> tuple[pd.Series, float | None, str]:
     return pd.Series(v[keep].values, index=code[keep].values), (float(england.iloc[0]) if len(england) else None), year
 
 
+def years(sheet: pd.DataFrame) -> list[tuple[str, pd.Series, float | None]]:
+    """Every year's values by billing authority, with England's figure."""
+    t = find_table(sheet, "Code")
+    cols = [c for c in t.columns if re.match(r"\d{4} to \d{4}", c)]
+    code = t["ONS Code"].astype(str).str.strip()
+    return year_columns(t, code, cols, code.str.match(r"^E0[6-9]\d{6}$"), t["Authority"].astype(str).str.strip().eq("England"))
+
+
 def load_council_tax(s: requests.Session, weights: pd.DataFrame) -> tuple[dict[str, pd.DataFrame], str]:
     r = s.get(find_file(s), timeout=120)
     r.raise_for_status()
     sheets = read_ods(r.content, only={"Area_CT", "Area_CT_(%)"})
-    frames, year = {}, ""
+    frames = {}
     for mid, name in [("council_tax_band_d", "Area_CT"), ("council_tax_rise", "Area_CT_(%)")]:
-        values, national, year = latest(sheets[name])
-        f = averaged(values, weights)
-        f.attrs["national"] = national
-        frames[mid] = f
-    return frames, year
+        ys = years(sheets[name])
+        frames[mid] = council_periods(ys, averaged, weights, label=lambda c: c.replace(" to ", "-"))
+    return frames, ys[-1][0]

@@ -18,6 +18,7 @@ import pandas as pd
 import requests
 
 from ..http import get_json
+from ..history import with_history
 from ..metrics import MetricMeta
 
 log = logging.getLogger(__name__)
@@ -132,11 +133,30 @@ def seat_frames(rows: pd.DataFrame, where: dict[str, str]) -> dict[str, pd.DataF
     return out
 
 
+def add_history(frames: dict[str, pd.DataFrame], df: pd.DataFrame, where: dict[str, str]) -> None:
+    """Attach each indicator's earlier periods (same practices, summed to seats) to its latest frame."""
+    df = df.copy()
+    df["Count"] = pd.to_numeric(df["Count"], errors="coerce")
+    df["Denominator"] = pd.to_numeric(df["Denominator"], errors="coerce")
+    df = df.drop_duplicates(["Indicator ID", "Area Code", "Time period Sortable"])
+    for ind, g in df.groupby("Indicator ID"):
+        mid = METRIC_BY_INDICATOR.get(int(ind))
+        if mid not in frames:
+            continue
+        periods = []
+        for _, p in sorted(g.groupby("Time period Sortable"), key=lambda x: x[0]):
+            f = seat_frames(p, where).get(mid)
+            if f is not None and len(f) >= 0.8 * len(frames[mid]):  # skip thinly reported periods
+                periods.append((str(p["Time period"].iloc[0]), f, None))
+        with_history(frames[mid], periods)
+
+
 def load_nhs(s: requests.Session, workers: int = 4, prescribing: bool = True) -> tuple[dict[str, pd.DataFrame], str]:
     parents = [a["Code"] for a in get_json(s, f"{FINGERTIPS}/areas/by_area_type", params={"area_type_id": SUB_ICB})]
     with ThreadPoolExecutor(workers) as pool:
         parts = list(pool.map(lambda p: fetch_parent(s, p), parents))
-    rows, periods = latest_by_practice(pd.concat(parts, ignore_index=True))
+    everything = pd.concat(parts, ignore_index=True)
+    rows, periods = latest_by_practice(everything)
     r = s.get(f"{FINGERTIPS}/area_addresses/csv/by_parent_area_code", timeout=120,
               params={"parent_area_code": "E92000001", "area_type_id": PRACTICE})
     r.raise_for_status()
@@ -144,6 +164,7 @@ def load_nhs(s: requests.Session, workers: int = 4, prescribing: bool = True) ->
     where = practice_constituencies(s, dict(zip(addr["Code"], addr["Postcode"])))
     log.info("NHS: %d practices, %d placed in constituencies", rows["Area Code"].nunique(), len(where))
     frames = seat_frames(rows, where)
+    add_history(frames, everything, where)
     qof = periods.get(241) or next(iter(periods.values()), "")
     gpps = periods.get(94126, "")
     period = f"QOF {qof}; GP Patient Survey {gpps}".strip("; ")

@@ -22,6 +22,7 @@ import pandas as pd
 import requests
 
 from ..http import get_json
+from ..history import with_history
 from ..metrics import MetricMeta
 from .nomis import BASE, _auth_params, fetch_csv, find_pcon_type
 
@@ -116,17 +117,27 @@ def _period(df: pd.DataFrame) -> str:
     return str(df["DATE_NAME"].iloc[0]) if "DATE_NAME" in df.columns and len(df) else ""
 
 
+ASHE_YEARS = 10
+
+
 def load_ashe(s: requests.Session) -> tuple[dict[str, pd.DataFrame], str]:
     out, period = {}, ""
     for mid, ds, sex, pay, *_ in ASHE_SERIES:
         geo = find_pcon_type(s, ds)
-        df = _csv(s, ds, f"{geo},{UK}", date="latest", sex=sex, item="2", pay=pay, measures="20100")
-        uk = df.loc[df["GEOGRAPHY"].astype(str) == UK, "value"]
-        seats = df[df["GEOGRAPHY"].astype(str) != UK].set_index("GEOGRAPHY_CODE")["value"]
-        f = pd.DataFrame({"num": seats, "den": 1.0})
-        f.attrs["national"] = float(uk.iloc[0]) if len(uk) and pd.notna(uk.iloc[0]) else None
-        out[mid] = f
-        period = _period(df)
+        dates = ",".join(["latest"] + [f"latestMINUS{k}" for k in range(1, ASHE_YEARS + 1)])
+        df = _csv(s, ds, f"{geo},{UK}", date=dates, sex=sex, item="2", pay=pay, measures="20100")
+        periods = []
+        for date, g in sorted(df.groupby("DATE" if "DATE" in df.columns else lambda _: 0), key=lambda x: str(x[0])):
+            uk = g.loc[g["GEOGRAPHY"].astype(str) == UK, "value"]
+            seats = g[g["GEOGRAPHY"].astype(str) != UK].set_index("GEOGRAPHY_CODE")["value"]
+            if seats.notna().any():
+                periods.append((_period(g), pd.DataFrame({"num": seats, "den": 1.0}),
+                                float(uk.iloc[0]) if len(uk) and pd.notna(uk.iloc[0]) else None))
+        label, f, nat = periods[-1]
+        f = f.copy()
+        f.attrs["national"] = nat
+        out[mid] = with_history(f, periods)
+        period = label
     return out, period
 
 

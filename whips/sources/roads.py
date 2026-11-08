@@ -17,6 +17,7 @@ import pandas as pd
 import requests
 
 from ..geo import SeatLocator
+from ..history import with_history
 from ..metrics import MetricMeta
 
 log = logging.getLogger(__name__)
@@ -71,4 +72,9 @@ def load_roads(s: requests.Session, geo: dict, lsoa_to_pcon: dict[str, str], ele
     log.info("Road collisions: %d, %.1f%% placed in a seat", len(d), seat.notna().mean() * 100)
     codes = [f["properties"]["code"] for f in geo["features"]]
     years = sorted(d["collision_year"].unique())
-    return seat_frames(d, seat, electorate, codes), f"{years[0]} to {years[-1]}"
+    frames = seat_frames(d, seat, electorate, codes)
+    # Each single year, for change over time (the headline figure is the five-year average).
+    by_year = {y: seat_frames(d[d["collision_year"].eq(y)], seat[d["collision_year"].eq(y)], electorate, codes) for y in years}
+    for mid in ("road_collisions_per_10k", "road_ksi_per_10k"):
+        with_history(frames[mid], [(str(y), by_year[y][mid], None) for y in years])
+    return frames, f"{years[0]} to {years[-1]}"

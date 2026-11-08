@@ -15,6 +15,7 @@ from concurrent.futures import ThreadPoolExecutor
 import pandas as pd
 import requests
 
+from ..history import council_periods
 from ..metrics import MetricMeta
 from .councils import averaged, lad_to_county, upper_tier_weights
 
@@ -42,17 +43,36 @@ PUBLIC_HEALTH_METRICS = [MetricMeta(mid, label, "health", unit, desc + NOTE, "OH
                          for mid, label, unit, desc, pol, dec in INDICATORS.values()]
 
 
-def parse(text: str) -> tuple[pd.Series, float | None, str]:
-    """Council values, England value and period label for the latest period (persons)."""
+def parse_periods(text: str) -> list[tuple[str, pd.Series, float | None]]:
+    """[(period, council values, England value)] for every period (persons), oldest first."""
     d = pd.read_csv(io.StringIO(text), low_memory=False)
     d = d[d["Category Type"].isna()]
     if "Persons" in set(d["Sex"]):
         d = d[d["Sex"].eq("Persons")]
-    d = d[d["Time period Sortable"].eq(d["Time period Sortable"].max())].drop_duplicates(["Area Code"])
-    eng = d.loc[d["Area Type"].eq("England"), "Value"]
-    councils = d[~d["Area Type"].eq("England")]
-    values = pd.Series(pd.to_numeric(councils["Value"], errors="coerce").values, index=councils["Area Code"].astype(str)).dropna()
-    return values, (float(eng.iloc[0]) if len(eng) and pd.notna(eng.iloc[0]) else None), str(d["Time period"].iloc[0]) if len(d) else ""
+    if "Age" in d:  # England is often also split by age band: keep the age group councils are published for
+        councils_age = d.loc[~d["Area Type"].eq("England"), "Age"].mode()
+        if len(councils_age):
+            d = d[d["Age"].eq(councils_age.iloc[0])]
+    out = []
+    for sortable, g in sorted(d.groupby("Time period Sortable"), key=lambda x: x[0]):
+        g = g.drop_duplicates(["Area Code"])
+        eng = g.loc[g["Area Type"].eq("England"), "Value"]
+        councils = g[~g["Area Type"].eq("England")]
+        values = pd.Series(pd.to_numeric(councils["Value"], errors="coerce").values,
+                           index=councils["Area Code"].astype(str)).dropna()
+        if len(values):
+            out.append((str(g["Time period"].iloc[0]), values,
+                        float(eng.iloc[0]) if len(eng) and pd.notna(eng.iloc[0]) else None))
+    return out
+
+
+def parse(text: str) -> tuple[pd.Series, float | None, str]:
+    """Council values, England value and period label for the latest period (persons)."""
+    periods = parse_periods(text)
+    if not periods:
+        return pd.Series(dtype=float), None, ""
+    period, values, national = periods[-1]
+    return values, national, period
 
 
 def fetch(s: requests.Session, indicator: int, area_type: int = COUNCILS) -> str:
@@ -75,13 +95,14 @@ def load_public_health(s: requests.Session, weights: pd.DataFrame) -> tuple[dict
             continue
         if values.empty:
             continue
-        w = weights
+        w, text = weights, texts[ind]
         if len(values) < 250:  # published for counties and unitaries only (e.g. vaccination): use those
-            values, national, period = parse(fetch(s, ind, UPPER_TIER))
+            text = fetch(s, ind, UPPER_TIER)
+            values, national, period = parse(text)
             upper = upper if upper is not None else upper_tier_weights(weights, lad_to_county(s))
             w = upper
-        f = averaged(values, w)
-        f.attrs["national"] = national
-        frames[mid] = f
+        # Earlier periods too, for change over time (only periods with most councils reporting).
+        past = [p for p in parse_periods(text) if len(p[1]) >= 0.8 * len(values)]
+        frames[mid] = council_periods(past, averaged, w)
         periods.append(f"{label.split(' per ')[0].lower()} {period}")
     return frames, "; ".join(periods)

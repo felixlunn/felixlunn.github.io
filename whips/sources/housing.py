@@ -19,6 +19,7 @@ import pandas as pd
 import requests
 
 from ..http import get_json
+from ..history import council_periods
 from ..metrics import MetricMeta
 from ..ods import find_table, read_ods
 from .councils import apportion, averaged
@@ -76,6 +77,11 @@ def ons_table(book: pd.ExcelFile, title: str) -> tuple[pd.DataFrame, str]:
     raise LookupError(f"No ONS table titled {title!r}")
 
 
+def year_cols(df: pd.DataFrame) -> dict[str, int]:
+    """Year columns ("2025", "2025.0" or "Year ending Sep 2025") -> year."""
+    return {c: int(m.group(1)) for c in df.columns if (m := re.search(r"\b((?:19|20)\d{2})(?:\.0)?$", c))}
+
+
 def national_value(book: pd.ExcelFile, title: str) -> float | None:
     """The England and Wales figure from the country/region table."""
     df, year = ons_table(book, title)
@@ -98,9 +104,17 @@ def load_affordability(s: requests.Session, weights: pd.DataFrame) -> tuple[dict
         ("affordability_ratio", "Table 5c", "Table 1c"),
     ]:
         df, year = ons_table(book, by_la)
-        f = averaged(by_council(df, year), weights)
-        f.attrs["national"] = national_value(book, by_country)
-        frames[mid] = f
+        nat_df, _ = ons_table(book, by_country)
+        ew = nat_df[nat_df.iloc[:, 1].astype(str).str.strip().str.lower().eq("england and wales")]
+        cols = sorted(year_cols(df), key=lambda c: year_cols(df)[c])
+        nat_col = {y: c for c, y in year_cols(nat_df).items()}  # the country table labels years its own way
+
+        def national(c):
+            nc = nat_col.get(year_cols(df)[c])
+            v = pd.to_numeric(ew[nc], errors="coerce").iloc[0] if nc is not None and len(ew) else None
+            return float(v) if v is not None and pd.notna(v) else None
+        years = [(str(year_cols(df)[c]), by_council(df, c), national(c)) for c in cols]
+        frames[mid] = council_periods([y for y in years if len(y[1])], averaged, weights)
     return frames, f"{re.search(r'(19|20)\d{2}', year).group(0)} (house prices: year ending September)"
 
 

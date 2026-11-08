@@ -124,7 +124,21 @@ def build_demo(out_dir: Path, n: int = 650, seed: int = 42) -> dict:
             continue
         f.loc[[c for c, ctry in zip(codes, countries) if ctry == "Scotland"], ["num"]] = np.nan
     metas = [census_meta(m) for m in CENSUS_METRICS] + CLAIMANT_METRICS + extra + POLICE_METRICS + ELECTION_METRICS
+    # Synthetic history for some metrics: each seat drifts over six years to its latest value.
+    from .history import assemble_history, with_history
+    for k, m in enumerate(extra + CLAIMANT_METRICS):
+        if k % 2:
+            continue
+        latest = frames[m.id]
+        trend = rng.normal(scale=0.04, size=n)
+        periods = []
+        for back in range(5, -1, -1):
+            factor = np.exp(-trend * back + rng.normal(scale=0.02, size=n) * (back > 0))
+            periods.append((str(2025 - back), pd.DataFrame({"num": latest["num"].values * factor, "den": latest["den"]},
+                                                         index=codes), None))
+        with_history(latest, periods)
     metrics, values = assemble(codes, frames, metas)
+    history = assemble_history(codes, frames, metrics)
     parties = ["Labour", "Conservative", "Liberal Democrat", "Reform UK", "Green Party", "Scottish National Party", "Plaid Cymru"]
     colours = {"Labour": "#E4003B", "Conservative": "#0087DC", "Liberal Democrat": "#FAA61A", "Reform UK": "#12B6CF",
                "Green Party": "#02A95B", "Scottish National Party": "#FDF38E", "Plaid Cymru": "#005B54"}
@@ -155,4 +169,4 @@ def build_demo(out_dir: Path, n: int = 650, seed: int = 42) -> dict:
     ]
     debates = parse_events([{"Id": k, "StartDate": day(d), "StartTime": t, "Type": v, "Category": c, "Description": title,
                              "Members": m} for k, (d, t, v, c, title, m) in enumerate(fake)])
-    return finish(out_dir, geo, seats, metrics, values, sources, demo=True, debates=debates)
+    return finish(out_dir, geo, seats, metrics, values, sources, demo=True, debates=debates, history=history)
