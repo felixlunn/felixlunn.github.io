@@ -14,6 +14,7 @@ import NeighbourhoodsTab, { pctLabel } from "./components/NeighbourhoodsTab";
 import { useColours, type Overlay } from "./components/MapView";
 import { classify } from "./lib/colors";
 import { dataUrl } from "./lib/dataUrl";
+import { formatChange, mapChange, useHistory } from "./lib/history";
 import { debateMetrics } from "./lib/debates";
 
 const MapView = lazy(() => import("./components/MapView"));
@@ -53,6 +54,9 @@ export default function App({ data, geo }: { data: DashboardData; geo: GeoJSON.F
   const partyMode = metricId === PARTY_ID;
   const metric = data.metrics.find((m) => m.id === metricId) ?? data.metrics.find((m) => m.theme === "politics") ?? data.metrics[0];
   const [theme, setTheme] = useState(partyMode ? "politics" : metric.theme);
+  // Change over time: history.json loads when the data has any history; the map can show change instead of level.
+  const past = useHistory(data.metrics.some((m) => m.history));
+  const [changeMode, setChangeMode] = useState(false);
   const partyMap = useMemo(() => partyChoropleth(data.seats), [data]);
 
   const setMySeat = useCallback((i: number | null) => {
@@ -200,6 +204,16 @@ export default function App({ data, geo }: { data: DashboardData; geo: GeoJSON.F
       };
     }
     if (partyMode) return partyMap;
+    const mc = changeMode ? mapChange(past, metric) : null;
+    if (mc) {
+      return {
+        title: `Change in ${metric.label}`,
+        subtitle: `${mc.from} to ${mc.to} · ${metric.unit === "%" ? "percentage points" : "percent change"}`,
+        metric,
+        values: mc.values,
+        format: (v) => formatChange(metric, v),
+      };
+    }
     return {
       title: metric.label + unitSuffix(metric),
       subtitle: metric.source,
@@ -207,7 +221,7 @@ export default function App({ data, geo }: { data: DashboardData; geo: GeoJSON.F
       values: data.values[metric.id],
       format: (v) => fmt(metric, v),
     };
-  }, [tab, twinScores, twinResults, twinIds, twinSettings, baseSeat, indexScores, indexRanking, weights, metric, data, partyMode, partyMap, nbActive, activeDebate, debateMetricId]);
+  }, [tab, twinScores, twinResults, twinIds, twinSettings, baseSeat, indexScores, indexRanking, weights, metric, data, partyMode, partyMap, nbActive, activeDebate, debateMetricId, past, changeMode]);
 
   const generated = new Date(data.generated_at);
   const failed = data.sources.filter((s) => s.status === "failed");
@@ -250,7 +264,8 @@ export default function App({ data, geo }: { data: DashboardData; geo: GeoJSON.F
               mapMetric={debateMetricId} setMapMetric={setDebateMetricId} onSelect={(i) => select(i)} />}
             {tab === "neighbourhoods" && <NeighbourhoodsTab data={data} seat={baseSeat} file={nbFile?.seat === nbSeatCode ? nbFile : null} status={nbStatus}
               metricId={nbMetric?.id ?? null} setMetricId={setNbMetricId} />}
-            {tab === "themes" && <ThemesTab data={data} theme={theme} setTheme={(t) => { setTheme(t); const first = t === "politics" ? PARTY_ID : data.metrics.find((m) => m.theme === t)?.id; if (first) setMetricId(first); }} metric={metric} partyMode={partyMode} parties={partyMap} setMetric={setMetricId} selected={baseSeat} onSelect={(i) => select(i)} />}
+            {tab === "themes" && <ThemesTab data={data} theme={theme} setTheme={(t) => { setTheme(t); const first = t === "politics" ? PARTY_ID : data.metrics.find((m) => m.theme === t)?.id; if (first) setMetricId(first); }} metric={metric} partyMode={partyMode} parties={partyMap} setMetric={setMetricId} selected={baseSeat} onSelect={(i) => select(i)}
+              history={past} changeMode={changeMode} setChangeMode={setChangeMode} />}
             {tab === "twins" && <TwinsTab data={data} selected={baseSeat} settings={twinSettings} setSettings={setTwinSettings} results={twinResults} metricCount={twinIds.length} onSelect={(i) => select(i)} />}
             {tab === "index" && <IndexTab data={data} weights={weights} setWeights={setWeights} ranking={indexRanking} selected={selected} onSelect={(i) => select(i)} />}
           </>
@@ -269,7 +284,7 @@ export default function App({ data, geo }: { data: DashboardData; geo: GeoJSON.F
         <Dossier data={data} index={selected} onClose={() => setSelected(null)} onSelect={(i) => select(i)} onShowMetric={showMetric}
           onDebate={(id) => { setTab("debates"); setPanelOpen(true); if (id >= 0) openDebate(id); }}
           onNeighbourhoods={() => { setTab("neighbourhoods"); setPanelOpen(true); }}
-          nbFile={nbFile?.seat === data.seats[selected].code ? nbFile : null} />
+          nbFile={nbFile?.seat === data.seats[selected].code ? nbFile : null} history={past} />
       )}
 
       {showSources && (

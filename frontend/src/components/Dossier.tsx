@@ -8,6 +8,8 @@ import { csv, download, fmt, ordinal, rankText, slug } from "../lib/format";
 import { missingFor, missingReason } from "../lib/missing";
 import NoData from "./NoData";
 import SourceLink from "./SourceLink";
+import { ChangeBadge, Sparkline } from "./Trend";
+import { changeValue, formatChange, seriesFor, type History } from "../lib/history";
 
 interface Props {
   data: DashboardData;
@@ -20,11 +22,13 @@ interface Props {
   onNeighbourhoods: () => void;
   /** This seat's neighbourhood file, when loaded. */
   nbFile: NeighbourhoodFile | null;
+  /** Past periods (change over time), when loaded. */
+  history: History | null;
 }
 
 const dayFmt = new Intl.DateTimeFormat("en-GB", { weekday: "short", day: "numeric", month: "short" });
 
-export default function Dossier({ data, index, onClose, onSelect, onShowMetric, onDebate, onNeighbourhoods, nbFile }: Props) {
+export default function Dossier({ data, index, onClose, onSelect, onShowMetric, onDebate, onNeighbourhoods, nbFile, history }: Props) {
   const seat = data.seats[index];
   const group = data.peer_groups.find((g) => g.id === seat.peer_group);
   const val = (id: string) => data.values[id]?.[index] ?? null;
@@ -57,6 +61,23 @@ export default function Dossier({ data, index, onClose, onSelect, onShowMetric, 
   const missing = useMemo(() => missingFor(data, index), [data, index]);
   const seatGaps = missing.filter((x) => !x.reason.startsWith("Not published"));
   const nationGaps = missing.filter((x) => x.reason.startsWith("Not published"));
+
+  // What's changed most here, compared with the change nationally over the same years.
+  const changed = useMemo(() => {
+    if (!history) return [];
+    return data.metrics.flatMap((m) => {
+      const s = seriesFor(history, m.id, index);
+      if (!s || m.polarity === "neutral") return [];
+      const a = s.seat[0], b = s.seat[s.seat.length - 1];
+      const na = s.national.find((p) => p.period === a.period), nb = s.national.find((p) => p.period === b.period);
+      const seat = changeValue(m, a.value, b.value);
+      const nat = na && nb ? changeValue(m, na.value, nb.value) : null;
+      if (seat === null || nat === null) return [];
+      // How much better or worse than the national trend, in the figure's own direction.
+      const gap = (seat - nat) * (m.polarity === "higher_better" ? 1 : -1);
+      return [{ m, s, seat, nat, gap }];
+    }).sort((x, y) => Math.abs(y.gap) - Math.abs(x.gap)).slice(0, 8);
+  }, [data, history, index]);
 
   const hasNeighbourhoods = data.neighbourhoods?.seats.includes(seat.code) ?? false;
   const deprived = useMemo(() => {
@@ -202,6 +223,23 @@ export default function Dossier({ data, index, onClose, onSelect, onShowMetric, 
           </section>
         )}
 
+        {changed.length > 0 && (
+          <section>
+            <h3>What's changed</h3>
+            <p className="tiny muted">Figures that moved most against the national trend over the same years. Green: better than nationally; red: worse.</p>
+            <ul className="changed-list">
+              {changed.map(({ m, s, nat, gap }) => (
+                <li key={m.id}>
+                  <span className="dev-label"><button className="link" onClick={() => onShowMetric(m.id)}>{m.label}</button><SourceLink metric={m} /></span>
+                  <span className={`chg ${gap > 0 ? "good" : "bad"}`}>{formatChange(m, changeValue(m, s.seat[0].value, s.seat[s.seat.length - 1].value)!)}</span>
+                  <span className="tiny muted">vs {formatChange(m, nat)} nationally, {s.seat[0].period}–{s.seat[s.seat.length - 1].period}</span>
+                  <Sparkline series={s} />
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+
         {missing.length > 0 && (
           <section>
             <h3>Missing data</h3>
@@ -249,7 +287,12 @@ export default function Dossier({ data, index, onClose, onSelect, onShowMetric, 
                       const why = missingReason(data, m, index);
                       return (
                         <tr key={m.id} onClick={() => onShowMetric(m.id)} title={why ?? rankText(r.rank, r.of)}>
-                          <td>{m.label}<SourceLink metric={m} /><div className="m-rank">{why ?? rankText(r.rank, r.of)}</div></td>
+                          <td>{m.label}<SourceLink metric={m} /><div className="m-rank">{why ?? rankText(r.rank, r.of)}</div>
+                            {!why && (() => {
+                              const s = seriesFor(history, m.id, index);
+                              return s && <div className="m-rank"><ChangeBadge metric={m} series={s} /><Sparkline series={s} /></div>;
+                            })()}
+                          </td>
                           <td className="num strong">{why ? <NoData reason={why} /> : fmt(m, r.value)}</td>
                           <td className="num muted">{fmt(m, m.national)}</td>
                           <td className="num muted">{fmt(m, groupMean(data, m.id, seat.peer_group))}</td>
