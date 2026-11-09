@@ -27,6 +27,7 @@ import numpy as np
 import pandas as pd
 
 from . import engine
+from .cache import STALE, cached
 from .history import assemble_history
 from .http import session
 from .metrics import (
@@ -131,12 +132,14 @@ def build(out_dir: Path, skip: set[str] | None = None) -> dict:
     metas: list[MetricMeta] = []
 
     def record(sid, name, url, status, detail="", as_of=None):
+        if status == "ok" and sid in STALE:  # an older saved copy is shown because the update failed
+            status, detail = "failed", STALE[sid]
         sources.append({"id": sid, "name": name, "url": url, "status": status, "detail": detail, "as_of": as_of})
 
     def optional(sid: str, name: str, url: str, detail: str, load, meta_list: list[MetricMeta]) -> None:
         """Run an optional source: ``load()`` returns (frames, period). A failure is recorded, not raised."""
         try:
-            got, period = load()
+            got, period = cached(sid, load)
             frames.update(got)
             metas.extend(m for m in meta_list if m.id in got)
             record(sid, name, url, "ok", detail, period)
@@ -240,7 +243,7 @@ def build(out_dir: Path, skip: set[str] | None = None) -> dict:
 
     if "epc" not in skip:
         try:
-            ef, period = epc_src.load_epc(s, names)
+            ef, period = cached("epc", lambda: epc_src.load_epc(s, names))
             frames.update(ef)
             metas += epc_src.EPC_METRICS
             record("epc", "Energy Performance Certificates (MHCLG)", epc_src.SOURCE_URL, "ok",
@@ -252,7 +255,7 @@ def build(out_dir: Path, skip: set[str] | None = None) -> dict:
     if "police" not in skip:
         try:
             t0 = time.time()
-            pf, months = police.load_police(s, geo, population)
+            pf, months = cached("police", lambda: police.load_police(s, geo, population))
             frames.update(pf)
             metas += POLICE_METRICS
             record("police", "police.uk street-level crime", "https://data.police.uk/", "ok",
