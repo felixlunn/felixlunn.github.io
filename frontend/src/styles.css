@@ -279,6 +279,8 @@ select, input { font: inherit; color: var(--text-1); background: var(--surface-1
   position: fixed; top: var(--header-h); right: 0; bottom: 0; width: var(--dossier-w); background: var(--surface-1);
   border-left: 1px solid var(--border); box-shadow: -8px 0 24px rgb(0 0 0 / 0.08); display: flex; flex-direction: column; z-index: 6;
 }
+.sheet-toggle { display: none; }
+.dossier-btns { display: flex; gap: 4px; flex: none; }
 .dossier-head { display: flex; justify-content: space-between; align-items: flex-start; padding: 14px 16px 10px; border-bottom: 1px solid var(--border); }
 .eyebrow { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-2); }
 .dossier-body { overflow-y: auto; padding: 12px 16px 24px; }
@@ -322,6 +324,27 @@ select, input { font: inherit; color: var(--text-1); background: var(--surface-1
   .legend, .legend.wide { width: auto; right: 12px; }
   .dossier { top: auto; height: 70vh; width: 100%; border-left: 0; border-top: 1px solid var(--border); border-radius: 14px 14px 0 0; }
   .row2, .checks { grid-template-columns: 1fr; }
+  .sheet-toggle { display: inline-grid; }
+  .dossier.min { height: auto; }
+  .dossier.min .dossier-body { display: none; }
+}
+
+/* ---------- Phones ---------- */
+@media (max-width: 600px) {
+  .app { grid-template-rows: auto auto 40vh auto; }
+  .brand h1 { font-size: 16px; }
+  .legend, .legend.wide { left: 8px; right: 8px; bottom: 8px; padding: 6px 8px; max-height: 45%; overflow-y: auto; font-size: 11px; }
+  .legend-sub { display: none; }
+  .legend-cats { grid-template-columns: 1fr 1fr 1fr; gap: 2px 8px; }
+  .legend-cats .num { display: none; }
+  .tab-body { padding-left: 12px; padding-right: 12px; }
+  .metric-table th, .metric-table td { padding-left: 4px; padding-right: 4px; }
+  input, select { font-size: 16px; } /* stops iOS zooming the page when a field is focused */
+  .modal { padding: 14px; }
+}
+@media (pointer: coarse) {
+  .src-link { width: 1.5em; height: 1.5em; margin-left: .4em; } /* big enough to tap */
+  .chip, .tabs > button[role="tab"] { min-height: 40px; }
 }
 
 /* ---------- Print: the dossier becomes a briefing sheet ---------- */
@@ -368,3 +391,11 @@ select, input { font: inherit; color: var(--text-1); background: var(--surface-1
 .changed-list li { display: flex; flex-wrap: wrap; align-items: baseline; gap: .1rem .5rem; padding: .25rem 0; border-bottom: 1px solid var(--border); }
 .changed-list .dev-label { flex: 1 1 100%; }
 .seg { display: flex; flex-wrap: wrap; align-items: center; gap: .35rem; margin: .4rem 0; }
+
+/* Find a figure */
+.figure-search { position: relative; margin-bottom: .6rem; }
+.figure-search input { width: 100%; padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-2); }
+.figure-results { max-height: 50vh; overflow-y: auto; }
+.help-steps { padding-left: 1.2rem; }
+.help-steps li, .help ul li { margin: .3rem 0; }
+.help h3 { margin: .8rem 0 .2rem; font-size: 1rem; }

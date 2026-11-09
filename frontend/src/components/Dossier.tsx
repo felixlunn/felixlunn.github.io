@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { DashboardData, NeighbourhoodFile } from "../types";
 import { debateMetrics, leadSeat, standing, standsOut } from "../lib/debates";
 import { groupMean, profileMetrics, rankOf, similarity, stats, topN } from "../lib/analytics";
@@ -8,6 +8,7 @@ import { csv, download, fmt, ordinal, rankText, slug } from "../lib/format";
 import { missingFor, missingReason } from "../lib/missing";
 import NoData from "./NoData";
 import SourceLink from "./SourceLink";
+import CopyLink from "./CopyLink";
 import { ChangeBadge, Sparkline } from "./Trend";
 import { changeValue, formatChange, seriesFor, type History } from "../lib/history";
 
@@ -30,6 +31,9 @@ const dayFmt = new Intl.DateTimeFormat("en-GB", { weekday: "short", day: "numeri
 
 export default function Dossier({ data, index, onClose, onSelect, onShowMetric, onDebate, onNeighbourhoods, nbFile, history }: Props) {
   const seat = data.seats[index];
+  // On phones the briefing is a bottom sheet: it can be minimised so the map and tools stay reachable.
+  const [min, setMin] = useState(false);
+  useEffect(() => setMin(false), [index]);
   const group = data.peer_groups.find((g) => g.id === seat.peer_group);
   const val = (id: string) => data.values[id]?.[index] ?? null;
   const metricById = useMemo(() => new Map(data.metrics.map((m) => [m.id, m])), [data]);
@@ -109,14 +113,18 @@ export default function Dossier({ data, index, onClose, onSelect, onShowMetric, 
   const turnout = val("turnout");
 
   return (
-    <aside className="dossier" aria-label={`Constituency dossier: ${seat.name}`}>
+    <aside className={`dossier ${min ? "min" : ""}`} aria-label={`Constituency dossier: ${seat.name}`}>
       <header className="dossier-head">
         <div>
           <div className="eyebrow">{[seat.region, seat.country].filter((x, i, a) => x && a.indexOf(x) === i).join(" · ")}</div>
           <h2>{seat.name}</h2>
-          <div className="tiny muted">{seat.code}</div>
+          <div className="tiny muted">{seat.code} · <CopyLink label="Copy link to this seat" /></div>
         </div>
-        <button className="icon close" onClick={onClose} aria-label="Close dossier">×</button>
+        <div className="dossier-btns">
+          <button className="icon sheet-toggle no-print" onClick={() => setMin((m) => !m)} aria-expanded={!min}
+            aria-label={min ? "Show briefing" : "Minimise briefing"}>{min ? "▴" : "▾"}</button>
+          <button className="icon close" onClick={onClose} aria-label="Close dossier">×</button>
+        </div>
       </header>
 
       <div className="dossier-body">
