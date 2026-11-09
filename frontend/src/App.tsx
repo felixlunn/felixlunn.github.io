@@ -7,6 +7,7 @@ import TwinsTab, { type TwinSettings } from "./components/TwinsTab";
 import IndexTab, { PRESETS } from "./components/IndexTab";
 import Dossier from "./components/Dossier";
 import Legend from "./components/Legend";
+import Help from "./components/Help";
 import { PARTY_ID, partyChoropleth } from "./lib/parties";
 import DebatesTab from "./components/DebatesTab";
 import OfficePicker from "./components/OfficePicker";
@@ -124,6 +125,7 @@ export default function App({ data, geo }: { data: DashboardData; geo: GeoJSON.F
     };
   }, [nbActive, nbChoropleth, nbFile, nbMetric, nbColours]);
   const [showSources, setShowSources] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
   const [panelOpen, setPanelOpen] = useState(true);
 
   const [twinSettings, setTwinSettings] = useState<TwinSettings>({ themes: ["people", "housing", "economy", "health", "education", "transport"], method: "euclidean", scope: "uk", n: 20 });
@@ -241,6 +243,7 @@ export default function App({ data, geo }: { data: DashboardData; geo: GeoJSON.F
           Data updated {generated.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
           {failed.length > 0 && <span className="warn-dot" title={`${failed.length} source(s) failed to update`}> ⚠</span>}
         </button>
+        <button className="link small help-btn" onClick={() => setShowHelp(true)}>Help</button>
       </header>
 
       {data.demo && (
@@ -287,6 +290,7 @@ export default function App({ data, geo }: { data: DashboardData; geo: GeoJSON.F
           nbFile={nbFile?.seat === data.seats[selected].code ? nbFile : null} history={past} />
       )}
 
+      {showHelp && <Help onClose={() => setShowHelp(false)} />}
       {showSources && (
         <div className="modal-backdrop" onClick={() => setShowSources(false)}>
           <div className="modal" role="dialog" aria-modal="true" aria-labelledby="src-title" onClick={(e) => e.stopPropagation()}>
