@@ -85,6 +85,8 @@ Every figure on the dashboard has an (i) link to its publisher's page for the da
 
 Where a source publishes earlier years, the build also keeps up to 12 past periods per figure in `history.json` (loaded only when needed). The app shows the change since the previous period next to each figure, a trend line with the national figure, a quotable sentence, a "What's changed" list in each seat briefing, and a map of change. Councils created since 2019 take their predecessors' figures for earlier years (`SUCCESSORS` in `whips/history.py`).
 
+**Refresh speed and alerts.** Slow sources that change rarely (police.uk, EPC, NHS and others, see `whips/cache.py`) are reused for a few days between refreshes; any change to the pipeline code discards the saved copies. If a source fails to update, its last saved copy is shown and flagged. The deploy workflow opens a GitHub issue when the refresh fails, when a source fails, or when a figure vanishes or loses more than a fifth of its seats compared with the live site, and closes it when everything updates again.
+
 Census 2021 covers England and Wales only (Scotland's census was 2022 and Northern Ireland's is published by
 NISRA), so census metrics show "No data" for Scottish and Northern Irish seats. Wherever a metric is a ratio,
 the national figure is the true combined rate (total numerator / total denominator), not an average of seat
