@@ -70,6 +70,8 @@ export interface DashboardData {
     items: { id: number; title: string; signatures: number; url: string }[];
     by_seat: Record<string, { top: [number, number, number][]; local: [number, number, number][] }>;
   } | null;
+  /** Councils covering each seat and who runs them (Open Council Data UK). */
+  councils?: { year: number; by_seat: Record<string, SeatCouncil[]> } | null;
   /** Seats with neighbourhood (LSOA) files in data/lsoa/<code>.json. */
   neighbourhoods?: { seats: string[]; lsoas: number; metrics: number } | null;
   debate_topics?: DebateTopic[];
@@ -118,4 +120,19 @@ export interface NeighbourhoodFile {
   /** IMD 2025 decile, 1 = most deprived 10% of neighbourhoods in England; null in Wales. */
   imd_decile?: (number | null)[];
   geo: GeoJSON.FeatureCollection;
+}
+
+export interface SeatCouncil {
+  name: string;
+  code: string;
+  /** "county" for the county council in two-tier areas; otherwise the district or unitary council. */
+  tier: "council" | "county";
+  /** Share of the seat (its neighbourhoods) in this council's area. */
+  share: number;
+  control: string;
+  largest: string | null;
+  largest_seats: number;
+  seats: number;
+  parties: Record<string, number>;
+  next_election: string | null;
 }

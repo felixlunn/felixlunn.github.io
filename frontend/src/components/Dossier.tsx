@@ -9,6 +9,7 @@ import { missingFor, missingReason } from "../lib/missing";
 import NoData from "./NoData";
 import SourceLink from "./SourceLink";
 import CopyLink from "./CopyLink";
+import LocalCouncils from "./LocalCouncils";
 import { ChangeBadge, Sparkline } from "./Trend";
 import { changeValue, formatChange, seriesFor, type History } from "../lib/history";
 
@@ -136,6 +137,10 @@ export default function Dossier({ data, index, onClose, onShowMetric, onDebate, 
           </div>
           {seat.result_2024 && <div className="small muted">2024: {seat.result_2024}{seat.second_party_2024 ? ` · runner-up ${seat.second_party_2024}` : ""}</div>}
         </section>
+
+        {(data.councils?.by_seat[seat.code]?.length ?? 0) > 0 && (
+          <LocalCouncils councils={data.councils!.by_seat[seat.code]} year={data.councils!.year} />
+        )}
 
         {data.debates !== undefined && (
           <section>

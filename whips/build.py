@@ -52,6 +52,7 @@ from .sources import sewage as sewage_src
 from .sources import imd as imd_src
 from .sources import life_expectancy as life_src
 from .sources import scotland as scotland_src
+from .sources import council_control as council_control_src
 from .sources import fire as fire_src
 from .sources import police_workforce as police_workforce_src
 from .sources import heat_pumps as heat_pumps_src
@@ -87,7 +88,7 @@ log = logging.getLogger("whips.build")
 # Neighbourhood (LSOA) profiles are published for seats held by this party.
 NEIGHBOURHOOD_PARTY = re.compile(r"^(liberal democrats?|lib ?dems?|ld)$", re.I)
 
-SKIPPABLE = ["scotland", "fire", "police_workforce", "heat_pumps", "green_space", "floods", "business_demography", "council_tax", "insolvency", "university", "ofsted", "pupils", "pharmacies", "public_health", "income", "asylum", "road_condition", "rents", "energy", "travel", "renewables", "air_pollution", "children", "vehicles", "buses", "cqc", "roads", "housing_stock", "child_poverty", "dental", "life_expectancy", "affordability", "homelessness", "ev", "sewage", "petitions", "questions", "rail", "courts", "fuel_poverty", "nhs", "schools", "epc", "imd", "neighbourhoods", "debates", "claimants", "aps", "ashe", "bres", "business", "popest", "police", "elections", "members", "lsoa"]
+SKIPPABLE = ["council_control", "scotland", "fire", "police_workforce", "heat_pumps", "green_space", "floods", "business_demography", "council_tax", "insolvency", "university", "ofsted", "pupils", "pharmacies", "public_health", "income", "asylum", "road_condition", "rents", "energy", "travel", "renewables", "air_pollution", "children", "vehicles", "buses", "cqc", "roads", "housing_stock", "child_poverty", "dental", "life_expectancy", "affordability", "homelessness", "ev", "sewage", "petitions", "questions", "rail", "courts", "fuel_poverty", "nhs", "schools", "epc", "imd", "neighbourhoods", "debates", "claimants", "aps", "ashe", "bres", "business", "popest", "police", "elections", "members", "lsoa"]
 
 COUNTRY_BY_PREFIX = {"E": "England", "W": "Wales", "S": "Scotland", "N": "Northern Ireland"}
 
@@ -485,6 +486,17 @@ def build(out_dir: Path, skip: set[str] | None = None) -> dict:
                  "By fire and rescue authority, averaged over each seat's councils; England",
                  lambda: fire_src.load_fire(s, council_weights()), fire_src.FIRE_METRICS)
 
+    councils = None
+    if "council_control" not in skip:
+        try:
+            councils, period = council_control_src.load_council_control(s, council_weights(), geo)
+            record("council_control", "Councillors and council control (Open Council Data UK)", council_control_src.SOURCE_URL,
+                   "ok", f"Councils covering {len(councils['by_seat'])} seats; Great Britain", period)
+        except Exception as exc:  # noqa: BLE001 - optional source
+            log.exception("Council control failed")
+            record("council_control", "Councillors and council control (Open Council Data UK)", council_control_src.SOURCE_URL,
+                   "failed", str(exc)[:300])
+
     petitions = None
     if "petitions" not in skip:
         def load_petitions():
@@ -539,12 +551,12 @@ def build(out_dir: Path, skip: set[str] | None = None) -> dict:
             log.exception("What's On calendar failed")
             record("debates", "Upcoming Commons debates (UK Parliament What's On)", debates_src.SOURCE_URL, "failed", str(exc))
     return finish(out_dir, geo, seats, metrics, values, sources, demo=False, debates=debates, neighbourhoods=neighbourhoods,
-                  petitions=petitions, history=history)
+                  petitions=petitions, history=history, councils=councils)
 
 
 def finish(out_dir: Path, geo: dict, seats: list[dict], metrics: list[dict], values: dict[str, list],
            sources: list[dict], demo: bool, debates: list[dict] | None = None, neighbourhoods: dict | None = None,
-           petitions: dict | None = None, history: dict | None = None) -> dict:
+           petitions: dict | None = None, history: dict | None = None, councils: dict | None = None) -> dict:
     """Add peer groups and write all output files."""
     ds = engine.Dataset.from_json({"seats": seats, "metrics": metrics, "values": values})
     groups, group_meta = engine.peer_groups(ds)
@@ -564,6 +576,7 @@ def finish(out_dir: Path, geo: dict, seats: list[dict], metrics: list[dict], val
         "debate_topics": debates_src.topic_catalogue(),
         "neighbourhoods": neighbourhoods,
         "petitions": petitions,
+        "councils": councils,
     }
     hist = (history or {}).get("metrics", {})
     for m in metrics:
