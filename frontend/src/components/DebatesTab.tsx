@@ -164,35 +164,38 @@ function DebateCard({ d, metrics, mine, leading, flagged, data, mySeat, history,
 
       {open && (
         <div className="debate-body">
-          {lead !== null && (
-            <p className="small">Lead member's seat: <button className="link" onClick={() => onSelect(lead)}>{data.seats[lead].name}</button></p>
-          )}
-          {metrics.length > 0 && (
-            <>
-              <div className="tiny muted">Shade the map by</div>
-              <div className="chips">
-                {metrics.map((m) => (
-                  <button key={m.id} className={`chip ${mapMetric === m.id ? "on" : ""}`} onClick={() => setMapMetric(m.id)}>{m.label}</button>
-                ))}
-              </div>
-            </>
-          )}
           {mySeat !== null && (mine.length > LOCAL_FIGURES || missing.length > 0) && (
-            <div className="my-standing">
-              <div className="tiny muted">More figures for {data.seats[mySeat].name} (bold: in the most extreme tenth of seats)</div>
+            <div className="local-figs more-figs">
+              <div className="local-seat tiny">More figures for {data.seats[mySeat].name}</div>
               <ul>
                 {mine.slice(LOCAL_FIGURES).map((h) => (
-                  <li key={h.metric.id} className={`small ${standsOut(h) ? "strong" : ""}`}>
-                    {h.metric.label}: {fmt(h.metric, h.value)}<SourceLink metric={h.metric} /> <span className="muted">({rankPhrase(h)}; national {fmt(h.metric, h.metric.national)})</span>
+                  <li key={h.metric.id} className={standsOut(h) ? "stand" : ""}>
+                    <span className="lf-value">{fmt(h.metric, h.value)}</span>
+                    <span className="lf-label">{h.metric.label}<SourceLink metric={h.metric} /></span>
+                    <span className="lf-rank">{rankPhrase(h)} · national {fmt(h.metric, h.metric.national)}</span>
                   </li>
                 ))}
                 {missing.map(({ metric, reason }) => (
-                  <li key={metric.id} className="small">
-                    {metric.label}: <NoData reason={reason} /><SourceLink metric={metric} /> <span className="muted">({reason}; not counted)</span>
+                  <li key={metric.id}>
+                    <span className="lf-value"><NoData reason={reason} /></span>
+                    <span className="lf-label">{metric.label}<SourceLink metric={metric} /></span>
+                    <span className="lf-rank">{reason}</span>
                   </li>
                 ))}
               </ul>
+              <div className="tiny muted">Coloured: in the most extreme tenth of seats.</div>
             </div>
+          )}
+          {metrics.length > 0 && (
+            <label className="debate-shade">
+              <span className="tiny muted">Shade the map by</span>
+              <select value={metrics.some((m) => m.id === mapMetric) ? mapMetric ?? "" : metrics[0].id} onChange={(e) => setMapMetric(e.target.value)}>
+                {metrics.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
+              </select>
+            </label>
+          )}
+          {lead !== null && (
+            <p className="small">Lead member's seat: <button className="link" onClick={() => onSelect(lead)}>{data.seats[lead].name}</button></p>
           )}
           {!metrics.length && <p className="small muted">This debate's title doesn't match a topic with figures.</p>}
         </div>
