@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { canPerHead, fmtValue, forSeat, points, ranked, summary } from "./analysis";
+import { calculate, canPerHead, fmtValue, forSeat, overallRate, points, ranked, summary, type Op } from "./analysis";
+import { outlier, vsMedian } from "./stats";
 import type { Backend, User } from "./backend";
 import FoiMap, { type MapItem } from "./FoiMap";
 import { targets } from "./match";
@@ -209,9 +210,13 @@ function SeatPicker({ ref_, seat, setSeat }: { ref_: Reference; seat: string; se
   );
 }
 
-function DatasetView({ d, ref_, shapes, seat, backend, canEdit, onDeleted }: {
+function DatasetView({ d: saved, ref_, shapes, seat, backend, canEdit, onDeleted }: {
   d: Dataset; ref_: Reference; shapes: GeoJSON.FeatureCollection; seat: string | null; backend: Backend; canEdit: boolean; onDeleted: () => void;
 }) {
+  // Calculated columns are added here first, and saved to the dataset on request.
+  const [d, setD] = useState(saved);
+  const [savedCols, setSavedCols] = useState(saved.columns.length);
+  const unsaved = d.columns.length !== savedCols;
   const [colKey, setColKey] = useState(d.columns[0]?.key ?? "");
   const col = d.columns.find((c) => c.key === colKey);
   const [perHead, setPerHead] = useState(false);
@@ -221,6 +226,9 @@ function DatasetView({ d, ref_, shapes, seat, backend, canEdit, onDeleted }: {
 
   const rows = useMemo(() => ranked(ref_, d, colKey, ph), [ref_, d, colKey, ph]);
   const stats = useMemo(() => summary(rows), [rows]);
+  const flagged = useMemo(() => rows.map((r) => ({ r, o: outlier(r.value, stats) })).filter((x) => x.o !== null), [rows, stats]);
+  const flaggedSet = useMemo(() => new Set(flagged.map((x) => x.r.target.code)), [flagged]);
+  const overall = ph ? overallRate(rows) : null;
   const tByCode = useMemo(() => new Map(targets(ref_, d.geography).map((t) => [t.code, t])), [ref_, d.geography]);
   const rowByCode = useMemo(() => new Map(d.rows.map((r) => [r.code, r])), [d.rows]);
   const seatLinks = useMemo(() => (seat ? forSeat(ref_, d.geography, seat) : []), [ref_, d.geography, seat]);
@@ -235,10 +243,13 @@ function DatasetView({ d, ref_, shapes, seat, backend, canEdit, onDeleted }: {
       : points(ref_, d.geography).map((p) => ({ code: p.code, name: p.name, sub: p.sub, lat: p.lat, lon: p.lon }));
     return base.map((b) => {
       const r = val.get(b.code);
-      const label = !r ? "Not in this response" : r.suppressed ? `Withheld (${r.suppressed})` : `${fmtValue(r.value, col, ph)}${unit}${r.rank ? ` · ${r.rank} of ${stats.n}` : ""}`;
+      const o = r ? outlier(r.value, stats) : null;
+      const label = !r ? "Not in this response" : r.suppressed ? `Withheld (${r.suppressed})`
+        : `${fmtValue(r.value, col, ph)}${unit}${r.rank ? ` · ${r.rank} of ${stats.n}` : ""}${o ? ` · unusually ${o}` : ""}`;
       return { ...b, value: r?.value ?? null, label };
     });
-  }, [rows, tByCode, ref_, d.geography, col, ph, unit, stats.n]);
+  }, [rows, tByCode, ref_, d.geography, col, ph, unit, stats]);
+  const notIn = useMemo(() => [...tByCode.values()].filter((t) => !rowByCode.has(t.code)), [tByCode, rowByCode]);
 
   const seatName = seat ? ref_.seats.find((s) => s.code === seat)?.name : null;
   const sel = selected ? tByCode.get(selected) : null;
@@ -266,7 +277,7 @@ function DatasetView({ d, ref_, shapes, seat, backend, canEdit, onDeleted }: {
   return (
     <div className="foi-main">
       <div className="foi-map-wrap">
-        <FoiMap shapes={layerShapes} items={items} reverse={col?.direction === "higher_better"} selected={selected} highlight={highlight} onSelect={setSelected} />
+        <FoiMap shapes={layerShapes} items={items} reverse={col?.direction === "higher_better"} selected={selected} highlight={highlight} flagged={flaggedSet} onSelect={setSelected} />
       </div>
       <section className="foi-detail">
         <div className="foi-detail-head">
@@ -293,12 +304,47 @@ function DatasetView({ d, ref_, shapes, seat, backend, canEdit, onDeleted }: {
         )}
 
         <div className="foi-stats">
-          <div><strong>{stats.n}</strong><span className="tiny muted">{PLURAL[d.geography]} with a figure</span></div>
+          <div><strong>{stats.n}<span className="of"> of {tByCode.size}</span></strong><span className="tiny muted">{PLURAL[d.geography]} with a figure</span></div>
           {!ph && col?.unit !== "rate" && col?.unit !== "percent" && <div><strong>{fmtValue(stats.total, col)}</strong><span className="tiny muted">total</span></div>}
-          <div><strong>{fmtValue(stats.median, col, ph)}</strong><span className="tiny muted">median{unit}</span></div>
+          {overall !== null && <div><strong>{fmtValue(overall, col, true)}</strong><span className="tiny muted">overall, per 100,000</span></div>}
+          <div><strong>{fmtValue(stats.mean, col, ph || !!stats.mean && stats.mean % 1 !== 0)}</strong><span className="tiny muted">average (mean)</span></div>
+          <div><strong>{fmtValue(stats.median, col, ph)}</strong><span className="tiny muted">median</span></div>
+          <div><strong>{fmtValue(stats.q1, col, true)} – {fmtValue(stats.q3, col, true)}</strong><span className="tiny muted">middle half</span></div>
           <div><strong>{fmtValue(stats.min, col, ph)} – {fmtValue(stats.max, col, ph)}</strong><span className="tiny muted">range</span></div>
           {stats.withheld > 0 && <div><strong>{stats.withheld}</strong><span className="tiny muted">withheld</span></div>}
         </div>
+        {(ph || unit) && <p className="tiny muted">Figures shown{unit}.</p>}
+
+        <div className="foi-outliers">
+          <h3 className="foi-h">Stands out</h3>
+          {stats.high === null ? (
+            <p className="small muted">Too few figures to judge what's unusual (needs at least 8).</p>
+          ) : !flagged.length ? (
+            <p className="small muted">Nothing unusual: every figure is within the normal spread.</p>
+          ) : (
+            <ul>
+              {flagged.map(({ r, o }) => (
+                <li key={r.target.code}>
+                  <span className={`tag ${o}`}>{o === "high" ? "▲ high" : "▼ low"}</span>
+                  <button className="link-btn" onClick={() => setSelected(r.target.code)}>{r.target.name}</button>{" "}
+                  <strong>{fmtValue(r.value, col, ph)}</strong> <span className="tiny muted">{vsMedian(r.value!, stats.median)}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+          <p className="tiny muted">Unusual means more than 1.5 times the middle half's spread above or below it (Tukey's rule), outlined on the map.</p>
+        </div>
+
+        {notIn.length > 0 && notIn.length < tByCode.size && (
+          <details className="small foi-missing">
+            <summary>{notIn.length} {notIn.length === 1 ? PLURAL[d.geography].replace(/s$/, "") : PLURAL[d.geography]} not in this response</summary>
+            <p className="tiny">{notIn.slice(0, 60).map((t) => t.name).join(", ")}{notIn.length > 60 ? ` and ${notIn.length - 60} more` : ""}</p>
+          </details>
+        )}
+
+        <Calculator d={d} canSave={canEdit} unsaved={unsaved}
+          onAdd={(next) => { setD(next); setColKey(next.columns[next.columns.length - 1].key); }}
+          onSave={async () => { try { const s2 = await backend.update(d.id, { columns: d.columns, rows: d.rows }); setD(s2); setSavedCols(s2.columns.length); } catch (e) { alert((e as Error).message); } }} />
 
         {seat && (
           <div className="foi-seatbox">
@@ -317,7 +363,8 @@ function DatasetView({ d, ref_, shapes, seat, backend, canEdit, onDeleted }: {
                             <button className="link-btn" onClick={() => setSelected(l.code)}>{tByCode.get(l.code)?.name ?? l.code}</button>{" "}
                             <span className="tiny muted">({l.why})</span>:{" "}
                             {!r || r.suppressed ? <span className="small">withheld{r?.suppressed ? ` (${r.suppressed})` : ""}</span> : <strong>{fmtValue(r.value, col, ph)}{unit}</strong>}
-                            {r?.rank && <span className="tiny muted"> · {r.rank} of {stats.n}; median {fmtValue(stats.median, col, ph)}</span>}
+                            {r?.rank && <span className="tiny muted"> · {r.rank} of {stats.n}{r.value !== null && vsMedian(r.value, stats.median) ? `; ${vsMedian(r.value, stats.median)}` : ""}</span>}
+                            {r && outlier(r.value, stats) && <span className={`tag ${outlier(r.value, stats)}`}>unusually {outlier(r.value, stats)}</span>}
                           </li>
                         );
                       })}
@@ -364,7 +411,7 @@ function DatasetView({ d, ref_, shapes, seat, backend, canEdit, onDeleted }: {
             {shown.map((r) => (
               <tr key={r.target.code} className={`${highlight.has(r.target.code) ? "mine" : ""} ${selected === r.target.code ? "sel" : ""}`} onClick={() => setSelected(r.target.code)}>
                 <td className="muted rk">{r.rank ?? ""}</td>
-                <td>{r.target.name}</td>
+                <td>{r.target.name}{flaggedSet.has(r.target.code) && <span className={`tag ${outlier(r.value, stats)}`}>{outlier(r.value, stats) === "high" ? "▲" : "▼"}</span>}</td>
                 <td className="num">{r.suppressed ? <span className="muted">withheld ({r.suppressed})</span> : fmtValue(r.value, col, ph)}</td>
               </tr>
             ))}
@@ -377,6 +424,50 @@ function DatasetView({ d, ref_, shapes, seat, backend, canEdit, onDeleted }: {
           </details>
         )}
       </section>
+    </div>
+  );
+}
+
+const OPS: [Op, string][] = [["/", "÷"], ["-", "−"], ["+", "+"], ["*", "×"]];
+
+/** Add a column from two others, e.g. vacancies ÷ officers × 100 = vacancy rate %. */
+function Calculator({ d, canSave, unsaved, onAdd, onSave }: { d: Dataset; canSave: boolean; unsaved: boolean; onAdd: (d: Dataset) => void; onSave: () => void }) {
+  const [open, setOpen] = useState(false);
+  const [a, setA] = useState(d.columns[0]?.key ?? "");
+  const [b, setB] = useState(d.columns[1]?.key ?? d.columns[0]?.key ?? "");
+  const [op, setOp] = useState<Op>("/");
+  const [scale, setScale] = useState(100);
+  const name = (k: string) => d.columns.find((c) => c.key === k)?.label ?? k;
+  const [label, setLabel] = useState("");
+  const auto = `${name(a)} ${OPS.find(([o]) => o === op)![1]} ${name(b)}${scale !== 1 ? (scale === 100 && op === "/" ? " (%)" : ` × ${scale.toLocaleString("en-GB")}`) : ""}`;
+  if (d.columns.length < 2) return null;
+  return (
+    <div className="foi-calc">
+      {!open ? (
+        <button className="link-btn small" onClick={() => setOpen(true)}>+ Calculate a new figure from two columns (e.g. a rate or %)</button>
+      ) : (
+        <>
+          <div className="foi-calc-row">
+            <select aria-label="First column" value={a} onChange={(e) => setA(e.target.value)}>{d.columns.map((c) => <option key={c.key} value={c.key}>{c.label}</option>)}</select>
+            <select aria-label="Operation" value={op} onChange={(e) => setOp(e.target.value as Op)}>{OPS.map(([o, l]) => <option key={o} value={o}>{l}</option>)}</select>
+            <select aria-label="Second column" value={b} onChange={(e) => setB(e.target.value)}>{d.columns.map((c) => <option key={c.key} value={c.key}>{c.label}</option>)}</select>
+            <select aria-label="Multiply by" value={scale} onChange={(e) => setScale(Number(e.target.value))}>
+              <option value={1}>as is</option><option value={100}>× 100 (%)</option><option value={1000}>× 1,000</option><option value={100000}>× 100,000</option>
+            </select>
+          </div>
+          <div className="foi-calc-row">
+            <input aria-label="Name" placeholder={auto} value={label} onChange={(e) => setLabel(e.target.value)} />
+            <button className="btn primary" onClick={() => { onAdd(calculate(d, a, op, b, scale, label.trim() || auto)); setLabel(""); setOpen(false); }}>Add</button>
+            <button className="btn" onClick={() => setOpen(false)}>Cancel</button>
+          </div>
+        </>
+      )}
+      {unsaved && (
+        <p className="tiny">
+          New figures are shown here only.{" "}
+          {canSave ? <button className="link-btn" onClick={onSave}>Save them to the dataset for the team</button> : "Only the uploader or an admin can save them."}
+        </p>
+      )}
     </div>
   );
 }

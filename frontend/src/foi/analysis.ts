@@ -1,6 +1,7 @@
 /** Turning a matched FOI dataset into map values, rankings and a seat's view. */
 
 import { targets } from "./match";
+import { describe } from "./stats";
 import { IS_AREA, type Column, type Dataset, type Geography, type Reference, type Target } from "./types";
 
 export interface Point { code: string; name: string; lat: number; lon: number; area: string | null; seat: string | null; sub: string }
@@ -34,10 +35,35 @@ export function ranked(ref: Reference, d: Dataset, colKey: string, perHead: bool
 }
 
 export function summary(rows: Ranked[]) {
-  const v = rows.map((r) => r.value).filter((x): x is number => x !== null).sort((a, b) => a - b);
-  const total = v.reduce((a, b) => a + b, 0);
-  const median = v.length ? (v.length % 2 ? v[(v.length - 1) / 2] : (v[v.length / 2 - 1] + v[v.length / 2]) / 2) : null;
-  return { n: v.length, total, median, min: v[0] ?? null, max: v[v.length - 1] ?? null, withheld: rows.filter((r) => r.suppressed).length };
+  return { ...describe(rows.map((r) => r.value)), withheld: rows.filter((r) => r.suppressed).length };
+}
+
+/** For count columns on area geographies: all the areas' counts over all their residents, per 100,000. */
+export function overallRate(rows: Ranked[]): number | null {
+  let num = 0, pop = 0;
+  for (const r of rows) {
+    if (r.raw !== null && r.target.population) { num += r.raw; pop += r.target.population; }
+  }
+  return pop ? (num * 100_000) / pop : null;
+}
+
+export type Op = "/" | "-" | "+" | "*";
+
+/** A new column from two others, e.g. vacancies ÷ officers × 100. Missing or withheld inputs give no value. */
+export function calculate(d: Dataset, a: string, op: Op, b: string, scale: number, label: string): Dataset {
+  const key = `calc${d.columns.filter((c) => c.key.startsWith("calc")).length + 1}_${Date.now().toString(36)}`;
+  const ca = d.columns.find((c) => c.key === a);
+  const unit: Column["unit"] = op === "/" ? (scale === 100 ? "percent" : "rate") : ca?.unit ?? "other";
+  const rows = d.rows.map((r) => {
+    const x = r.values[a] ?? null, y = r.values[b] ?? null;
+    let v: number | null = null;
+    if (x !== null && y !== null) {
+      v = op === "/" ? (y === 0 ? null : x / y) : op === "-" ? x - y : op === "+" ? x + y : x * y;
+      if (v !== null) v *= scale;
+    }
+    return { ...r, values: { ...r.values, [key]: v } };
+  });
+  return { ...d, columns: [...d.columns, { key, label, unit, direction: ca?.direction ?? "neutral" }], rows };
 }
 
 /** The targets that serve a seat: the area(s) it lies in, or the courts / trusts in it and in its wider area. */
