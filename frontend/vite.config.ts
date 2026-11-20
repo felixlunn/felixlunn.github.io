@@ -14,6 +14,8 @@ export default defineConfig({
     target: "es2020",
     chunkSizeWarningLimit: 900, // maplibre-gl is ~800 kB on its own and loads in parallel
     rollupOptions: {
+      // Two pages: the public dashboard, and the login-only FOI research section (with its own code chunk).
+      input: { main: "index.html", foi: "foi.html" },
       output: {
         manualChunks: { maplibre: ["maplibre-gl"] },
       },

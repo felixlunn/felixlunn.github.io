@@ -201,6 +201,7 @@ export default function App({ data, geo }: { data: DashboardData; geo: GeoJSON.F
           {failed.length > 0 && <span className="warn-dot" title={`${failed.length} source(s) failed to update`}> ⚠</span>}
         </button>
         <button className="link small help-btn" onClick={() => setShowHelp(true)}>Help</button>
+        <a className="link small" href="./foi.html" title="FOI research: team login required">FOI research</a>
       </header>
 
       {data.demo && (
