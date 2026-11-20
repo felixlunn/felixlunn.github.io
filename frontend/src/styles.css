@@ -229,7 +229,12 @@ select, input { font: inherit; color: var(--text-1); background: var(--surface-1
 .debate-meta .party { font-size: 11px; font-weight: 600; padding: 1px 6px; }
 .topic { font-size: 11px; padding: 1px 7px; border-radius: 999px; background: var(--surface-3); color: var(--text-2); }
 .debate-body { padding: 0 12px 12px; border-top: 1px solid var(--surface-3); }
-.debate-body .chips { margin-top: 4px; }
+.more-figs { margin-top: 10px; }
+.more-figs li + li { border-top: 1px solid var(--surface-3); }
+.more-figs .lf-value { font-size: 15px; }
+.debate-shade { display: grid; gap: 3px; margin: 8px 0; }
+.debate-shade select { padding: 7px 9px; border: 1px solid var(--border); border-radius: 8px; width: 100%; cursor: pointer; }
+.debate-shade select:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .office { position: relative; flex: none; }
 .office-bar { flex: 1; max-width: 520px; margin-left: auto; }
 .office-search-bar { max-width: none; margin: 0; }
