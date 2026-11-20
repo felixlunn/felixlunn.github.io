@@ -98,7 +98,7 @@ export interface Choropleth {
   subtitle?: string;
   values: (number | null)[];
   format: (v: number) => string;
-  /** Seats to outline (e.g. twin seats or top-ranked). */
+  /** Seats to outline on the map. */
   highlight?: string[];
   /** Categorical map: each value is an index into this list, coloured as given (e.g. parties). */
   categories?: { label: string; colour: string; count: number }[];

@@ -6,6 +6,8 @@ import { csv, download, fmt, rankText, slug } from "../lib/format";
 import { missingReason } from "../lib/missing";
 import NoData from "./NoData";
 import SourceLink from "./SourceLink";
+import FigureSearch from "./FigureSearch";
+import CopyLink from "./CopyLink";
 import { ChangeBadge, Sparkline, TrendChart } from "./Trend";
 import { seriesFor, type History } from "../lib/history";
 import Strip from "./Strip";
@@ -52,6 +54,7 @@ export default function ThemesTab({ data, theme, setTheme, metric, partyMode, pa
 
   return (
     <div className="tab-body">
+      <FigureSearch data={data} selected={selected} onPick={(id) => { const m = data.metrics.find((x) => x.id === id); if (m) { setTheme(m.theme); setMetric(id); } }} />
       <div className="chips" role="tablist" aria-label="Themes">
         {themesWithData.map((t) => (
           <button key={t.id} role="tab" aria-selected={t.id === theme} className={`chip ${t.id === theme ? "on" : ""}`} onClick={() => setTheme(t.id)}>
@@ -141,6 +144,7 @@ export default function ThemesTab({ data, theme, setTheme, metric, partyMode, pa
         <p className="small muted">
           Source: {metric.source_url ? <a href={metric.source_url} target="_blank" rel="noopener noreferrer">{metric.source}</a> : metric.source} · {metric.coverage} seats with data · national {fmt(metric, metric.national)}
           {!["%", "people", "£", "ratio"].includes(metric.unit) ? ` ${metric.unit}` : ""}
+          {" · "}<CopyLink label="Copy link to this figure" />
         </p>
         <div className="rank-head">
           <h4>Highest</h4>

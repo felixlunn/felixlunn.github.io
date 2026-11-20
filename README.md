@@ -7,12 +7,10 @@ theme by theme. The homepage opens on the electoral map, with every seat in its 
 | Tool | What it answers |
 |---|---|
 | **Debates** | Upcoming Commons debates (not questions, statements or Private Members' Bills) from the UK Parliament calendar, tagged by topic. With an MP chosen in the toolbar, a debate is flagged only when that MP is leading it or their seat is in the most extreme tenth of seats on a figure the debate touches (e.g. a policing debate and unusually high burglary), with a filter to show just those. Opening a debate shades the map by its figures. |
-| **Your office** (header) | The single search bar: choose the MP's office using the dashboard (search by MP, seat or postcode). It opens that seat's briefing (now headed by the upcoming debates where the seat stands out and a neighbourhoods summary), and does so on every later visit. The map outlines and zooms to that seat, Debates ranks it on each debate, Themes and Twins start from it, and the party flagged in Debates defaults to the MP's. Saved per browser; share `…/#office=<GSS code>` ("Copy link for this office") to set up a colleague's browser in one click. |
+| **Your office** (header) | The single search bar: choose the MP's office using the dashboard (search by MP, seat or postcode). It opens that seat's briefing (now headed by the upcoming debates where the seat stands out and a neighbourhoods summary), and does so on every later visit. The map outlines and zooms to that seat, Debates ranks it on each debate, and Themes starts from it. Saved per browser; share `…/#office=<GSS code>` ("Copy link for this office") to set up a colleague's browser in one click. |
 | **Neighbourhoods** | For seats held by Lib Dem MPs in England & Wales: every LSOA (about 1,500 residents each) in the seat, labelled with its ward and council, mapped and ranked on any Census 2021 metric, with badges where it is in the top or bottom 10% of all 35,672 LSOAs in England & Wales, and a CSV of every metric. One small file per seat (`data/lsoa/<code>.json`), loaded on demand. |
 | **Themes** (thematic organiser) | How does this seat compare on people, households, housing, economy, jobs & pay, health, education, transport, policing and politics? About 150 metrics in all. Every metric shades the map, shows the seat's rank ("42nd highest of 575"), the national figure, and a distribution strip. Full rankings download as CSV. |
-| **Constituency dossier** | One-click briefing for a seat: MP and party, 2024 majority and turnout, peer group, the metrics where the seat is most unusual, per-theme tables against national and peer-group averages, and its demographic twins. Exports to CSV or prints as a PDF briefing sheet. |
-| **Twins** | Which seats look most like this one? Ranks every seat by similarity across the standardised metrics of whichever themes you tick (closest levels, or same overall shape). Can be restricted to the same nation or region. |
-| **Index** | Build a composite index (e.g. *cost-of-living vulnerability* = private renting + household deprivation + claimant rate + ...) with weight sliders. Weights can be negative. The map re-shades and every seat is re-ranked instantly. Presets are included. |
+| **Constituency dossier** | One-click briefing for a seat: MP and party, 2024 majority and turnout, peer group, the metrics where the seat is most unusual, per-theme tables against national and peer-group averages, and what has changed against the national trend. Exports to CSV or prints as a PDF briefing sheet. |
 | **Peer groups** | Every seat is clustered (k-means on its census profile) into one of 8 peer groups, so "national average" isn't the only benchmark. |
 
 ## Data
@@ -113,7 +111,7 @@ MapLibre loads in parallel as its own chunk.
 whips/                Python package
   metrics.py          catalogue of themes and metrics (add new census metrics here)
   sources/            one adapter per API: nomis, boundaries, police, parliament
-  engine.py           analytics: ranks, twins, composite index, k-means peer groups
+  engine.py           analytics: ranks and k-means peer groups
   build.py            pipeline entry point
   api.py              optional FastAPI REST API over the same data
   demo.py             synthetic offline dataset for UI development
@@ -176,17 +174,14 @@ pip install -e ".[api]"
 WHIPS_DATA=frontend/public/data/data.json uvicorn whips.api:app
 ```
 
-Endpoints: `GET /api/v1/constituencies/{code}`, `GET /api/v1/twins/{code}`, `POST /api/v1/index`,
-`GET /api/v1/metrics`. Interactive docs are at `/docs`. A `Dockerfile` is included for
+Endpoints: `GET /api/v1/constituencies`, `GET /api/v1/constituencies/{code}`, `GET /api/v1/metrics`. Interactive docs are at `/docs`. A `Dockerfile` is included for
 Render / Fly.io; point `WHIPS_DATA` at the deployed `data.json` URL.
 
 ## Method notes
 
-- **Standardisation**: twins and index both work on z-scores (seat value minus the mean across seats,
-  divided by the standard deviation), so a percentage-point gap in a rare characteristic counts as much as a
-  larger gap in a common one.
-- **Twins, Euclidean** = 1 / (1 + RMS distance in SD units); **cosine** = similarity of the pattern of
-  above/below-average traits regardless of how extreme they are.
+- **Standardisation**: "Where it stands out" and peer groups work on z-scores (seat value minus the mean
+  across seats, divided by the standard deviation), so a percentage-point gap in a rare characteristic counts
+  as much as a larger gap in a common one.
 - **Policing**: each constituency's boundary polygon is queried against police.uk for the latest 3 months
   (`POLICE_MONTHS` to change it), then annualised per 1,000 residents. Crimes are located to anonymised map
   points, so seat-edge attribution is approximate. Outcome shares only count crimes with a final outcome;
