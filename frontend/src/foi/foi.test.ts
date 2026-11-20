@@ -77,3 +77,22 @@ describe("projectUrl", () => {
     expect(projectUrl("")).toBeUndefined();
   });
 });
+
+describe("stats", () => {
+  it("describes a column and finds outliers", async () => {
+    const { describe: d, outlier, vsMedian, quantile } = await import("./stats");
+    expect(quantile([1, 2, 3, 4], 0.25)).toBe(1.75);
+    const s = d([10, 11, 12, 12, 13, 14, 15, 16, 60, null, 1]);
+    expect(s.n).toBe(10);
+    expect(s.median).toBe(12.5);
+    expect(outlier(60, s)).toBe("high");
+    expect(outlier(1, s)).toBe("low");
+    expect(outlier(14, s)).toBeNull();
+    expect(vsMedian(60, s.median)).toBe("4.8× the median");
+    expect(vsMedian(10, 12.5)).toBe("20% below the median");
+  });
+  it("doesn't flag outliers in very small sets", async () => {
+    const { describe: d } = await import("./stats");
+    expect(d([1, 2, 100]).high).toBeNull();
+  });
+});

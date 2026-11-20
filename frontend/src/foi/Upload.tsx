@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Matcher, targets, type Match } from "./match";
-import { numericShare, parseValue, readFile, type Table } from "./parse";
+import { numericShare, parseCsv, parseValue, readFile, toTable, type Table } from "./parse";
 import { DEPARTMENTS, GEOGRAPHY_LABEL, type Cell, type Column, type DataRow, type Department, type Direction, type Geography, type NewDataset, type Reference } from "./types";
 
 interface Props {
@@ -29,6 +29,7 @@ export default function Upload({ ref_, department, onCancel, onSave }: Props) {
   const [table, setTable] = useState<Table | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [dragging, setDragging] = useState(false);
   const [geography, setGeography] = useState<Geography>(dept.geographies[0]);
   const [meta, setMeta] = useState({ title: "", authority: "", foi_reference: "", period: "", requested_on: "", received_on: "", notes: "" });
   const [areaCol, setAreaCol] = useState(0);
@@ -39,32 +40,67 @@ export default function Upload({ ref_, department, onCancel, onSave }: Props) {
   const matcher = useMemo(() => new Matcher(ts, geography), [ts, geography]);
   const tByCode = useMemo(() => new Map(ts.map((t) => [t.code, t])), [ts]);
 
+  /** How many rows of a table match known names, in its best column, for a geography. */
+  function score(t: Table, g: Geography): { best: number; hits: number } {
+    const m = new Matcher(targets(ref_, g), g);
+    const per = t.headers.map((_, k) => t.rows.filter((r) => { const x = m.match(r[k] ?? ""); return x.how === "exact" || x.how === "close"; }).length);
+    const hits = Math.max(0, ...per);
+    return { best: per.indexOf(hits), hits };
+  }
+
+  function applyTable(t: Table, f: File) {
+    if (!t.rows.length) throw new Error("No rows found under the header. Check the file, or pick another sheet.");
+    // Which kind of body the rows are (e.g. trusts or NHS areas), judged by which matches more names.
+    const scored = dept.geographies.map((g) => ({ g, ...score(t, g) })).sort((x, y) => y.hits - x.hits);
+    const g = scored[0].hits > 0 ? scored[0].g : geography;
+    const best = scored.find((x) => x.g === g)!.best;
+    setGeography(g);
+    setFile(f);
+    setTable(t);
+    setAreaCol(Math.max(best, 0));
+    const picked: Record<number, Column> = {};
+    t.headers.forEach((h, k) => {
+      if (k !== best && numericShare(t.rows, k) >= 0.6) {
+        picked[k] = { key: `c${k}`, label: h, unit: guessUnit(h, t.rows.map((r) => r[k])), direction: "higher_worse" };
+      }
+    });
+    setCols(picked);
+    setOverrides({});
+    if (!meta.title) setMeta((m) => ({ ...m, title: f.name.replace(/\.[^.]+$/, "").replace(/[_-]+/g, " ") }));
+  }
+
   async function load(f: File, sheet?: string) {
     setError(null);
     setBusy(true);
     try {
-      const t = await readFile(f, sheet);
-      if (!t.rows.length) throw new Error("No rows found under the header. Check the file, or pick another sheet.");
-      setFile(f);
-      setTable(t);
-      // The area column: the one whose cells match best. Value columns: mostly numeric, other than that one.
-      const scores = t.headers.map((_, k) => t.rows.filter((r) => { const m = matcher.match(r[k] ?? ""); return m.how === "exact" || m.how === "close"; }).length);
-      const best = scores.indexOf(Math.max(...scores));
-      setAreaCol(best);
-      const picked: Record<number, Column> = {};
-      t.headers.forEach((h, k) => {
-        if (k !== best && numericShare(t.rows, k) >= 0.6) {
-          picked[k] = { key: `c${k}`, label: h, unit: guessUnit(h, t.rows.map((r) => r[k])), direction: "higher_worse" };
+      let t = await readFile(f, sheet);
+      // Workbooks: unless a sheet was chosen, use the one whose names match best.
+      if (!sheet && t.sheets && t.sheets.length > 1) {
+        let top = { t, hits: Math.max(...dept.geographies.map((g) => score(t, g).hits)) };
+        for (const name of t.sheets.slice(1, 12)) {
+          const other = await readFile(f, name);
+          const hits = Math.max(...dept.geographies.map((g) => score(other, g).hits));
+          if (hits > top.hits) top = { t: other, hits };
         }
-      });
-      setCols(picked);
-      setOverrides({});
-      if (!meta.title) setMeta((m) => ({ ...m, title: f.name.replace(/\.[^.]+$/, "").replace(/[_-]+/g, " ") }));
+        t = top.t;
+      }
+      applyTable(t, f);
     } catch (e) {
       setError((e as Error).message);
       setTable(null);
     } finally {
       setBusy(false);
+    }
+  }
+
+  function loadPasted(text: string) {
+    setError(null);
+    try {
+      if (!text.trim()) return;
+      applyTable(toTable(parseCsv(text)), new File([text], "pasted-from-spreadsheet.tsv", { type: "text/tab-separated-values" }));
+    } catch (e) {
+      setError((e as Error).message);
+      setTable(null);
     }
   }
 
@@ -142,10 +178,18 @@ export default function Upload({ ref_, department, onCancel, onSave }: Props) {
 
         {step === "file" && (
           <div className="foi-step">
-            <label className="foi-field">
-              <span>File (CSV or Excel)</span>
-              <input type="file" accept=".csv,.txt,.xlsx,.xlsm,.xls,.ods" onChange={(e) => e.target.files?.[0] && load(e.target.files[0])} />
+            <label className={`foi-drop ${dragging ? "over" : ""}`}
+              onDragOver={(e) => { e.preventDefault(); setDragging(true); }} onDragLeave={() => setDragging(false)}
+              onDrop={(e) => { e.preventDefault(); setDragging(false); const f = e.dataTransfer.files?.[0]; if (f) load(f); }}>
+              <strong>{file ? `✓ ${file.name}` : "Drop the FOI response here"}</strong>
+              <span className="tiny muted">{table ? `${table.rows.length} rows${table.sheet ? ` from sheet “${table.sheet}”` : ""} · ` : ""}CSV or Excel, or choose a file</span>
+              <input type="file" accept=".csv,.txt,.tsv,.xlsx,.xlsm,.xls,.ods" onChange={(e) => e.target.files?.[0] && load(e.target.files[0])} />
             </label>
+            <details className="foi-paste">
+              <summary className="small">…or paste cells copied from Excel or a web page</summary>
+              <textarea rows={5} placeholder="Select the table in Excel (including its header row), copy, and paste here" onPaste={(e) => { const t = e.clipboardData.getData("text"); e.preventDefault(); (e.target as HTMLTextAreaElement).value = t; loadPasted(t); }}
+                onChange={(e) => loadPasted(e.target.value)} />
+            </details>
             {table?.sheets && table.sheets.length > 1 && (
               <label className="foi-field">
                 <span>Sheet</span>

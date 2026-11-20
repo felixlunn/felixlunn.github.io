@@ -14,6 +14,8 @@ interface Props {
   selected: string | null;
   /** Codes to outline, e.g. those serving the chosen seat. */
   highlight: Set<string>;
+  /** Outliers: outlined dashed (areas) or ringed (points). */
+  flagged?: Set<string>;
   onSelect: (code: string) => void;
 }
 
@@ -22,7 +24,9 @@ const EMPTY: GeoJSON.FeatureCollection = { type: "FeatureCollection", features: 
 
 function css(name: string) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || "#ccc"; }
 
-export default function FoiMap({ shapes, items, reverse, selected, highlight, onSelect }: Props) {
+const NONE = new Set<string>();
+
+export default function FoiMap({ shapes, items, reverse, selected, highlight, flagged = NONE, onSelect }: Props) {
   const el = useRef<HTMLDivElement>(null);
   const map = useRef<MLMap | null>(null);
   const [ready, setReady] = useState(false);
@@ -63,12 +67,13 @@ export default function FoiMap({ shapes, items, reverse, selected, highlight, on
       m.addSource("pts", { type: "geojson", data: EMPTY, promoteId: "code" });
       m.addLayer({ id: "fill", type: "fill", source: "areas", paint: { "fill-color": ["get", "c"], "fill-opacity": ["case", ["boolean", ["feature-state", "hover"], false], 0.85, 0.68] } });
       m.addLayer({ id: "line", type: "line", source: "areas", paint: { "line-color": css("--map-line"), "line-width": 0.8 } });
+      m.addLayer({ id: "flag", type: "line", source: "areas", filter: ["==", ["get", "f"], 1], paint: { "line-color": css("--text-1"), "line-width": 2, "line-dasharray": [2, 1.5] } });
       m.addLayer({ id: "hl", type: "line", source: "areas", filter: ["==", ["get", "h"], 1], paint: { "line-color": css("--accent"), "line-width": 2.5 } });
       m.addLayer({ id: "sel", type: "line", source: "areas", filter: ["==", ["get", "s"], 1], paint: { "line-color": css("--accent-2"), "line-width": 3.5 } });
       m.addLayer({ id: "dots", type: "circle", source: "pts", paint: {
         "circle-color": ["get", "c"], "circle-radius": ["interpolate", ["linear"], ["zoom"], 5, ["case", ["==", ["get", "s"], 1], 8, 5], 10, 10],
-        "circle-stroke-color": ["case", ["==", ["get", "s"], 1], css("--accent-2"), ["==", ["get", "h"], 1], css("--accent"), "#ffffff"],
-        "circle-stroke-width": ["case", ["==", ["get", "s"], 1], 3, ["==", ["get", "h"], 1], 2.5, 1],
+        "circle-stroke-color": ["case", ["==", ["get", "s"], 1], css("--accent-2"), ["==", ["get", "h"], 1], css("--accent"), ["==", ["get", "f"], 1], css("--text-1"), "#ffffff"],
+        "circle-stroke-width": ["case", ["==", ["get", "s"], 1], 3, ["==", ["get", "h"], 1], 2.5, ["==", ["get", "f"], 1], 2, 1],
         "circle-opacity": ["case", ["==", ["get", "v"], 1], 0.95, 0.35],
       } });
       let hovered: string | null = null;
@@ -102,7 +107,7 @@ export default function FoiMap({ shapes, items, reverse, selected, highlight, on
   useEffect(() => {
     const m = map.current;
     if (!m || !ready) return;
-    const flags = (code: string) => ({ s: code === selected ? 1 : 0, h: highlight.has(code) ? 1 : 0 });
+    const flags = (code: string) => ({ s: code === selected ? 1 : 0, h: highlight.has(code) ? 1 : 0, f: flagged.has(code) ? 1 : 0 });
     const areas: GeoJSON.FeatureCollection = shapes ? {
       type: "FeatureCollection",
       features: shapes.features.map((f) => {
@@ -122,7 +127,7 @@ export default function FoiMap({ shapes, items, reverse, selected, highlight, on
     (m.getSource("areas") as GeoJSONSource).setData(areas);
     (m.getSource("pts") as GeoJSONSource).setData(pts);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ready, shapes, items, breaks, colours, selected, highlight]);
+  }, [ready, shapes, items, breaks, colours, selected, highlight, flagged]);
 
   const h = hover ? byCode.get(hover.code) : null;
   return (

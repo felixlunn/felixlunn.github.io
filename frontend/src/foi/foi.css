@@ -127,3 +127,23 @@
   .foi-legend { bottom: 44px; left: 8px; padding: 4px 6px; }
   .foi-legend .sw { width: 12px; }
 }
+
+/* Analysis: outliers, missing responders, calculated figures */
+.foi-stats .of { font-size: 11px; font-weight: 500; color: var(--text-2); }
+.foi-outliers { border: 1px solid var(--border); border-radius: 10px; padding: 2px 12px 8px; margin: 10px 0; }
+.foi-outliers ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 5px; font-size: 13px; }
+.tag { display: inline-block; font-size: 10.5px; font-weight: 700; padding: 1px 6px; border-radius: 999px; margin: 0 6px 0 4px; vertical-align: 1px; }
+.tag.high { background: color-mix(in srgb, #d73027 16%, transparent); color: #b2201a; }
+.tag.low { background: color-mix(in srgb, #4575b4 18%, transparent); color: #2c5a94; }
+:root[data-theme="dark"] .tag.high { color: #ff8a80; } :root[data-theme="dark"] .tag.low { color: #9cc3ff; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .tag.high { color: #ff8a80; } :root:not([data-theme="light"]) .tag.low { color: #9cc3ff; } }
+.foi-missing { margin: 6px 0 10px; }
+.foi-missing p { margin: 6px 0 0; color: var(--text-2); }
+.foi-calc { margin: 8px 0 4px; }
+.foi-calc-row { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+.foi-calc-row select, .foi-calc-row input { padding: 6px 8px; border: 1px solid var(--border); border-radius: 7px; background: var(--surface-1); color: inherit; font: inherit; font-size: 13px; min-width: 0; }
+.foi-calc-row input { flex: 1; min-width: 160px; }
+.foi-drop { display: grid; gap: 4px; justify-items: center; text-align: center; padding: 18px 12px; border: 2px dashed var(--border); border-radius: 10px; cursor: pointer; background: var(--surface-2); }
+.foi-drop.over { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, var(--surface-2)); }
+.foi-drop input[type=file] { font-size: 12px; max-width: 100%; }
+.foi-paste textarea { width: 100%; margin-top: 6px; padding: 7px 9px; border: 1px solid var(--border); border-radius: 7px; background: var(--surface-1); color: inherit; font: 12px ui-monospace, monospace; }
