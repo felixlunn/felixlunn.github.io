@@ -124,9 +124,14 @@ jobs:
           # FOI research section (foi.html): the Supabase project URL and its public "anon" key, set as repository
           # variables (Settings > Secrets and variables > Actions > Variables). The anon key is designed to be public:
           # the database's row-level security decides who can read what. Without them the page says it isn't set up.
-          VITE_SUPABASE_URL: ${{ vars.SUPABASE_URL }}
-          VITE_SUPABASE_ANON_KEY: ${{ vars.SUPABASE_ANON_KEY }}
+          # Read from repository variables, or from repository secrets of the same name if saved there instead.
+          VITE_SUPABASE_URL: ${{ vars.SUPABASE_URL || secrets.SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ vars.SUPABASE_ANON_KEY || secrets.SUPABASE_ANON_KEY }}
         run: |
+          if [ -z "$VITE_SUPABASE_URL" ] || [ -z "$VITE_SUPABASE_ANON_KEY" ]; then
+            echo "::warning title=FOI research not connected::SUPABASE_URL and/or SUPABASE_ANON_KEY is missing (Settings > Secrets and variables > Actions, repository level, exact names). foi.html will say it isn't set up."
+          fi
+          case "$VITE_SUPABASE_URL" in ""|https://*.supabase.co|https://*.supabase.co/) ;; *) echo "::warning title=FOI research::SUPABASE_URL should look like https://<project>.supabase.co" ;; esac
           npm ci
           npm run build
 
