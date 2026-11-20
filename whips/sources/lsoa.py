@@ -26,7 +26,9 @@ from .boundaries import ARCGIS_ROOT, _round_coords
 
 log = logging.getLogger(__name__)
 
-BOUNDARY_PATTERN = re.compile(r"^Lower_layer_Super_Output_Areas_December_2021_Boundaries_EW_(BGC|BSC)", re.I)
+# ONS renames these layers from time to time: the long form ("Lower_layer_Super_Output_Areas_December_2021_
+# Boundaries_EW_BGC_V5") and the short form ("LSOA_2021_EW_BSC_V4_RUC") are both recognised.
+BOUNDARY_PATTERN = re.compile(r"^(?:Lower_layer_Super_Output_Areas_December_2021_Boundaries_EW|LSOA_2021_EW)_(BGC|BSC)", re.I)
 WARD_PATTERN = re.compile(r"^LSOA21_WD(\d{2})_LAD(\d{2})_EW_LU", re.I)
 BATCH = 150  # LSOA codes per ArcGIS "IN (...)" query
 

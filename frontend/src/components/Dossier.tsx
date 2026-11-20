@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { DashboardData, NeighbourhoodFile } from "../types";
 import { debateMetrics, leadSeat, standing, standsOut } from "../lib/debates";
-import { groupMean, profileMetrics, rankOf, similarity, stats, topN } from "../lib/analytics";
+import { groupMean, rankOf, stats } from "../lib/analytics";
 import { textOn } from "../lib/colors";
 import { partyStyle } from "../lib/parties";
 import { csv, download, fmt, ordinal, rankText, slug } from "../lib/format";
@@ -16,7 +16,6 @@ interface Props {
   data: DashboardData;
   index: number;
   onClose: () => void;
-  onSelect: (i: number) => void;
   onShowMetric: (id: string) => void;
   /** Open a debate in the Debates tab (-1 for the whole list). */
   onDebate: (id: number) => void;
@@ -29,7 +28,7 @@ interface Props {
 
 const dayFmt = new Intl.DateTimeFormat("en-GB", { weekday: "short", day: "numeric", month: "short" });
 
-export default function Dossier({ data, index, onClose, onSelect, onShowMetric, onDebate, onNeighbourhoods, nbFile, history }: Props) {
+export default function Dossier({ data, index, onClose, onShowMetric, onDebate, onNeighbourhoods, nbFile, history }: Props) {
   const seat = data.seats[index];
   // On phones the briefing is a bottom sheet: it can be minimised so the map and tools stay reachable.
   const [min, setMin] = useState(false);
@@ -93,11 +92,6 @@ export default function Dossier({ data, index, onClose, onSelect, onShowMetric, 
   }, [nbFile, seat.code]);
 
   const petitions = data.petitions?.by_seat[seat.code] ?? null;
-
-  const twins = useMemo(() => {
-    const ids = profileMetrics(data.metrics);
-    return ids.length ? topN(data, similarity(data, index, ids, "euclidean"), 5, { exclude: index }) : [];
-  }, [data, index]);
 
   const exportDossier = () => {
     const rows: (string | number | null)[][] = [["theme", "metric", "unit", "value", "national", "rank", "of", "peer_group_average", "source", "missing"]];
@@ -313,22 +307,6 @@ export default function Dossier({ data, index, onClose, onSelect, onShowMetric, 
             );
           })}
         </section>
-
-        {twins.length > 0 && (
-          <section>
-            <h3>Demographic twins</h3>
-            <ol className="rank-list">
-              {twins.map((t, k) => (
-                <li key={t.code}>
-                  <span className="rk">{k + 1}</span>
-                  <button className="link grow" onClick={() => onSelect(t.index)}>{t.name}</button>
-                  <span className="tiny muted">{data.seats[t.index].party ?? ""}</span>
-                  <span className="num">{(t.score * 100).toFixed(0)}%</span>
-                </li>
-              ))}
-            </ol>
-          </section>
-        )}
 
         <div className="actions no-print">
           <button className="btn" onClick={exportDossier}>Download dossier (CSV)</button>

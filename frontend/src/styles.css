@@ -158,8 +158,6 @@ select, input { font: inherit; color: var(--text-1); background: var(--surface-1
 .rank-list li.sel { background: color-mix(in srgb, var(--accent-2) 16%, transparent); border-radius: 4px; }
 .rank-list .rk { width: 26px; color: var(--text-3); font-variant-numeric: tabular-nums; text-align: right; flex: none; }
 .rank-list .link { text-align: left; }
-.rank-list.twins .bar { width: 60px; height: 6px; background: var(--surface-3); border-radius: 3px; overflow: hidden; flex: none; }
-.rank-list.twins .bar > span { display: block; height: 100%; background: var(--pos); border-radius: 0 3px 3px 0; }
 
 .link { background: none; border: 0; padding: 0; color: var(--accent); cursor: pointer; text-decoration: underline; text-underline-offset: 2px; text-decoration-color: color-mix(in srgb, var(--accent) 40%, transparent); }
 .link:hover { text-decoration-color: currentColor; }

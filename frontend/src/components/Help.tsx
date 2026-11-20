@@ -14,8 +14,7 @@ export default function Help({ onClose }: { onClose: () => void }) {
           <li><strong>Read the seat briefing</strong> (the panel that opens for your seat): where the seat stands out, what has changed against the national trend, and what data is missing.</li>
           <li><strong>Debates</strong> lists upcoming Commons debates and flags those where your seat is in the most extreme tenth on a relevant figure, or your MP is leading.</li>
           <li><strong>Themes</strong> holds every figure. Use <em>Find a figure</em> to search in everyday words (potholes, dentist, rent), then click a figure to map it and see its trend.</li>
-          <li><strong>Neighbourhoods</strong> breaks census figures and deprivation down within the seat (Lib Dem seats).</li>
-          <li><strong>Twins</strong> finds seats most like yours; <strong>Index</strong> ranks seats on a mix of figures you choose.</li>
+          <li><strong>Neighbourhoods</strong> breaks census figures and deprivation down within the seat (Lib Dem seats in England and Wales).</li>
         </ol>
         <h3>Quoting a figure</h3>
         <ul className="small">

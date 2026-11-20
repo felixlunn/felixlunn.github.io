@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { compositeIndex, rankOf, similarity, topN } from "./analytics";
+import { rankOf } from "./analytics";
 import type { DashboardData } from "../types";
 
 // Same fixture as tests/test_engine.py::tiny so the two engines can be compared.
@@ -13,17 +13,5 @@ describe("analytics", () => {
   it("ranks with missing values", () => {
     expect(rankOf(data.values.x, 3)).toEqual({ value: 31, rank: 1, of: 4, percentile: 100 });
     expect(rankOf(data.values.x, 4).rank).toBeNull();
-  });
-
-  it.each(["euclidean", "cosine"] as const)("finds the nearest twin (%s)", (method) => {
-    const s = similarity(data, 0, ["x", "y"], method);
-    expect(s[4]).toBeNull();
-    expect(topN(data, s, 2, { exclude: 0 })[0].code).toBe("B");
-    expect(topN(data, s, 5, { exclude: 0, filter: { region: "South" } }).map((r) => r.code).sort()).toEqual(["C", "D"]);
-  });
-
-  it("builds a signed composite index", () => {
-    expect(topN(data, compositeIndex(data, { x: 1 }), 1)[0].code).toBe("D");
-    expect(topN(data, compositeIndex(data, { x: -1 }), 1)[0].code).toBe("A");
   });
 });
