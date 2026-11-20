@@ -28,7 +28,7 @@ log = logging.getLogger(__name__)
 
 # ONS renames these layers from time to time: the long form ("Lower_layer_Super_Output_Areas_December_2021_
 # Boundaries_EW_BGC_V5") and the short form ("LSOA_2021_EW_BSC_V4_RUC") are both recognised.
-BOUNDARY_PATTERN = re.compile(r"^(?:Lower_layer_Super_Output_Areas_December_2021_Boundaries_EW|LSOA_2021_EW)_(BGC|BSC)", re.I)
+BOUNDARY_PATTERN = re.compile(r"^(?:Lower_layer_Super_Output_Areas_December_2021_Boundaries_EW|LSOA_2021_EW)_(BFC|BGC|BFE|BSC)", re.I)
 WARD_PATTERN = re.compile(r"^LSOA21_WD(\d{2})_LAD(\d{2})_EW_LU", re.I)
 BATCH = 150  # LSOA codes per ArcGIS "IN (...)" query
 
@@ -38,12 +38,31 @@ def _services(s: requests.Session) -> list[str]:
     return [svc["name"] for svc in data.get("services", []) if svc.get("type") == "FeatureServer"]
 
 
-def find_boundary_service(names: list[str]) -> str:
-    # Generalised (20m) boundaries: detailed enough for small urban LSOAs, light enough for the web.
-    hits = sorted((0 if BOUNDARY_PATTERN.match(n).group(1).upper() == "BGC" else 1, n) for n in names if BOUNDARY_PATTERN.match(n))
-    if not hits:
+# Boundary versions, most preferred first. ONS has withdrawn the clipped full (BFC) and 20m generalised (BGC) LSOA
+# layers; the full-resolution "extent of the realm" layer (BFE) remains and is used, trimmed to the coastline with
+# the 200m super-generalised (BSC) layer. BSC alone (blocky at street scale) is the last resort.
+RES_PREFERENCE = ["BFC", "BGC", "BFE", "BSC"]
+COAST_MARGIN = 0.003  # degrees (~200-300 m): BFE is trimmed to its BSC shape grown by this, removing tidal flats
+SIMPLIFY = 0.00008  # degrees (~6-9 m): street-level detail at a fraction of the full-resolution size
+
+
+def find_boundary_services(names: list[str]) -> tuple[str, str | None]:
+    """(service to draw with, coarse BSC service to trim it to the coast, or None when not needed)."""
+    by_res: dict[str, str] = {}
+    for n in sorted(names):
+        m = BOUNDARY_PATTERN.match(n)
+        if m:
+            by_res.setdefault(m.group(1).upper(), n)
+    best = next((r for r in RES_PREFERENCE if r in by_res), None)
+    if best is None:
         raise LookupError("No LSOA 2021 boundary service found on the ONS portal")
-    return f"{ARCGIS_ROOT}/{hits[0][1]}/FeatureServer/0"
+    return by_res[best], (by_res.get("BSC") if best == "BFE" else None)
+
+
+def layer_url(s: requests.Session, service: str) -> str:
+    """The service's first layer: not always layer 0 (the BFE service's only layer is 3)."""
+    layers = get_json(s, f"{ARCGIS_ROOT}/{service}/FeatureServer", params={"f": "json"}).get("layers") or [{"id": 0}]
+    return f"{ARCGIS_ROOT}/{service}/FeatureServer/{layers[0]['id']}"
 
 
 def find_ward_service(names: list[str]) -> str:
@@ -77,18 +96,33 @@ def load_wards(s: requests.Session, layer: str, codes: list[str]) -> dict[str, d
     return out
 
 
-def load_geometries(s: requests.Session, layer: str, codes: list[str]) -> dict[str, dict]:
+def _shapes(s: requests.Session, layer: str, codes: list[str]) -> dict:
     feats = _query_in(s, layer, "LSOA21CD", codes, outFields="LSOA21CD", outSR="4326", f="geojson")
     out = {}
     for f in feats:
         props = {k.upper(): v for k, v in (f.get("properties") or {}).items()}
-        if not props.get("LSOA21CD") or not f.get("geometry"):
-            continue
-        geom = shape(f["geometry"])
-        if not geom.is_valid:
-            geom = geom.buffer(0)
-        g = mapping(geom.simplify(0.00005, preserve_topology=True))
-        out[props["LSOA21CD"]] = {"type": g["type"], "coordinates": _round_coords(g["coordinates"], 5)}
+        if props.get("LSOA21CD") and f.get("geometry"):
+            geom = shape(f["geometry"])
+            out[props["LSOA21CD"]] = geom if geom.is_valid else geom.buffer(0)
+    return out
+
+
+def trim_to_coast(detail, coarse):
+    """Cut a full-extent LSOA back to (near) the coastline: keep only what lies within COAST_MARGIN of its coarse
+    clipped shape. Inland edges are unaffected (the coarse shape is never that far off); tidal flats are removed."""
+    if coarse is None:
+        return detail
+    trimmed = detail.intersection(coarse.buffer(COAST_MARGIN))
+    return trimmed if not trimmed.is_empty else detail
+
+
+def load_geometries(s: requests.Session, layer: str, codes: list[str], coast_layer: str | None = None) -> dict[str, dict]:
+    shapes = _shapes(s, layer, codes)
+    coarse = _shapes(s, coast_layer, codes) if coast_layer else {}
+    out = {}
+    for code, geom in shapes.items():
+        g = mapping(trim_to_coast(geom, coarse.get(code)).simplify(SIMPLIFY, preserve_topology=True))
+        out[code] = {"type": g["type"], "coordinates": _round_coords(g["coordinates"], 5)}
     return out
 
 
@@ -135,7 +169,9 @@ def write_seat_files(s: requests.Session, out_dir: Path, seats: dict[str, str], 
     wanted = sorted(c for cs in by_seat.values() for c in cs)
     names = _services(s)
     wards = load_wards(s, find_ward_service(names), wanted)
-    geoms = load_geometries(s, find_boundary_service(names), wanted)
+    detail, coast = find_boundary_services(names)
+    log.info("Neighbourhood boundaries: %s%s", detail, f" trimmed to the coast with {coast}" if coast else "")
+    geoms = load_geometries(s, layer_url(s, detail), wanted, layer_url(s, coast) if coast else None)
     vals, pct = metric_values(frames)
     folder = out_dir / "lsoa"
     folder.mkdir(parents=True, exist_ok=True)

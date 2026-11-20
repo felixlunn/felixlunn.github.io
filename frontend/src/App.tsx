@@ -20,8 +20,8 @@ const MapView = lazy(() => import("./components/MapView"));
 type Tab = "debates" | "neighbourhoods" | "themes";
 const TABS: { id: Tab; label: string }[] = [
   { id: "debates", label: "Debates" },
-  { id: "neighbourhoods", label: "Neighbourhoods" },
   { id: "themes", label: "Themes" },
+  { id: "neighbourhoods", label: "Neighbourhoods" },
 ];
 
 function readHash(): Record<string, string> {
