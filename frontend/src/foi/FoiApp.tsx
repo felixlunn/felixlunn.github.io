@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { calculate, canPerHead, fmtValue, forSeat, overallRate, points, ranked, summary, type Op } from "./analysis";
 import { outlier, vsMedian } from "./stats";
 import { jurisdictionOf, nearestAreas } from "./cells";
+import { addChange, timeSeries } from "./periods";
 import type { Backend, User } from "./backend";
 import FoiMap, { type MapItem } from "./FoiMap";
 import { targets } from "./match";
@@ -174,6 +175,7 @@ function Workspace({ backend, user, admin, ref_, shapes }: { backend: Backend; u
         </aside>
         {active ? (
           <DatasetView key={active.id} d={active} ref_={ref_} shapes={shapes} seat={seat || null} backend={backend}
+            others={(datasets ?? []).filter((x) => x.id !== active.id && x.geography === active.geography)}
             canEdit={admin || active.created_by === user.id} onDeleted={reload} />
         ) : (
           <div className="foi-main foi-empty">
@@ -211,14 +213,17 @@ function SeatPicker({ ref_, seat, setSeat }: { ref_: Reference; seat: string; se
   );
 }
 
-function DatasetView({ d: saved, ref_, shapes, seat, backend, canEdit, onDeleted }: {
+function DatasetView({ d: saved, ref_, shapes, seat, backend, canEdit, onDeleted, others }: {
   d: Dataset; ref_: Reference; shapes: GeoJSON.FeatureCollection; seat: string | null; backend: Backend; canEdit: boolean; onDeleted: () => void;
+  /** Other datasets of the same geography: candidates for "change since an earlier response". */
+  others: Dataset[];
 }) {
   // Calculated columns are added here first, and saved to the dataset on request.
   const [d, setD] = useState(saved);
   const [savedCols, setSavedCols] = useState(saved.columns.length);
   const unsaved = d.columns.length !== savedCols;
-  const [colKey, setColKey] = useState(d.columns[0]?.key ?? "");
+  // Open on the change over time when the response covers several years (the headline for multi-year FOIs).
+  const [colKey, setColKey] = useState(d.columns.find((c) => c.change)?.key ?? d.columns[0]?.key ?? "");
   const col = d.columns.find((c) => c.key === colKey);
   const [perHead, setPerHead] = useState(false);
   const ph = perHead && canPerHead(d, col);
@@ -230,6 +235,14 @@ function DatasetView({ d: saved, ref_, shapes, seat, backend, canEdit, onDeleted
   const flagged = useMemo(() => rows.map((r) => ({ r, o: outlier(r.value, stats) })).filter((x) => x.o !== null), [rows, stats]);
   const flaggedSet = useMemo(() => new Set(flagged.map((x) => x.r.target.code)), [flagged]);
   const overall = ph ? overallRate(rows) : null;
+  // How far from the middle: a ratio for levels ("2.3× the median"), a difference for changes ("+12 points above").
+  const vsMid = (v: number): string | null => {
+    if (!col?.change) return vsMedian(v, stats.median);
+    if (stats.median === null) return null;
+    const diff = v - stats.median;
+    const unit = col.change.mode === "percent" ? " points" : "";
+    return Math.abs(diff) < 1e-9 ? "at the median" : `${fmtValue(Math.abs(diff), { ...col, change: undefined, unit: col.change.mode === "percent" ? "other" : col.unit })}${unit} ${diff > 0 ? "above" : "below"} the median`;
+  };
   const tByCode = useMemo(() => new Map(targets(ref_, d.geography).map((t) => [t.code, t])), [ref_, d.geography]);
   const rowByCode = useMemo(() => new Map(d.rows.map((r) => [r.code, r])), [d.rows]);
   const seatLinks = useMemo(() => (seat ? forSeat(ref_, d.geography, seat) : []), [ref_, d.geography, seat]);
@@ -345,7 +358,7 @@ function DatasetView({ d: saved, ref_, shapes, seat, backend, canEdit, onDeleted
                 <li key={r.target.code}>
                   <span className={`tag ${o}`}>{o === "high" ? "▲ high" : "▼ low"}</span>
                   <button className="link-btn" onClick={() => setSelected(r.target.code)}>{r.target.name}</button>{" "}
-                  <strong>{fmtValue(r.value, col, ph)}</strong> <span className="tiny muted">{vsMedian(r.value!, stats.median)}</span>
+                  <strong>{fmtValue(r.value, col, ph)}</strong> <span className="tiny muted">{vsMid(r.value!)}</span>
                 </li>
               ))}
             </ul>
@@ -359,6 +372,9 @@ function DatasetView({ d: saved, ref_, shapes, seat, backend, canEdit, onDeleted
             <p className="tiny">{notIn.slice(0, 60).map((t) => t.name).join(", ")}{notIn.length > 60 ? ` and ${notIn.length - 60} more` : ""}</p>
           </details>
         )}
+
+        <ChangeTool d={d} others={others}
+          onAdd={(next) => { setD(next); setColKey(next.columns[next.columns.length - 1].key); }} />
 
         <Calculator d={d} canSave={canEdit} unsaved={unsaved}
           onAdd={(next) => { setD(next); setColKey(next.columns[next.columns.length - 1].key); }}
@@ -381,7 +397,7 @@ function DatasetView({ d: saved, ref_, shapes, seat, backend, canEdit, onDeleted
                             <button className="link-btn" onClick={() => setSelected(l.code)}>{tByCode.get(l.code)?.name ?? l.code}</button>{" "}
                             <span className="tiny muted">({l.why})</span>:{" "}
                             {!r || r.suppressed ? <span className="small">withheld{r?.suppressed ? ` (${r.suppressed})` : ""}</span> : <strong>{fmtValue(r.value, col, ph)}{unit}</strong>}
-                            {r?.rank && <span className="tiny muted"> · {r.rank} of {stats.n}{r.value !== null && vsMedian(r.value, stats.median) ? `; ${vsMedian(r.value, stats.median)}` : ""}</span>}
+                            {r?.rank && <span className="tiny muted"> · {r.rank} of {stats.n}{r.value !== null && vsMid(r.value) ? `; ${vsMid(r.value)}` : ""}</span>}
                             {r && outlier(r.value, stats) && <span className={`tag ${outlier(r.value, stats)}`}>unusually {outlier(r.value, stats)}</span>}
                           </li>
                         );
@@ -485,6 +501,53 @@ function Calculator({ d, canSave, unsaved, onAdd, onSave }: { d: Dataset; canSav
           New figures are shown here only.{" "}
           {canSave ? <button className="link-btn" onClick={onSave}>Save them to the dataset for the team</button> : "Only the uploader or an admin can save them."}
         </p>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Change over time: pick two figures (two years in this response, or this response and an earlier one of the same
+ * kind) and map the % or absolute change for every area with both.
+ */
+function ChangeTool({ d, others, onAdd }: { d: Dataset; others: Dataset[]; onAdd: (d: Dataset) => void }) {
+  const series = timeSeries(d.columns);
+  const options = [
+    ...d.columns.filter((c) => !c.change).map((c) => ({ id: `${d.id}|${c.key}`, label: c.label, d, col: c })),
+    ...others.flatMap((o) => o.columns.filter((c) => !c.change).map((c) => ({ id: `${o.id}|${c.key}`, label: `${o.title}${o.period ? ` (${o.period})` : ""}: ${c.label}`, d: o, col: c }))),
+  ];
+  const firstSeries = series[0]?.cols;
+  const [from, setFrom] = useState(firstSeries ? `${d.id}|${firstSeries[0].key}` : options.find((o) => o.d.id !== d.id)?.id ?? "");
+  const [to, setTo] = useState(firstSeries ? `${d.id}|${firstSeries[firstSeries.length - 1].key}` : options[0]?.id ?? "");
+  const [mode, setMode] = useState<"percent" | "absolute">("percent");
+  const [open, setOpen] = useState(false);
+  if (!series.length && !others.length) return null;
+  const pick = (id: string) => options.find((o) => o.id === id);
+  return (
+    <div className="foi-calc foi-change">
+      {!open ? (
+        <button className="link-btn small" onClick={() => setOpen(true)}>
+          {series.length ? "↗ Change over time: compare any two years" : "↗ Change since an earlier response of the same kind"}
+        </button>
+      ) : (
+        <>
+          <div className="foi-calc-row">
+            <label className="tiny muted">From <select aria-label="From" value={from} onChange={(e) => setFrom(e.target.value)}>{options.map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}</select></label>
+            <label className="tiny muted">to <select aria-label="To" value={to} onChange={(e) => setTo(e.target.value)}>{options.map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}</select></label>
+            <select aria-label="Show" value={mode} onChange={(e) => setMode(e.target.value as "percent" | "absolute")}>
+              <option value="percent">% change</option><option value="absolute">change (difference)</option>
+            </select>
+          </div>
+          <div className="foi-calc-row">
+            <button className="btn primary" disabled={!pick(from) || !pick(to) || from === to} onClick={() => {
+              const a = pick(from)!, b = pick(to)!;
+              onAdd(addChange(d, { d: a.d, col: a.col }, { d: b.d, col: b.col }, mode));
+              setOpen(false);
+            }}>Show on the map</button>
+            <button className="btn" onClick={() => setOpen(false)}>Cancel</button>
+          </div>
+          <p className="tiny muted">Areas need a figure in both to get a change. Comparing two responses only makes sense if they asked the same question.</p>
+        </>
       )}
     </div>
   );

@@ -96,3 +96,45 @@ describe("stats", () => {
     expect(d([1, 2, 100]).high).toBeNull();
   });
 });
+
+describe("periods", () => {
+  it("recognises years and periods, not ordinary numbers", async () => {
+    const { parsePeriod: p, seriesName } = await import("./periods");
+    expect(p("2023")?.label).toBe("2023");
+    expect(p("2023/24")?.label).toBe("2023/24");
+    expect(p("FY 2023-2024")?.label).toBe("2023/24");
+    expect(p("Officers 2022/23")?.label).toBe("2022/23");
+    expect(p("Q2 2024")?.label).toBe("2024 Q2");
+    expect(p("March 2024")?.label).toBe("Mar 2024");
+    expect(p("1,234")).toBeNull();
+    expect(p("3000")).toBeNull();
+    expect(p("2023/25")).toBeNull();
+    expect(p("2023/24")!.key).toBeGreaterThan(p("2023")!.key);
+    expect(seriesName("Officers (2022/23)")).toBe("Officers");
+    expect(seriesName("2024")).toBe("");
+  });
+  it("groups year columns and calculates change, within and across datasets", async () => {
+    const { timeSeries, autoChanges, addChange, changeValue } = await import("./periods");
+    expect(changeValue(100, 125, "percent")).toBe(25);
+    expect(changeValue(0, 5, "percent")).toBeNull();
+    expect(changeValue(80, 60, "absolute")).toBe(-20);
+    const base = { id: "a", department: "policing", geography: "police_force", title: "t", foi_reference: null, authority: null, period: null,
+      requested_on: null, received_on: null, notes: null, unmatched: [], file_path: null, created_by: null, created_by_email: "", created_at: "", updated_at: "" } as const;
+    const d = { ...base, columns: [
+      { key: "a", label: "2024", unit: "count", direction: "higher_worse", period: "2024", series: "" },
+      { key: "b", label: "2022", unit: "count", direction: "higher_worse", period: "2022", series: "" },
+    ], rows: [{ code: "X", source_name: "X", values: { a: 150, b: 100 } }, { code: "Y", source_name: "Y", values: { a: null, b: 10 } }] } as never;
+    expect(timeSeries((d as { columns: never[] }).columns)[0].cols.map((c) => c.period)).toEqual(["2022", "2024"]);
+    const out = autoChanges(d) as { columns: { label: string; key: string }[]; rows: { code: string; values: Record<string, number | null> }[] };
+    const chg = out.columns[2];
+    expect(chg.label).toBe("% change 2022 to 2024");
+    expect(out.rows.find((r) => r.code === "X")!.values[chg.key]).toBe(50);
+    expect(out.rows.find((r) => r.code === "Y")!.values[chg.key]).toBeNull();
+    const later = { ...base, id: "b", period: "2025", columns: [{ key: "z", label: "Count", unit: "count", direction: "higher_worse" }],
+      rows: [{ code: "X", source_name: "X", values: { z: 300 } }, { code: "Z", source_name: "Z", values: { z: 5 } }] } as never;
+    const cross = addChange(d, { d, col: (d as { columns: never[] }).columns[0] }, { d: later, col: (later as { columns: never[] }).columns[0] }, "percent") as typeof out;
+    const k = cross.columns[cross.columns.length - 1].key;
+    expect(cross.rows.find((r) => r.code === "X")!.values[k]).toBe(100);
+    expect(cross.rows.some((r) => r.code === "Z")).toBe(true);
+  });
+});
