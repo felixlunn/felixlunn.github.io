@@ -7,11 +7,14 @@ import { fmt, ordinal } from "../lib/format";
 import { missingFor } from "../lib/missing";
 import NoData from "./NoData";
 import SourceLink from "./SourceLink";
+import { ChangeBadge } from "./Trend";
+import { seriesFor, type History } from "../lib/history";
 
 interface Props {
   data: DashboardData;
-  /** The seat of the MP chosen in the toolbar, if any. Debates are flagged only for this seat. */
+  /** The seat whose local figures lead every debate card: the office's seat, or else the seat being viewed. */
   mySeat: number | null;
+  history: History | null;
   active: number | null;
   setActive: (id: number | null) => void;
   mapMetric: string | null;
@@ -27,7 +30,7 @@ function rankPhrase(h: Hit): string {
   return h.rank <= h.of / 2 ? `${ordinal(h.rank)} ${hi} of ${h.of}` : `${ordinal(h.of - h.rank + 1)} ${lo} of ${h.of}`;
 }
 
-export default function DebatesTab({ data, mySeat, active, setActive, mapMetric, setMapMetric, onSelect }: Props) {
+export default function DebatesTab({ data, mySeat, history, active, setActive, mapMetric, setMapMetric, onSelect }: Props) {
   const [onlyMine, setOnlyMine] = useState(false);
   // Bring an opened debate into view (e.g. when arriving from the seat briefing).
   useEffect(() => {
@@ -60,13 +63,15 @@ export default function DebatesTab({ data, mySeat, active, setActive, mapMetric,
       <p className="muted small">Upcoming Commons debates (not questions, statements or Private Members' Bills).</p>
       {seat === null ? (
         <p className="small">
-          Choose your MP in the bar at the top to flag the debates where their seat stands out: in the most extreme tenth of seats
-          on a figure the debate touches, or where they're leading the debate.
+          Choose your MP in the bar at the top (or open a seat on the map) to see that seat's figures on every debate, and which
+          debates it stands out on.
         </p>
       ) : (
         <>
           <p className="small">
-            <strong>{flaggedCount}</strong> {flaggedCount === 1 ? "debate stands" : "debates stand"} out for {seat.mp ?? seat.name} ({seat.name}).
+            Each debate shows <strong>{seat.name}</strong>'s figures on its topic, most notable first.{" "}
+            <strong>{flaggedCount}</strong> {flaggedCount === 1 ? "debate is" : "debates are"} highlighted, where the seat is in the most extreme
+            tenth of seats or {seat.mp ?? "its MP"} is leading.
           </p>
           <label className="check small">
             <input type="checkbox" checked={onlyMine} onChange={(e) => setOnlyMine(e.target.checked)} />
@@ -84,7 +89,7 @@ export default function DebatesTab({ data, mySeat, active, setActive, mapMetric,
         <section key={day} className="debate-day">
           <h3>{dayFmt.format(new Date(`${day}T12:00:00`))}</h3>
           {items.map((r) => (
-            <DebateCard key={r.d.id} {...r} data={data} mySeat={mySeat}
+            <DebateCard key={r.d.id} {...r} data={data} mySeat={mySeat} history={history}
               open={active === r.d.id} onToggle={() => setActive(active === r.d.id ? null : r.d.id)}
               mapMetric={mapMetric} setMapMetric={setMapMetric} onSelect={onSelect} />
           ))}
@@ -95,19 +100,55 @@ export default function DebatesTab({ data, mySeat, active, setActive, mapMetric,
   );
 }
 
-function DebateCard({ d, metrics, mine, standouts, leading, flagged, data, mySeat, open, onToggle, mapMetric, setMapMetric, onSelect }: {
+const LOCAL_FIGURES = 3; // figures shown on each card before it is opened
+
+function DebateCard({ d, metrics, mine, leading, flagged, data, mySeat, history, open, onToggle, mapMetric, setMapMetric, onSelect }: {
   d: Debate; metrics: ReturnType<typeof debateMetrics>; mine: Hit[]; standouts: Hit[]; leading: boolean; flagged: boolean;
-  data: DashboardData; mySeat: number | null;
+  data: DashboardData; mySeat: number | null; history: History | null;
   open: boolean; onToggle: () => void; mapMetric: string | null; setMapMetric: (id: string) => void; onSelect: (i: number) => void;
 }) {
   const topicLabels = d.topics.map((t) => data.debate_topics?.find((x) => x.id === t)?.label ?? t);
   const lead = leadSeat(data, d);
-  const top = standouts[0];
+  const missing = mySeat !== null ? missingFor(data, mySeat, metrics) : [];
   return (
     <article id={`debate-${d.id}`} className={`debate ${open ? "open" : ""} ${flagged ? "is-mine" : ""}`}>
       <button className="debate-head" onClick={onToggle} aria-expanded={open} disabled={!metrics.length && !d.members.length}>
         <div className="tiny muted">{[d.time, d.venue, d.category].filter(Boolean).join(" · ")}</div>
         <div className="debate-title">{d.title}</div>
+
+        {/* Local figures first, always: the seat's numbers on this debate's topic. */}
+        <div className="local-figs">
+          {mySeat === null ? (
+            <div className="tiny muted">Choose your MP at the top to see local figures for this debate.</div>
+          ) : !metrics.length ? (
+            <div className="tiny muted">No local figures match this debate's topic.</div>
+          ) : !mine.length ? (
+            <div className="small"><NoData reason="No data for this seat on these figures" /> <span className="tiny muted">for {data.seats[mySeat].name} on this topic</span></div>
+          ) : (
+            <>
+              <div className="local-seat tiny">
+                {data.seats[mySeat].name}
+                {leading && <span className="lead-flag"> · your MP is leading this debate</span>}
+              </div>
+              <ul>
+                {mine.slice(0, LOCAL_FIGURES).map((h) => {
+                  const s = seriesFor(history, h.metric.id, mySeat);
+                  return (
+                    <li key={h.metric.id} className={standsOut(h) ? "stand" : ""}>
+                      <span className="lf-value">{fmt(h.metric, h.value)}</span>
+                      <span className="lf-label">{h.metric.label}<SourceLink metric={h.metric} /></span>
+                      <span className="lf-rank">{rankPhrase(h)} · national {fmt(h.metric, h.metric.national)}{s && <> · <ChangeBadge metric={h.metric} series={s} /></>}</span>
+                    </li>
+                  );
+                })}
+              </ul>
+              {mine.length + missing.length > LOCAL_FIGURES && (
+                <div className="tiny muted">{open ? "" : `+${mine.length + missing.length - LOCAL_FIGURES} more figures: open the debate`}</div>
+              )}
+            </>
+          )}
+        </div>
+
         <div className="debate-meta">
           {d.members.slice(0, 1).map((m) => {
             const st = m.party ? partyStyle(m.party) : null;
@@ -119,16 +160,6 @@ function DebateCard({ d, metrics, mine, standouts, leading, flagged, data, mySea
           })}
           {topicLabels.map((t) => <span key={t} className="topic">{t}</span>)}
         </div>
-        {!flagged && mySeat !== null && metrics.length > 0 && mine.length === 0 && (
-          <div className="debate-mine"><NoData reason="Your seat has no data on any figure this debate touches" /> <span className="tiny muted">for your seat on these figures</span></div>
-        )}
-        {flagged && (
-          <div className="debate-mine on">
-            {leading ? "Your MP is leading this debate" : "Your seat stands out"}
-            {top && <>{leading ? " · " : ": "}{top.metric.label} {fmt(top.metric, top.value)}, {rankPhrase(top)}<SourceLink metric={top.metric} /></>}
-            {standouts.length > 1 && <span className="muted"> (+{standouts.length - 1} more)</span>}
-          </div>
-        )}
       </button>
 
       {open && (
@@ -146,16 +177,16 @@ function DebateCard({ d, metrics, mine, standouts, leading, flagged, data, mySea
               </div>
             </>
           )}
-          {mySeat !== null && (mine.length > 0 || missingFor(data, mySeat, metrics).length > 0) && (
+          {mySeat !== null && (mine.length > LOCAL_FIGURES || missing.length > 0) && (
             <div className="my-standing">
-              <div className="tiny muted">{data.seats[mySeat].name} on these figures (bold: in the most extreme tenth of seats)</div>
+              <div className="tiny muted">More figures for {data.seats[mySeat].name} (bold: in the most extreme tenth of seats)</div>
               <ul>
-                {mine.map((h) => (
+                {mine.slice(LOCAL_FIGURES).map((h) => (
                   <li key={h.metric.id} className={`small ${standsOut(h) ? "strong" : ""}`}>
                     {h.metric.label}: {fmt(h.metric, h.value)}<SourceLink metric={h.metric} /> <span className="muted">({rankPhrase(h)}; national {fmt(h.metric, h.metric.national)})</span>
                   </li>
                 ))}
-                {missingFor(data, mySeat, metrics).map(({ metric, reason }) => (
+                {missing.map(({ metric, reason }) => (
                   <li key={metric.id} className="small">
                     {metric.label}: <NoData reason={reason} /><SourceLink metric={metric} /> <span className="muted">({reason}; not counted)</span>
                   </li>
