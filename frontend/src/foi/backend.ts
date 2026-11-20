@@ -28,7 +28,13 @@ export interface Backend {
   fileUrl(path: string): Promise<string>;
 }
 
-const URL_ = import.meta.env.VITE_SUPABASE_URL as string | undefined;
+/** The project address only: a URL copied with a path such as /rest/v1/ makes every login fail ("Invalid path"). */
+export function projectUrl(raw: string | undefined): string | undefined {
+  if (!raw?.trim()) return undefined;
+  try { return new URL(raw.trim()).origin; } catch { return raw.trim(); }
+}
+
+const URL_ = projectUrl(import.meta.env.VITE_SUPABASE_URL as string | undefined);
 const KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
 
 export const configured = Boolean(URL_ && KEY);

@@ -131,7 +131,7 @@ jobs:
           if [ -z "$VITE_SUPABASE_URL" ] || [ -z "$VITE_SUPABASE_ANON_KEY" ]; then
             echo "::warning title=FOI research not connected::SUPABASE_URL and/or SUPABASE_ANON_KEY is missing (Settings > Secrets and variables > Actions, repository level, exact names). foi.html will say it isn't set up."
           fi
-          case "$VITE_SUPABASE_URL" in ""|https://*.supabase.co|https://*.supabase.co/) ;; *) echo "::warning title=FOI research::SUPABASE_URL should look like https://<project>.supabase.co" ;; esac
+          case "$VITE_SUPABASE_URL" in ""|https://*.supabase.co|https://*.supabase.co/) ;; *) echo "::warning title=FOI research::SUPABASE_URL should be just https://<project>.supabase.co (any path such as /rest/v1/ is ignored)" ;; esac
           npm ci
           npm run build
 
