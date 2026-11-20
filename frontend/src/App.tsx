@@ -254,15 +254,20 @@ export default function App({ data, geo }: { data: DashboardData; geo: GeoJSON.F
               <h2 id="src-title">Data sources</h2>
               <button className="icon" onClick={() => setShowSources(false)} aria-label="Close">×</button>
             </div>
-            <p className="small">Built {generated.toLocaleString("en-GB")}. The pipeline re-runs automatically every two days.</p>
+            <p className="small">Built {generated.toLocaleString("en-GB")}. The pipeline re-runs automatically every day, re-downloading everything weekly.</p>
             <table className="metric-table">
               <thead><tr><th scope="col">Source</th><th scope="col">Period</th><th scope="col">Status</th></tr></thead>
               <tbody>
                 {data.sources.map((s) => (
                   <tr key={s.id}>
                     <td>{s.url ? <a href={s.url} target="_blank" rel="noreferrer">{s.name}</a> : s.name}<div className="tiny muted">{s.detail}</div></td>
-                    <td className="small">{s.as_of ?? "–"}</td>
-                    <td className={`small ${s.status === "ok" ? "ok" : "bad"}`}>{s.status === "ok" ? "✓ Updated" : "✕ Failed"}</td>
+                    <td className="small">
+                      {s.as_of ?? "–"}
+                      {s.since && <div className="tiny muted">unchanged since {new Date(s.since).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}</div>}
+                    </td>
+                    <td className={`small ${s.status !== "ok" ? "bad" : s.overdue ? "warn-dot" : "ok"}`}>
+                      {s.status !== "ok" ? "✕ Failed" : s.overdue ? <span title="Not updated for longer than this source usually goes between releases">⚠ Overdue</span> : "✓ Updated"}
+                    </td>
                   </tr>
                 ))}
               </tbody>

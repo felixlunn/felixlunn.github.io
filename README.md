@@ -15,7 +15,7 @@ theme by theme. The homepage opens on the electoral map, with every seat in its 
 
 ## Data
 
-All data are open, refreshed automatically **every two days** by GitHub Actions, and keyed by GSS code to the
+All data are open, refreshed automatically **every day** by GitHub Actions (a full re-download every Monday; sources that stop picking up new releases raise an alert), and keyed by GSS code to the
 **July 2024 Westminster constituencies** (650 seats).
 
 | Source | Used for | Coverage | Refresh |

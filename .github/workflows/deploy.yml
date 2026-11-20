@@ -1,10 +1,11 @@
 name: Refresh data & deploy
 
 # Rebuilds every dataset from the live APIs and publishes the dashboard to
-# GitHub Pages. Runs every two days, on every push to main, and on demand.
+# GitHub Pages. Runs daily, on every push to main, and on demand. Monday's run (and a manual run with
+# "fresh" ticked) ignores saved copies and re-downloads every source.
 on:
   schedule:
-    - cron: "17 3 */2 * *" # 03:17 UTC every other day
+    - cron: "17 3 * * *" # 03:17 UTC every day
   push:
     branches: [main]
   workflow_dispatch:
@@ -13,6 +14,11 @@ on:
         description: "Optional sources to skip, space-separated (foi council_control scotland fire police_workforce heat_pumps green_space floods business_demography council_tax insolvency university ofsted pupils pharmacies public_health income asylum road_condition rents energy travel renewables air_pollution children vehicles buses cqc roads housing_stock child_poverty dental life_expectancy affordability homelessness ev sewage petitions questions rail courts fuel_poverty nhs schools epc imd neighbourhoods debates claimants aps ashe bres business popest police elections members lsoa)"
         required: false
         default: ""
+      fresh:
+        description: "Re-download every source, ignoring saved copies"
+        type: boolean
+        required: false
+        default: false
 
 permissions:
   contents: read
@@ -53,10 +59,18 @@ jobs:
           key: sources-v1-${{ github.run_id }}
           restore-keys: sources-v1-
 
+      # The data now on the live site: used to tell how long each source's figures have gone unchanged.
+      - name: Fetch the published data
+        run: |
+          SITE="https://${GITHUB_REPOSITORY_OWNER}.github.io"
+          [ "${GITHUB_REPOSITORY#*/}" = "${GITHUB_REPOSITORY_OWNER}.github.io" ] || SITE="$SITE/${GITHUB_REPOSITORY#*/}"
+          curl -sfL --max-time 60 "$SITE/data/data.json" -o previous.json || rm -f previous.json
+
       - name: Fetch data and compute metrics
         env:
           WHIPS_CENSUS_CACHE: .cache/census
-          WHIPS_SOURCE_CACHE: .cache/sources
+          WHIPS_PREVIOUS_DATA: previous.json
+          FRESH_INPUT: ${{ github.event.inputs.fresh }}
           NOMIS_UID: ${{ secrets.NOMIS_UID }} # optional Nomis API key (higher limits)
           EPC_TOKEN: ${{ secrets.EPC_TOKEN }} # EPC API bearer token (get-energy-performance-data.communities.gov.uk)
           SKIP_INPUT: ${{ github.event.inputs.skip }}
@@ -65,6 +79,12 @@ jobs:
           for s in $SKIP_INPUT; do
             case "$s" in foi|council_control|scotland|fire|police_workforce|heat_pumps|green_space|floods|business_demography|council_tax|insolvency|university|ofsted|pupils|pharmacies|public_health|income|asylum|road_condition|rents|energy|travel|renewables|air_pollution|children|vehicles|buses|cqc|roads|housing_stock|child_poverty|dental|life_expectancy|affordability|homelessness|ev|sewage|petitions|questions|rail|courts|fuel_poverty|nhs|schools|epc|imd|neighbourhoods|debates|claimants|aps|ashe|bres|business|popest|police|elections|members|lsoa) SKIP="$SKIP --skip $s" ;; *) echo "ignoring '$s'" ;; esac
           done
+          # Saved copies of slow sources are reused for a few days (whips/cache.py), except on the weekly full refresh.
+          if [ "$FRESH_INPUT" = "true" ] || { [ "$GITHUB_EVENT_NAME" = "schedule" ] && [ "$(date -u +%u)" = "1" ]; }; then
+            echo "Full refresh: re-downloading every source"
+          else
+            export WHIPS_SOURCE_CACHE=.cache/sources
+          fi
           python -m whips.build --out frontend/public/data $SKIP
 
       # One open issue lists the sources that failed to update; it is closed when they all work again.
@@ -76,10 +96,7 @@ jobs:
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           TITLE="Data sources failing to update"
-          # Compare with the data currently on the live site, to catch a source that "worked" but returned little.
-          SITE="https://${GITHUB_REPOSITORY_OWNER}.github.io"
-          [ "${GITHUB_REPOSITORY#*/}" = "${GITHUB_REPOSITORY_OWNER}.github.io" ] || SITE="$SITE/${GITHUB_REPOSITORY#*/}"
-          curl -sfL --max-time 60 "$SITE/data/data.json" -o previous.json || rm -f previous.json
+          # Compare with the data on the live site (fetched above), to catch a source that "worked" but returned little.
           FAILED="$(python -m whips.report frontend/public/data/data.json previous.json)"
           OPEN="$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --search "\"$TITLE\" in:title" --json number --jq '.[0].number')"
           if [ -n "$FAILED" ]; then
