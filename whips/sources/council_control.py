@@ -82,7 +82,7 @@ def load_councillors(s: requests.Session) -> tuple[pd.DataFrame, int]:
 
 def council_names(s: requests.Session) -> dict[str, str]:
     """Council code -> name, for UK local authorities and English counties."""
-    names = _services(s)
+    names = _services(s, UK_NAMES, COUNTY_PATTERN)
     uk = max((n for n in names if UK_NAMES.match(n)), key=lambda n: (int(UK_NAMES.match(n).group(1)), n))
     out = {column(r, r"LAD\d{2}CD"): column(r, r"LAD\d{2}NM") for r in arcgis_rows(s, f"{ARCGIS_ROOT}/{uk}/FeatureServer/0")}
     cty = max(n for n in names if COUNTY_PATTERN.match(n))

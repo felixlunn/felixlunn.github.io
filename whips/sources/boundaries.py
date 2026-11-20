@@ -11,6 +11,7 @@ from __future__ import annotations
 import logging
 import os
 import re
+import time
 
 import requests
 from shapely.geometry import mapping, shape
@@ -24,16 +25,45 @@ SERVICE_PATTERN = re.compile(r"^Westminster_Parliamentary_Constituencies_July_20
 RES_ORDER = {"BUC": 0, "BSC": 1, "BGC": 2}
 
 
+_SERVICES: set[str] = set()
+MIN_LISTINGS, MAX_LISTINGS = 3, 8
+
+
+def portal_services(s: requests.Session, *wanted: re.Pattern) -> list[str]:
+    """Names of the ONS portal's feature services.
+
+    The portal's service listing sometimes leaves out a large share of its services (on 20 Nov 2026 a run lost
+    the police force, ward, county and LSOA lookups at once), so several listings are combined and cached. If a
+    ``wanted`` pattern still has no match, the portal is listed again (up to MAX_LISTINGS in all) before giving up.
+    """
+    def listing() -> None:
+        data = get_json(s, ARCGIS_ROOT, params={"f": "json"})
+        _SERVICES.update(svc["name"] for svc in data.get("services", []) if svc.get("type") == "FeatureServer")
+
+    done = 0
+    if not _SERVICES:
+        for _ in range(MIN_LISTINGS):
+            listing()
+            done += 1
+    missing = lambda: [p for p in wanted if not any(p.search(n) for n in _SERVICES)]  # noqa: E731
+    while missing() and done < MAX_LISTINGS:
+        time.sleep(2)
+        listing()
+        done += 1
+    if missing():
+        log.warning("ONS portal listing still lacks %s after %d listings", [p.pattern for p in missing()], done)
+    return sorted(_SERVICES)
+
+
 def find_service(s: requests.Session) -> str:
     override = os.environ.get("PCON_BOUNDARY_SERVICE")
     if override:
         return override
-    data = get_json(s, ARCGIS_ROOT, params={"f": "json"})
     candidates = []
-    for svc in data.get("services", []):
-        m = SERVICE_PATTERN.match(svc.get("name", ""))
-        if m and svc.get("type") == "FeatureServer":
-            candidates.append((RES_ORDER[m.group(1).upper()], svc["name"]))
+    for name in portal_services(s, SERVICE_PATTERN):
+        m = SERVICE_PATTERN.match(name)
+        if m:
+            candidates.append((RES_ORDER[m.group(1).upper()], name))
     if not candidates:
         raise LookupError("No July 2024 Westminster constituency boundary service found on the ONS portal")
     name = sorted(candidates)[0][1]
@@ -97,9 +127,7 @@ def find_lookup_service(s: requests.Session) -> str:
     override = os.environ.get("LSOA_PCON_LOOKUP_SERVICE")
     if override:
         return override
-    data = get_json(s, ARCGIS_ROOT, params={"f": "json"})
-    names = [svc["name"] for svc in data.get("services", [])
-             if svc.get("type") == "FeatureServer" and LOOKUP_PATTERN.search(svc.get("name", ""))]
+    names = [n for n in portal_services(s, LOOKUP_PATTERN) if LOOKUP_PATTERN.search(n)]
     if not names:
         raise LookupError("No LSOA 2021 -> PCON 2024 lookup service found on the ONS portal")
     name = sorted(names, key=len)[0]

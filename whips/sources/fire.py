@@ -79,7 +79,7 @@ def response_times(d: pd.DataFrame, fire_type: str) -> tuple[pd.Series, float | 
 
 
 def lad_to_fra(s: requests.Session) -> dict[str, str]:
-    names = [n for n in _services(s) if FRA_PATTERN.match(n)]
+    names = [n for n in _services(s, FRA_PATTERN) if FRA_PATTERN.match(n)]
     latest = max(names, key=lambda n: (int(FRA_PATTERN.match(n).group(1)), n))
     return {column(r, r"LAD\d{2}CD"): key(column(r, r"FRA\d{2}NM")) for r in arcgis_rows(s, f"{ARCGIS_ROOT}/{latest}/FeatureServer/0")}
 
