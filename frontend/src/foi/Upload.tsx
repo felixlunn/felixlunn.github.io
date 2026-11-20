@@ -1,7 +1,8 @@
 import { useMemo, useState } from "react";
 import { Matcher, targets, type Match } from "./match";
 import { numericShare, parseCsv, parseValue, readFile, toTable, type Table } from "./parse";
-import { DEPARTMENTS, GEOGRAPHY_LABEL, type Cell, type Column, type DataRow, type Department, type Direction, type Geography, type NewDataset, type Reference } from "./types";
+import { autoChanges, parsePeriod, seriesName } from "./periods";
+import { DEPARTMENTS, GEOGRAPHY_LABEL, type Cell, type Column, type DataRow, type Dataset, type Department, type Direction, type Geography, type NewDataset, type Reference } from "./types";
 
 interface Props {
   ref_: Reference;
@@ -13,6 +14,27 @@ interface Props {
 type Step = "file" | "columns" | "review";
 const UNITS: [Column["unit"], string][] = [["count", "Count (number of…)"], ["rate", "Rate (per 1,000, per 100,000…)"], ["percent", "Percentage"], ["money", "Money (£)"], ["other", "Other"]];
 const DIRECTIONS: [Direction, string][] = [["higher_worse", "Higher is worse"], ["higher_better", "Higher is better"], ["neutral", "Neither"]];
+
+/** A value column, with its year or period if the header names one (e.g. "Officers 2023/24"). */
+function makeColumn(k: number, header: string, cells: string[]): Column {
+  const p = parsePeriod(header);
+  return { key: `c${k}`, label: header, unit: guessUnit(header, cells), direction: "higher_worse", ...(p ? { period: p.label, series: seriesName(header) } : {}) };
+}
+
+/** A column of years (one row per area per year): mostly periods, several distinct, and areas repeat. */
+function findPeriodColumn(t: Table, areaCol: number): number | null {
+  const names = t.rows.map((r) => (r[areaCol] ?? "").trim().toLowerCase()).filter(Boolean);
+  if (new Set(names).size === names.length) return null;
+  for (let k = 0; k < t.headers.length; k++) {
+    if (k === areaCol) continue;
+    const cells = t.rows.map((r) => (r[k] ?? "").trim()).filter(Boolean);
+    const ps = cells.map(parsePeriod);
+    const ok = ps.filter(Boolean).length;
+    const distinct = new Set(ps.map((p) => p?.label)).size;
+    if (cells.length && ok / cells.length >= 0.8 && distinct >= 2 && distinct <= 40) return k;
+  }
+  return null;
+}
 
 function guessUnit(header: string, cells: string[]): Column["unit"] {
   const h = header.toLowerCase();
@@ -35,6 +57,7 @@ export default function Upload({ ref_, department, onCancel, onSave }: Props) {
   const [areaCol, setAreaCol] = useState(0);
   const [cols, setCols] = useState<Record<number, Column>>({});
   const [overrides, setOverrides] = useState<Record<number, string>>({}); // row index -> target code, or "" to skip
+  const [periodCol, setPeriodCol] = useState<number | null>(null); // one row per area per period: the period column
 
   const ts = useMemo(() => targets(ref_, geography), [ref_, geography]);
   const matcher = useMemo(() => new Matcher(ts, geography), [ts, geography]);
@@ -58,11 +81,11 @@ export default function Upload({ ref_, department, onCancel, onSave }: Props) {
     setFile(f);
     setTable(t);
     setAreaCol(Math.max(best, 0));
+    const pcol = findPeriodColumn(t, Math.max(best, 0));
+    setPeriodCol(pcol);
     const picked: Record<number, Column> = {};
     t.headers.forEach((h, k) => {
-      if (k !== best && numericShare(t.rows, k) >= 0.6) {
-        picked[k] = { key: `c${k}`, label: h, unit: guessUnit(h, t.rows.map((r) => r[k])), direction: "higher_worse" };
-      }
+      if (k !== best && k !== pcol && numericShare(t.rows, k) >= 0.6) picked[k] = makeColumn(k, h, t.rows.map((r) => r[k]));
     });
     setCols(picked);
     setOverrides({});
@@ -113,34 +136,68 @@ export default function Upload({ ref_, department, onCancel, onSave }: Props) {
       const c = finalCode(i);
       if (m.how === "total" && !(i in overrides)) total++;
       else if (!c) none++;
-      else { ok++; if (m.how === "close" && !(i in overrides)) close++; seen.set(c, (seen.get(c) ?? 0) + 1); }
+      else {
+        ok++;
+        if (m.how === "close" && !(i in overrides)) close++;
+        const k = periodCol !== null ? `${c}|${parsePeriod(table!.rows[i][periodCol] ?? "")?.label ?? ""}` : c;
+        seen.set(k, (seen.get(k) ?? 0) + 1);
+      }
     });
-    return { ok, close, none, total, dupes: [...seen].filter(([, n]) => n > 1).map(([c]) => c) };
+    return { ok, close, none, total, dupes: [...seen].filter(([, n]) => n > 1).map(([c]) => c.split("|")[0]) };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [matches, overrides]);
+  }, [matches, overrides, periodCol]);
 
   async function save() {
     if (!table) return;
-    const columns = Object.entries(cols).map(([, c]) => c);
-    const rows: DataRow[] = [];
-    const unmatched: NewDataset["unmatched"] = [];
-    const used = new Set<string>();
-    table.rows.forEach((r, i) => {
+    const valueCols = Object.entries(cols).map(([k, c]) => [Number(k), c] as const);
+    const read = (r: string[]) => {
       const values: Record<string, Cell> = {};
       const suppressed: Record<string, string> = {};
-      for (const [k, c] of Object.entries(cols)) {
-        const p = parseValue(r[Number(k)] ?? "");
+      for (const [k, c] of valueCols) {
+        const p = parseValue(r[k] ?? "");
         values[c.key] = p.value;
         if (p.suppressed) suppressed[c.key] = p.suppressed;
       }
-      const code = finalCode(i);
-      if (code && !used.has(code)) {
-        used.add(code);
-        rows.push({ code, source_name: r[areaCol] ?? "", values, ...(Object.keys(suppressed).length ? { suppressed } : {}) });
-      } else if (matches[i].how !== "total" && (r[areaCol] ?? "").trim()) {
-        unmatched.push({ source_name: r[areaCol] ?? "", values });
-      }
-    });
+      return { values, suppressed };
+    };
+    let columns: Column[] = valueCols.map(([, c]) => c);
+    const byCode = new Map<string, DataRow>();
+    const unmatched: NewDataset["unmatched"] = [];
+    if (periodCol === null) {
+      table.rows.forEach((r, i) => {
+        const { values, suppressed } = read(r);
+        const code = finalCode(i);
+        if (code && !byCode.has(code)) byCode.set(code, { code, source_name: r[areaCol] ?? "", values, ...(Object.keys(suppressed).length ? { suppressed } : {}) });
+        else if (matches[i].how !== "total" && (r[areaCol] ?? "").trim()) unmatched.push({ source_name: r[areaCol] ?? "", values });
+      });
+    } else {
+      // One row per area per period: one column per measure and period ("Officers 2023", "Officers 2024", ...).
+      const periods = [...new Map(table.rows.map((r) => parsePeriod(r[periodCol] ?? "")).filter((p): p is NonNullable<typeof p> => !!p).map((p) => [p.label, p])).values()]
+        .sort((a, b) => a.key - b.key);
+      const key = (c: Column, p: string) => `${c.key}_${p.replace(/[^0-9A-Za-z]+/g, "")}`;
+      columns = valueCols.flatMap(([, c]) => periods.map((p) => ({ ...c, key: key(c, p.label), label: `${c.label} ${p.label}`, period: p.label, series: c.label })));
+      table.rows.forEach((r, i) => {
+        const p = parsePeriod(r[periodCol] ?? "");
+        const { values, suppressed } = read(r);
+        const code = finalCode(i);
+        if (!code || !p) {
+          if (matches[i].how !== "total" && (r[areaCol] ?? "").trim()) unmatched.push({ source_name: `${r[areaCol] ?? ""} (${r[periodCol] ?? ""})`, values });
+          return;
+        }
+        const row = byCode.get(code) ?? { code, source_name: r[areaCol] ?? "", values: {} };
+        for (const [, c] of valueCols) {
+          const k = key(c, p.label);
+          if (k in row.values) continue; // first row for an area and period wins
+          row.values[k] = values[c.key];
+          if (suppressed[c.key]) row.suppressed = { ...row.suppressed, [k]: suppressed[c.key] };
+        }
+        byCode.set(code, row);
+      });
+    }
+    // Several years: add the % change from the first to the last automatically.
+    const withChange = autoChanges({ columns, rows: [...byCode.values()] } as unknown as Dataset);
+    columns = withChange.columns;
+    const rows = withChange.rows;
     const nul = (s: string) => s.trim() || null;
     setBusy(true);
     setError(null);
@@ -235,6 +292,18 @@ export default function Upload({ ref_, department, onCancel, onSave }: Props) {
                 {table.headers.map((h, k) => <option key={k} value={k}>{h} (e.g. {table.rows[0]?.[k] || "blank"})</option>)}
               </select>
             </label>
+            <label className="foi-field">
+              <span>Does each row cover one year (or period)?</span>
+              <select value={periodCol ?? ""} onChange={(e) => { const k = e.target.value === "" ? null : Number(e.target.value); setPeriodCol(k); if (k !== null) { const c = { ...cols }; delete c[k]; setCols(c); } }}>
+                <option value="">No: one row per {GEOGRAPHY_LABEL[geography].toLowerCase()}</option>
+                {table.headers.map((h, k) => k === areaCol ? null : <option key={k} value={k}>Yes: the year is in “{h}”</option>)}
+              </select>
+            </label>
+            {(() => {
+              const years = periodCol !== null ? new Set(table.rows.map((r) => parsePeriod(r[periodCol] ?? "")?.label).filter(Boolean)).size
+                : new Set(Object.values(cols).map((c) => c.period).filter(Boolean)).size;
+              return years >= 2 ? <p className="tiny ok">{years} years found: the % change from the first to the last will be added and mapped automatically.</p> : null;
+            })()}
             <div className="foi-field"><span>Figures to keep</span></div>
             <div className="foi-cols">
               {table.headers.map((h, k) => k === areaCol ? null : (
@@ -242,7 +311,7 @@ export default function Upload({ ref_, department, onCancel, onSave }: Props) {
                   <label className="foi-col-pick">
                     <input type="checkbox" checked={!!cols[k]} onChange={(e) => {
                       const c = { ...cols };
-                      if (e.target.checked) c[k] = { key: `c${k}`, label: h, unit: guessUnit(h, table.rows.map((r) => r[k])), direction: "higher_worse" };
+                      if (e.target.checked) c[k] = makeColumn(k, h, table.rows.map((r) => r[k]));
                       else delete c[k];
                       setCols(c);
                     }} />

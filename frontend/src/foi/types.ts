@@ -44,6 +44,12 @@ export interface Column {
   /** "count" values can be shown per 100,000 residents on area geographies. */
   unit: "count" | "rate" | "percent" | "money" | "other";
   direction: Direction;
+  /** Year or period this column covers (e.g. "2023", "2023/24"), when the response gives several. */
+  period?: string;
+  /** The measure the period belongs to (e.g. "Officers"): columns with the same series and different periods form a time series. */
+  series?: string;
+  /** A change between two periods: shown with a sign (+/−). */
+  change?: { from: string; to: string; mode: "percent" | "absolute" };
 }
 
 export type Cell = number | null;
