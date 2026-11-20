@@ -12,6 +12,12 @@ def test_service_discovery_prefers_generalised_boundaries_and_latest_wards():
     assert "LSOA21_WD26_LAD26_EW_LU" in lsoa.find_ward_service(names)
 
 
+def test_boundary_service_found_under_its_new_short_name():
+    # ONS renamed the layer in 2026; the long name stopped matching and Neighbourhoods broke.
+    names = ["LSOA_2021_EW_BFE_V10_RUC", "LSOA_2021_EW_BSC_V4_RUC", "LSOA21_WD26_LAD26_EW_LU"]
+    assert lsoa.find_boundary_service(names).endswith("LSOA_2021_EW_BSC_V4_RUC/FeatureServer/0")
+
+
 def test_seat_file_values_percentiles_and_order():
     frames = {
         "private_rented": pd.DataFrame({"num": [10.0, 20.0, 30.0, 40.0], "den": [100.0, 100.0, 100.0, 100.0]},

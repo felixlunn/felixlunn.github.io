@@ -1,14 +1,6 @@
-"""Constituency analytics engine.
+"""Constituency analytics engine: the dataset model, ranks, and the peer groups the pipeline assigns.
 
-The same algorithms run in the browser (``frontend/src/lib/analytics.ts``) so
-that sliders and weights respond instantly; this Python implementation powers
-the pipeline (peer groups) and the optional REST API, and is the reference the
-TypeScript port is tested against.
-
-Everything is plain NumPy: with ~650 constituencies and ~60 metrics an exact
-nearest-neighbour search takes well under a millisecond, so approximate
-indexes (FAISS/Annoy) would add complexity without any speed benefit. They
-become worthwhile only for small-area data (e.g. 180k Output Areas).
+Plain NumPy: with ~650 constituencies everything here takes well under a millisecond.
 """
 
 from __future__ import annotations
@@ -80,78 +72,6 @@ def zscore(X: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     sd = np.nanstd(X, axis=0)
     sd = np.where(sd > 0, sd, 1.0)
     return (X - mu) / sd, mu, sd
-
-
-def _filter_mask(ds: Dataset, country: str | None, region: str | None) -> np.ndarray:
-    mask = np.ones(len(ds.seats), dtype=bool)
-    if country:
-        mask &= np.array([s.get("country") == country for s in ds.seats])
-    if region:
-        mask &= np.array([s.get("region") == region for s in ds.seats])
-    return mask
-
-
-def twins(ds: Dataset, code: str, metric_ids: list[str] | None = None, method: str = "euclidean",
-          top_n: int = 10, country: str | None = None, region: str | None = None) -> list[dict]:
-    """Constituencies most similar to ``code`` across standardised metrics.
-
-    ``euclidean`` compares levels (a seat with 40% renters matches others near 40%);
-    ``cosine`` compares the *shape* of the profile relative to the national mean.
-    Seats lacking any of the chosen metrics are skipped.
-    """
-    metric_ids = metric_ids or ds.default_profile_metrics()
-    X = ds.matrix(metric_ids)
-    complete = ~np.isnan(X).any(axis=1)
-    i = ds.index_of(code)
-    if not complete[i]:
-        raise ValueError(f"{code} lacks data for the selected metrics")
-    Z = np.full_like(X, np.nan)
-    Z[complete], _, _ = zscore(X[complete])
-    t = Z[i]
-    if method == "cosine":
-        norms = np.linalg.norm(Z, axis=1) * (np.linalg.norm(t) or 1.0)
-        score = (Z @ t) / np.where(norms > 0, norms, 1.0)
-        order = np.argsort(-np.nan_to_num(score, nan=-np.inf))
-    elif method == "euclidean":
-        dist = np.sqrt(np.nansum((Z - t) ** 2, axis=1) / len(metric_ids))
-        score = 1 / (1 + dist)  # 1 = identical
-        order = np.argsort(np.where(complete, dist, np.inf))
-    else:
-        raise ValueError("method must be 'cosine' or 'euclidean'")
-    mask = _filter_mask(ds, country, region) & complete
-    mask[i] = False
-    out = []
-    for j in order:
-        if mask[j]:
-            out.append({"code": ds.seats[j]["code"], "name": ds.seats[j]["name"], "similarity": round(float(score[j]), 4)})
-            if len(out) >= top_n:
-                break
-    return out
-
-
-def composite_index(ds: Dataset, weights: dict[str, float]) -> list[dict]:
-    """Weighted sum of z-scores, divided by total absolute weight. Negative weights invert a metric.
-
-    Seats missing any weighted metric get no score. Returns all seats ranked (1 = highest score).
-    """
-    weights = {k: float(v) for k, v in weights.items() if v}
-    if not weights:
-        raise ValueError("At least one non-zero weight is required")
-    ids = list(weights)
-    X = ds.matrix(ids)
-    complete = ~np.isnan(X).any(axis=1)
-    Z = np.full_like(X, np.nan)
-    Z[complete], _, _ = zscore(X[complete])
-    w = np.array([weights[k] for k in ids])
-    score = (Z @ w) / np.abs(w).sum()
-    order = np.argsort(-np.where(complete, score, -np.inf))
-    out, rank = [], 0
-    for j in order:
-        if not complete[j]:
-            continue
-        rank += 1
-        out.append({"code": ds.seats[j]["code"], "name": ds.seats[j]["name"], "score": round(float(score[j]), 4), "rank": rank})
-    return out
 
 
 def kmeans(Z: np.ndarray, k: int, seed: int = 7, iters: int = 100) -> tuple[np.ndarray, np.ndarray]:

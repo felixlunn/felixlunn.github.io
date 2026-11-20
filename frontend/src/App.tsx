@@ -1,12 +1,10 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import type { Choropleth, DashboardData, NeighbourhoodFile } from "./types";
-import { compositeIndex, profileMetrics, similarity, topN, type Scored } from "./lib/analytics";
 import { fmt, unitSuffix } from "./lib/format";
 import ThemesTab from "./components/ThemesTab";
-import TwinsTab, { type TwinSettings } from "./components/TwinsTab";
-import IndexTab, { PRESETS } from "./components/IndexTab";
 import Dossier from "./components/Dossier";
 import Legend from "./components/Legend";
+import Help from "./components/Help";
 import { PARTY_ID, partyChoropleth } from "./lib/parties";
 import DebatesTab from "./components/DebatesTab";
 import OfficePicker from "./components/OfficePicker";
@@ -19,13 +17,11 @@ import { debateMetrics } from "./lib/debates";
 
 const MapView = lazy(() => import("./components/MapView"));
 
-type Tab = "debates" | "neighbourhoods" | "themes" | "twins" | "index";
+type Tab = "debates" | "neighbourhoods" | "themes";
 const TABS: { id: Tab; label: string }[] = [
   { id: "debates", label: "Debates" },
   { id: "neighbourhoods", label: "Neighbourhoods" },
   { id: "themes", label: "Themes" },
-  { id: "twins", label: "Twins" },
-  { id: "index", label: "Index" },
 ];
 
 function readHash(): Record<string, string> {
@@ -124,12 +120,9 @@ export default function App({ data, geo }: { data: DashboardData; geo: GeoJSON.F
     };
   }, [nbActive, nbChoropleth, nbFile, nbMetric, nbColours]);
   const [showSources, setShowSources] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
   const [panelOpen, setPanelOpen] = useState(true);
 
-  const [twinSettings, setTwinSettings] = useState<TwinSettings>({ themes: ["people", "housing", "economy", "health", "education", "transport"], method: "euclidean", scope: "uk", n: 20 });
-  const [weights, setWeights] = useState<Record<string, number>>(() =>
-    Object.fromEntries(Object.entries(PRESETS[0].weights).filter(([k]) => metricIds.has(k))),
-  );
 
   // Keep the URL shareable: #seat=E14001063&metric=private_rented&tab=themes
   useEffect(() => {
@@ -153,41 +146,7 @@ export default function App({ data, geo }: { data: DashboardData; geo: GeoJSON.F
     setTab("themes");
   }, [data]);
 
-  // --- analytics for each tool (recomputed instantly; ~650 rows) ---
-  const twinIds = useMemo(() => profileMetrics(data.metrics, twinSettings.themes), [data, twinSettings.themes]);
-  const twinScores = useMemo(
-    () => (tab === "twins" && baseSeat !== null && twinIds.length ? similarity(data, baseSeat, twinIds, twinSettings.method) : null),
-    [tab, data, baseSeat, twinIds, twinSettings.method],
-  );
-  const twinResults: Scored[] = useMemo(() => {
-    if (!twinScores || baseSeat === null) return [];
-    const s = data.seats[baseSeat];
-    const filter = twinSettings.scope === "country" ? { country: s.country } : twinSettings.scope === "region" ? { region: s.region } : {};
-    return topN(data, twinScores, twinSettings.n, { exclude: baseSeat, filter });
-  }, [twinScores, data, baseSeat, twinSettings]);
-
-  const indexScores = useMemo(() => (tab === "index" ? compositeIndex(data, weights) : null), [tab, data, weights]);
-  const indexRanking = useMemo(() => (indexScores ? topN(data, indexScores, data.seats.length) : []), [indexScores, data]);
-
   const choropleth: Choropleth = useMemo(() => {
-    if (tab === "twins" && twinScores && baseSeat !== null) {
-      return {
-        title: `Similarity to ${data.seats[baseSeat].name}`,
-        subtitle: `${twinIds.length} metrics · ${twinSettings.method === "euclidean" ? "closest levels" : "same shape"}`,
-        values: twinScores, // the seat itself scores 100%
-        format: (v) => `${(v * 100).toFixed(0)}%`,
-        highlight: twinResults.slice(0, 10).map((r) => r.code),
-      };
-    }
-    if (tab === "index" && indexScores && indexRanking.length) {
-      return {
-        title: "Custom index",
-        subtitle: Object.keys(weights).map((k) => data.metrics.find((m) => m.id === k)?.label).filter(Boolean).join(", "),
-        values: indexScores,
-        format: (v) => `${v >= 0 ? "+" : ""}${v.toFixed(2)} SD`,
-        highlight: indexRanking.slice(0, 20).map((r) => r.code),
-      };
-    }
     if (tab === "neighbourhoods" && nbActive) {
       // Constituencies stay grey behind the seat's neighbourhoods.
       return { title: "", values: data.seats.map(() => null), format: String };
@@ -221,7 +180,7 @@ export default function App({ data, geo }: { data: DashboardData; geo: GeoJSON.F
       values: data.values[metric.id],
       format: (v) => fmt(metric, v),
     };
-  }, [tab, twinScores, twinResults, twinIds, twinSettings, baseSeat, indexScores, indexRanking, weights, metric, data, partyMode, partyMap, nbActive, activeDebate, debateMetricId, past, changeMode]);
+  }, [tab, baseSeat, metric, data, partyMode, partyMap, nbActive, activeDebate, debateMetricId, past, changeMode]);
 
   const generated = new Date(data.generated_at);
   const failed = data.sources.filter((s) => s.status === "failed");
@@ -241,6 +200,7 @@ export default function App({ data, geo }: { data: DashboardData; geo: GeoJSON.F
           Data updated {generated.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
           {failed.length > 0 && <span className="warn-dot" title={`${failed.length} source(s) failed to update`}> ⚠</span>}
         </button>
+        <button className="link small help-btn" onClick={() => setShowHelp(true)}>Help</button>
       </header>
 
       {data.demo && (
@@ -266,8 +226,6 @@ export default function App({ data, geo }: { data: DashboardData; geo: GeoJSON.F
               metricId={nbMetric?.id ?? null} setMetricId={setNbMetricId} />}
             {tab === "themes" && <ThemesTab data={data} theme={theme} setTheme={(t) => { setTheme(t); const first = t === "politics" ? PARTY_ID : data.metrics.find((m) => m.theme === t)?.id; if (first) setMetricId(first); }} metric={metric} partyMode={partyMode} parties={partyMap} setMetric={setMetricId} selected={baseSeat} onSelect={(i) => select(i)}
               history={past} changeMode={changeMode} setChangeMode={setChangeMode} />}
-            {tab === "twins" && <TwinsTab data={data} selected={baseSeat} settings={twinSettings} setSettings={setTwinSettings} results={twinResults} metricCount={twinIds.length} onSelect={(i) => select(i)} />}
-            {tab === "index" && <IndexTab data={data} weights={weights} setWeights={setWeights} ranking={indexRanking} selected={selected} onSelect={(i) => select(i)} />}
           </>
         )}
       </nav>
@@ -281,12 +239,13 @@ export default function App({ data, geo }: { data: DashboardData; geo: GeoJSON.F
       </main>
 
       {selected !== null && (
-        <Dossier data={data} index={selected} onClose={() => setSelected(null)} onSelect={(i) => select(i)} onShowMetric={showMetric}
+        <Dossier data={data} index={selected} onClose={() => setSelected(null)} onShowMetric={showMetric}
           onDebate={(id) => { setTab("debates"); setPanelOpen(true); if (id >= 0) openDebate(id); }}
           onNeighbourhoods={() => { setTab("neighbourhoods"); setPanelOpen(true); }}
           nbFile={nbFile?.seat === data.seats[selected].code ? nbFile : null} history={past} />
       )}
 
+      {showHelp && <Help onClose={() => setShowHelp(false)} />}
       {showSources && (
         <div className="modal-backdrop" onClick={() => setShowSources(false)}>
           <div className="modal" role="dialog" aria-modal="true" aria-labelledby="src-title" onClick={(e) => e.stopPropagation()}>

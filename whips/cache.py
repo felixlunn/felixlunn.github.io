@@ -31,6 +31,7 @@ MAX_AGE_DAYS = {
     "cqc": 6,           # monthly
     "sewage": 27,       # annual
     "rail": 27,         # annual
+    "scotland": 60,     # Scotland's Census 2022 (~170 MB download; published once)
 }
 STALE: dict[str, str] = {}  # source id -> why an older copy is being shown
 

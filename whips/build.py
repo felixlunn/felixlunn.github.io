@@ -51,6 +51,7 @@ from .sources import schools as schools_src
 from .sources import sewage as sewage_src
 from .sources import imd as imd_src
 from .sources import life_expectancy as life_src
+from .sources import scotland as scotland_src
 from .sources import fire as fire_src
 from .sources import police_workforce as police_workforce_src
 from .sources import heat_pumps as heat_pumps_src
@@ -86,7 +87,7 @@ log = logging.getLogger("whips.build")
 # Neighbourhood (LSOA) profiles are published for seats held by this party.
 NEIGHBOURHOOD_PARTY = re.compile(r"^(liberal democrats?|lib ?dems?|ld)$", re.I)
 
-SKIPPABLE = ["fire", "police_workforce", "heat_pumps", "green_space", "floods", "business_demography", "council_tax", "insolvency", "university", "ofsted", "pupils", "pharmacies", "public_health", "income", "asylum", "road_condition", "rents", "energy", "travel", "renewables", "air_pollution", "children", "vehicles", "buses", "cqc", "roads", "housing_stock", "child_poverty", "dental", "life_expectancy", "affordability", "homelessness", "ev", "sewage", "petitions", "questions", "rail", "courts", "fuel_poverty", "nhs", "schools", "epc", "imd", "neighbourhoods", "debates", "claimants", "aps", "ashe", "bres", "business", "popest", "police", "elections", "members", "lsoa"]
+SKIPPABLE = ["scotland", "fire", "police_workforce", "heat_pumps", "green_space", "floods", "business_demography", "council_tax", "insolvency", "university", "ofsted", "pupils", "pharmacies", "public_health", "income", "asylum", "road_condition", "rents", "energy", "travel", "renewables", "air_pollution", "children", "vehicles", "buses", "cqc", "roads", "housing_stock", "child_poverty", "dental", "life_expectancy", "affordability", "homelessness", "ev", "sewage", "petitions", "questions", "rail", "courts", "fuel_poverty", "nhs", "schools", "epc", "imd", "neighbourhoods", "debates", "claimants", "aps", "ashe", "bres", "business", "popest", "police", "elections", "members", "lsoa"]
 
 COUNTRY_BY_PREFIX = {"E": "England", "W": "Wales", "S": "Scotland", "N": "Northern Ireland"}
 
@@ -176,7 +177,22 @@ def build(out_dir: Path, skip: set[str] | None = None) -> dict:
            + (f"; {len(prov['aggregated_from_lsoa'])} summed from LSOAs (ONS best-fit)" if prov.get("aggregated_from_lsoa") else "")
            + (f"; unavailable: {', '.join(sorted(prov['failed']))}" if prov["failed"] else ""), "March 2021")
     log.info("Census: %d metrics (%.0fs)", len(census), time.time() - t0)
-    population = census["population"]["num"]
+    # Scotland's Census 2022 (NRS) fills the Scottish seats for the census figures defined the same way.
+    if "scotland" not in skip:
+        try:
+            t0 = time.time()
+            scot, period = cached("scotland", lambda: scotland_src.load_scotland(s, geo))
+            for mid, f in scot.items():
+                if mid in frames:
+                    base = frames[mid]
+                    frames[mid] = pd.concat([base[~base.index.isin(f.index)], f])
+            record("scotland", "Scotland's Census 2022 (National Records of Scotland)", scotland_src.SOURCE_URL, "ok",
+                   f"{len(scot)} census figures for Scottish seats, summed from output areas", period)
+            log.info("Scotland census: %d figures (%.0fs)", len(scot), time.time() - t0)
+        except Exception as exc:  # noqa: BLE001 - optional source
+            log.exception("Scotland's Census failed")
+            record("scotland", "Scotland's Census 2022 (National Records of Scotland)", scotland_src.SOURCE_URL, "failed", str(exc)[:300])
+    population = frames["population"]["num"]
 
     # 3. Optional sources
     imd_deciles = None

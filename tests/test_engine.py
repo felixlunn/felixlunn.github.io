@@ -23,29 +23,6 @@ def test_rank_handles_missing_and_ties():
     assert ds.rank("x", "E")["rank"] is None
 
 
-@pytest.mark.parametrize("method", ["euclidean", "cosine"])
-def test_twins_finds_nearest(method):
-    ds = tiny()
-    out = engine.twins(ds, "A", method=method, top_n=2)
-    assert out[0]["code"] == "B"
-    assert all(o["code"] not in ("A", "E") for o in out)  # self and incomplete excluded
-
-
-def test_twins_region_filter():
-    out = engine.twins(tiny(), "A", region="South", top_n=5)
-    assert {o["code"] for o in out} == {"C", "D"}
-
-
-def test_composite_index_signs():
-    ds = tiny()
-    up = engine.composite_index(ds, {"x": 1})
-    assert up[0]["code"] == "D" and up[0]["rank"] == 1
-    down = engine.composite_index(ds, {"x": -1})
-    assert down[0]["code"] == "A"
-    with pytest.raises(ValueError):
-        engine.composite_index(ds, {"x": 0})
-
-
 def test_kmeans_separates_clusters():
     Z = np.vstack([np.random.default_rng(1).normal(0, 0.1, (20, 2)), np.random.default_rng(2).normal(5, 0.1, (20, 2))])
     labels, _ = engine.kmeans(Z, 2)
@@ -77,9 +54,5 @@ def test_api(demo, monkeypatch):
     api.dataset.cache_clear()
     c = TestClient(api.app)
     assert c.get("/api/v1/constituencies/DEMO-001").json()["metrics"]["private_rented"]["of"] > 0
-    tw = c.get("/api/v1/twins/DEMO-001?top_n=5").json()
-    assert len(tw) == 5
-    idx = c.post("/api/v1/index", json={"private_rented": 0.5, "level4_plus": 0.5}).json()
-    assert idx[0]["rank"] == 1
     assert c.get("/api/v1/constituencies/NOPE").status_code == 404
     api.dataset.cache_clear()
