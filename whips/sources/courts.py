@@ -28,7 +28,7 @@ from ..http import get_json
 from ..metrics import MetricMeta
 from .boundaries import ARCGIS_ROOT
 from .councils import arcgis_rows, column
-from .lsoa import _services, find_ward_service
+from .lsoa import WARD_PATTERN, _services, find_ward_service
 
 log = logging.getLogger(__name__)
 
@@ -109,7 +109,7 @@ def open_by_area(df: pd.DataFrame) -> tuple[pd.DataFrame, str]:
 
 def seat_areas(s: requests.Session, lsoa_to_pcon: dict[str, str]) -> dict[str, str]:
     """Seat code -> police force area key: the area most of its LSOAs fall in (LSOA -> council -> police force area)."""
-    names = _services(s)
+    names = _services(s, WARD_PATTERN, PFA_PATTERN)
     ward = find_ward_service(names)
     pfa_svc = sorted(((int(PFA_PATTERN.match(n).group(1)), n) for n in names if PFA_PATTERN.match(n)), reverse=True)
     if not pfa_svc:

@@ -19,7 +19,7 @@ import requests
 
 from ..http import get_json
 from .boundaries import ARCGIS_ROOT
-from .lsoa import _services, find_ward_service
+from .lsoa import WARD_PATTERN, _services, find_ward_service
 
 
 def arcgis_rows(s: requests.Session, layer: str) -> list[dict]:
@@ -42,7 +42,7 @@ def column(row: dict, pattern: str):
 
 def lsoa_to_lad(s: requests.Session) -> dict[str, str]:
     """LSOA (2021) -> council code, from the latest ONS LSOA-to-ward-to-council lookup."""
-    layer = find_ward_service(_services(s))
+    layer = find_ward_service(_services(s, WARD_PATTERN))
     return {r["LSOA21CD"]: column(r, r"LAD\d{2}CD") for r in arcgis_rows(s, layer) if r.get("LSOA21CD")}
 
 
@@ -77,7 +77,7 @@ def lad_to_county(s: requests.Session) -> dict[str, str]:
     """District code -> county code (non-metropolitan E10 and metropolitan E11), from the latest ONS lookup.
 
     Unitary councils and London boroughs are not in it."""
-    names = [n for n in _services(s) if COUNTY_PATTERN.match(n)]
+    names = [n for n in _services(s, COUNTY_PATTERN) if COUNTY_PATTERN.match(n)]
     if not names:
         raise LookupError("No district to county lookup found on the ONS portal")
     latest = max(names, key=lambda n: (int(COUNTY_PATTERN.match(n).group(1)), n))

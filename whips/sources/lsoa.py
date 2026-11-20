@@ -22,7 +22,7 @@ import requests
 from shapely.geometry import mapping, shape
 
 from ..http import get_json
-from .boundaries import ARCGIS_ROOT, _round_coords
+from .boundaries import ARCGIS_ROOT, _round_coords, portal_services
 
 log = logging.getLogger(__name__)
 
@@ -33,9 +33,9 @@ WARD_PATTERN = re.compile(r"^LSOA21_WD(\d{2})_LAD(\d{2})_EW_LU", re.I)
 BATCH = 150  # LSOA codes per ArcGIS "IN (...)" query
 
 
-def _services(s: requests.Session) -> list[str]:
-    data = get_json(s, ARCGIS_ROOT, params={"f": "json"})
-    return [svc["name"] for svc in data.get("services", []) if svc.get("type") == "FeatureServer"]
+def _services(s: requests.Session, *wanted: re.Pattern) -> list[str]:
+    """The ONS portal's feature services, listed until each ``wanted`` pattern is found (see portal_services)."""
+    return portal_services(s, *wanted)
 
 
 # Boundary versions, most preferred first. ONS has withdrawn the clipped full (BFC) and 20m generalised (BGC) LSOA
@@ -167,7 +167,7 @@ def write_seat_files(s: requests.Session, out_dir: Path, seats: dict[str, str], 
     if not by_seat:
         raise ValueError("None of the chosen seats has LSOAs in England & Wales")
     wanted = sorted(c for cs in by_seat.values() for c in cs)
-    names = _services(s)
+    names = _services(s, BOUNDARY_PATTERN, WARD_PATTERN)
     wards = load_wards(s, find_ward_service(names), wanted)
     detail, coast = find_boundary_services(names)
     log.info("Neighbourhood boundaries: %s%s", detail, f" trimmed to the coast with {coast}" if coast else "")

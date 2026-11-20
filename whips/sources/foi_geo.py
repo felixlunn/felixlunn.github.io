@@ -218,7 +218,7 @@ def assemble(geo: dict, seats: list[dict], population: dict[str, float], police:
 
 def load_foi_reference(s: requests.Session, geo: dict, seats: list[dict], population: dict[str, float], as_of: str) -> tuple[dict, dict, list[str]]:
     """Fetch every layer. Courts and trusts are each optional: a failure leaves them out and is reported."""
-    names = _services(s)
+    names = _services(s, *(p for p, _, _ in LAYERS.values()))
     police = load_layer(s, names, "police")
     police += [nation_area(geo, "S", "S23000009", "Police Scotland"), nation_area(geo, "N", "N23000001", "Police Service of Northern Ireland")]
     health = load_layer(s, names, "icb") + load_layer(s, names, "lhb")
