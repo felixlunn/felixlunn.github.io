@@ -29,6 +29,10 @@ def lost_data(new: dict, old: dict, drop: float = 0.2) -> list[str]:
     return out
 
 
+def overdue_sources(data: dict) -> list[dict]:
+    return [s for s in data.get("sources", []) if s.get("overdue") and s.get("status") == "ok"]
+
+
 def markdown(failed: list[dict]) -> str:
     return "\n".join(f"- **{s['name']}** (`{s['id']}`): {s.get('detail') or 'no detail'}" for s in failed)
 
@@ -37,6 +41,12 @@ def main(argv: list[str] | None = None) -> None:
     args = argv if argv is not None else sys.argv[1:]
     new = json.loads(Path(args[0]).read_text())
     lines = [markdown(failed_sources(new))]
+    late = overdue_sources(new)
+    if late:
+        lines.append("Not updated for longer than usual (the publisher may be late, or may have moved or renamed the release "
+                     "so the newest one isn't being found; check the source link):\n"
+                     + "\n".join(f"- **{s['name']}** (`{s['id']}`): still {s.get('as_of')}, unchanged since {s.get('since')} "
+                                  f"[source]({s.get('url')})" for s in late))
     if len(args) > 1 and Path(args[1]).exists():
         try:
             lost = lost_data(new, json.loads(Path(args[1]).read_text()))

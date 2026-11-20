@@ -1,6 +1,7 @@
 """Keep slow, slowly-changing sources between runs so each refresh only re-downloads what may have changed.
 
-Set ``WHIPS_SOURCE_CACHE`` to a folder to turn this on (the deploy workflow does). A source listed in
+Set ``WHIPS_SOURCE_CACHE`` to a folder to turn this on (the deploy workflow does, except on its weekly full
+refresh, which re-downloads everything). A source listed in
 ``MAX_AGE_DAYS`` is reused until it is that many days old; any change to the pipeline code discards every
 saved copy, so a new figure or a fix is never hidden by old data. If a source fails to update and an
 older copy exists, the older copy is used and the failure is noted in ``STALE`` (shown as a failed update).
@@ -20,17 +21,17 @@ log = logging.getLogger(__name__)
 # How long each source's last successful download is reused. Sources not listed are fetched on every run.
 MAX_AGE_DAYS = {
     "police": 6,        # ~10 minutes to fetch; police.uk adds a month of data monthly
-    "epc": 13,          # ~5 minutes; millions of certificates, updated monthly
-    "nhs": 13,          # ~2 minutes; QOF is annual, prescribing monthly
+    "epc": 6,           # ~5 minutes; millions of certificates, updated monthly
+    "nhs": 6,           # ~2 minutes; QOF is annual, prescribing monthly
     "travel": 60,       # ~2 minutes; DfT's latest edition is 2019
-    "energy": 27,       # annual
-    "vehicles": 13,     # quarterly, two large files
-    "roads": 13,        # annual, large file
+    "energy": 13,       # annual
+    "vehicles": 6,      # quarterly, two large files
+    "roads": 6,         # annual, large file
     "green_space": 60,  # 2020 edition
     "university": 60,   # 2021 release
     "cqc": 6,           # monthly
-    "sewage": 27,       # annual
-    "rail": 27,         # annual
+    "sewage": 13,       # annual
+    "rail": 13,         # annual
     "scotland": 60,     # Scotland's Census 2022 (~170 MB download; published once)
 }
 STALE: dict[str, str] = {}  # source id -> why an older copy is being shown

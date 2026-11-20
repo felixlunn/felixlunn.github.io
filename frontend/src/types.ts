@@ -52,6 +52,10 @@ export interface Source {
   status: "ok" | "failed";
   detail: string;
   as_of: string | null;
+  /** Date this period was first seen: how long the figures have gone unchanged. */
+  since?: string;
+  /** Unchanged for longer than the publisher's usual cycle: may have missed a newer release. */
+  overdue?: boolean;
 }
 
 export interface DashboardData {

@@ -26,7 +26,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from . import engine
+from . import engine, freshness
 from .cache import STALE, cached
 from .history import assemble_history
 from .http import session
@@ -566,6 +566,7 @@ def build(out_dir: Path, skip: set[str] | None = None) -> dict:
         except Exception as exc:  # noqa: BLE001
             log.exception("FOI reference failed")
             record("foi", "FOI reference: police force areas, courts and tribunals, NHS trusts and areas", foi_src.SOURCE_URL, "failed", str(exc)[:300])
+    freshness.stamp(sources, freshness.load_previous())
     return finish(out_dir, geo, seats, metrics, values, sources, demo=False, debates=debates, neighbourhoods=neighbourhoods,
                   petitions=petitions, history=history, councils=councils)
 
