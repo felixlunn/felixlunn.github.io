@@ -217,7 +217,7 @@ export default function App({ data, geo }: { data: DashboardData; geo: GeoJSON.F
               {t.label}
             </button>
           ))}
-          <button className="icon panel-toggle" aria-label={panelOpen ? "Collapse panel" : "Expand panel"} onClick={() => setPanelOpen((o) => !o)}>{panelOpen ? "‹" : "›"}</button>
+          <button className="icon panel-toggle" aria-label="Hide panel" title="Hide panel" onClick={() => setPanelOpen(false)}>‹</button>
         </div>
         {panelOpen && (
           <>
@@ -232,6 +232,11 @@ export default function App({ data, geo }: { data: DashboardData; geo: GeoJSON.F
       </nav>
 
       <main className="main">
+        {!panelOpen && (
+          <button className="panel-open" onClick={() => setPanelOpen(true)} aria-label="Show panel" title="Show panel">
+            <span aria-hidden="true">›</span> Show panel
+          </button>
+        )}
         <Suspense fallback={<div className="map-loading">Loading map…</div>}>
           <MapView geo={geo} seats={data.seats} choropleth={choropleth} selected={selected !== null ? data.seats[selected].code : null} mine={mySeat !== null ? data.seats[mySeat].code : null} overlay={overlay}
             focus={focus} onSelect={(code) => { const i = codeIndex.get(code); if (i !== undefined) select(i, false); }} />
