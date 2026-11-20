@@ -169,4 +169,20 @@ def build_demo(out_dir: Path, n: int = 650, seed: int = 42) -> dict:
     ]
     debates = parse_events([{"Id": k, "StartDate": day(d), "StartTime": t, "Type": v, "Category": c, "Description": title,
                              "Members": m} for k, (d, t, v, c, title, m) in enumerate(fake)])
-    return finish(out_dir, geo, seats, metrics, values, sources, demo=True, debates=debates, history=history)
+    # Synthetic councils: a unitary or district (plus a county for some), with random control.
+    parties5 = ["Liberal Democrat", "Labour", "Conservative", "Reform UK", "Green Party"]
+    councils = {}
+    for i, sc in enumerate(seats):
+        if sc["country"] == "Northern Ireland":
+            continue
+        n = int(rng.integers(30, 70))
+        split = rng.dirichlet(np.ones(5)) * n
+        counts = {p: int(c) for p, c in sorted(zip(parties5, split), key=lambda x: -x[1]) if int(c)}
+        top, top_n = next(iter(counts.items()))
+        council = {"name": f"Demo council {i // 3 + 1:03d}", "code": f"DEMO-C{i // 3:03d}", "tier": "council", "share": 1.0,
+                   "control": top if top_n * 2 > sum(counts.values()) else "No overall control", "largest": top,
+                   "largest_seats": top_n, "seats": sum(counts.values()), "parties": counts, "next_election": "2027-05-06"}
+        councils[sc["code"]] = [council] + ([{**council, "name": f"Demo county {i // 9 + 1:03d}", "code": f"DEMO-K{i // 9:03d}",
+                                              "tier": "county", "next_election": "2029-05-03"}] if i % 2 else [])
+    return finish(out_dir, geo, seats, metrics, values, sources, demo=True, debates=debates, history=history,
+                  councils={"year": 2026, "by_seat": councils})

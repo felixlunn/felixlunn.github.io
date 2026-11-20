@@ -397,3 +397,9 @@ select, input { font: inherit; color: var(--text-1); background: var(--surface-1
 .help-steps { padding-left: 1.2rem; }
 .help-steps li, .help ul li { margin: .3rem 0; }
 .help h3 { margin: .8rem 0 .2rem; font-size: 1rem; }
+
+/* Local councils */
+.councils { list-style: none; padding: 0; margin: .3rem 0; }
+.councils li { padding: .35rem 0; border-bottom: 1px solid var(--border); }
+.council-head { display: flex; justify-content: space-between; align-items: baseline; gap: .5rem; }
+.council-name { font-weight: 600; font-size: 14px; }
