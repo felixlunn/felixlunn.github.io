@@ -80,13 +80,13 @@ All data are open, refreshed automatically **every two days** by GitHub Actions,
 | [Boiler Upgrade Scheme statistics](https://www.gov.uk/government/collections/boiler-upgrade-scheme-statistics) | Heat pump grants paid since May 2022 per 10,000 households, by constituency | England & Wales | Monthly |
 | [Home Office police workforce](https://www.gov.uk/government/collections/police-workforce-england-and-wales) | Police officers (FTE) per 100,000 people in the seat's police force area | England & Wales | Twice yearly |
 | [Home Office fire statistics](https://www.gov.uk/government/statistical-data-sets/fire-statistics-data-tables) (FIRE1001) | Average response times to dwelling fires and all primary fires, by fire and rescue authority, averaged across seats | England | Quarterly |
+| [Scotland's Census 2022](https://www.scotlandscensus.gov.uk/) (National Records of Scotland) | 72 census figures for Scottish seats (age, ethnicity, religion, tenure, housing, heating, cars, health, care, work, commuting, households), summed from output areas | Scotland | Once (2022) |
 
 Every figure on the dashboard has an (i) link to its publisher's page for the dataset (`SOURCE_LINKS` in `whips/metrics.py`; a test fails if a metric's source has no link).
 
 Where a source publishes earlier years, the build also keeps up to 12 past periods per figure in `history.json` (loaded only when needed). The app shows the change since the previous period next to each figure, a trend line with the national figure, a quotable sentence, a "What's changed" list in each seat briefing, and a map of change. Councils created since 2019 take their predecessors' figures for earlier years (`SUCCESSORS` in `whips/history.py`).
 
-Census 2021 covers England and Wales only (Scotland's census was 2022 and Northern Ireland's is published by
-NISRA), so census metrics show "No data" for Scottish and Northern Irish seats. Wherever a metric is a ratio,
+Census 2021 covers England and Wales; Scottish seats use Scotland's Census 2022 for the 72 figures defined the same way, and Northern Irish seats show "No data" for census metrics. Wherever a metric is a ratio,
 the national figure is the true combined rate (total numerator / total denominator), not an average of seat
 averages.
 

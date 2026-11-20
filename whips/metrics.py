@@ -315,13 +315,29 @@ ELECTION_METRICS = [
 ]
 
 
+# Census figures that also have Scottish values (Scotland's Census 2022, see whips/sources/scotland.py).
+SCOTLAND_NOTE = " Scottish seats: Scotland's Census 2022 (National Records of Scotland), March 2022."
+SCOTLAND_CENSUS = {
+    "population", "age_0_14", "age_20_34", "age_35_49", "age_50_64", "age_65_plus", "age_80_plus", "female", "ethnic_minority",
+    "eth_asian", "eth_indian", "eth_pakistani", "eth_bangladeshi", "eth_black", "eth_mixed", "eth_white_other",
+    "religion_christian", "religion_muslim", "religion_none", "religion_hindu", "religion_sikh", "religion_jewish",
+    "english_not_main", "owner_occupied", "owned_outright", "mortgage", "shared_ownership", "private_rented", "social_rented",
+    "overcrowded", "under_occupied", "flats", "detached", "semi_detached", "terraced", "caravan", "no_central_heating",
+    "heat_gas", "heat_oil", "heat_electric", "no_car", "cars_2plus", "bad_health", "very_good_health", "disabled",
+    "disabled_a_lot", "unpaid_carers", "carers_50h", "no_qualifications", "apprenticeship", "retired", "inactive_sick",
+    "looking_after_home", "unemployed", "in_employment", "nssec_professional", "nssec_routine", "nssec_self_employed",
+    "students", "work_from_home", "commute_car", "commute_public", "commute_active", "commute_train", "commute_bus",
+    "commute_cycle", "commute_30km_plus", "commute_under_2km", "hh_one_person", "hh_alone_66", "hh_pensioner", "hh_large",
+}
+
+
 def census_meta(m: CensusMetric) -> MetricMeta:
     return MetricMeta(
         id=m.id,
         label=m.label,
         theme=m.theme,
         unit=m.unit,
-        description=m.description,
+        description=m.description + (SCOTLAND_NOTE if m.id in SCOTLAND_CENSUS else ""),
         source=f"Census 2021 {m.table} (ONS via Nomis)",
         polarity=m.polarity,
         decimals=0 if m.is_count else 1,
