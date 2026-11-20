@@ -36,6 +36,7 @@ from .metrics import (
 )
 from .sources import boundaries as bsrc
 from .sources import courts as courts_src
+from .sources import foi_geo as foi_src
 from .sources import debates as debates_src
 from .sources import epc as epc_src
 from .sources import ev as ev_src
@@ -88,7 +89,7 @@ log = logging.getLogger("whips.build")
 # Neighbourhood (LSOA) profiles are published for seats held by this party.
 NEIGHBOURHOOD_PARTY = re.compile(r"^(liberal democrats?|lib ?dems?|ld)$", re.I)
 
-SKIPPABLE = ["council_control", "scotland", "fire", "police_workforce", "heat_pumps", "green_space", "floods", "business_demography", "council_tax", "insolvency", "university", "ofsted", "pupils", "pharmacies", "public_health", "income", "asylum", "road_condition", "rents", "energy", "travel", "renewables", "air_pollution", "children", "vehicles", "buses", "cqc", "roads", "housing_stock", "child_poverty", "dental", "life_expectancy", "affordability", "homelessness", "ev", "sewage", "petitions", "questions", "rail", "courts", "fuel_poverty", "nhs", "schools", "epc", "imd", "neighbourhoods", "debates", "claimants", "aps", "ashe", "bres", "business", "popest", "police", "elections", "members", "lsoa"]
+SKIPPABLE = ["foi", "council_control", "scotland", "fire", "police_workforce", "heat_pumps", "green_space", "floods", "business_demography", "council_tax", "insolvency", "university", "ofsted", "pupils", "pharmacies", "public_health", "income", "asylum", "road_condition", "rents", "energy", "travel", "renewables", "air_pollution", "children", "vehicles", "buses", "cqc", "roads", "housing_stock", "child_poverty", "dental", "life_expectancy", "affordability", "homelessness", "ev", "sewage", "petitions", "questions", "rail", "courts", "fuel_poverty", "nhs", "schools", "epc", "imd", "neighbourhoods", "debates", "claimants", "aps", "ashe", "bres", "business", "popest", "police", "elections", "members", "lsoa"]
 
 COUNTRY_BY_PREFIX = {"E": "England", "W": "Wales", "S": "Scotland", "N": "Northern Ireland"}
 
@@ -550,6 +551,21 @@ def build(out_dir: Path, skip: set[str] | None = None) -> dict:
         except Exception as exc:  # noqa: BLE001
             log.exception("What's On calendar failed")
             record("debates", "Upcoming Commons debates (UK Parliament What's On)", debates_src.SOURCE_URL, "failed", str(exc))
+    # Reference geographies for the password-protected FOI research section (police forces, courts, NHS bodies).
+    if "foi" not in skip:
+        try:
+            t0 = time.time()
+            ref, areas, problems = foi_src.load_foi_reference(s, geo, seats, population.to_dict(),
+                                                              datetime.now(timezone.utc).date().isoformat())
+            foi_src.write_foi(out_dir, ref, areas)
+            record("foi", "FOI reference: police force areas, courts and tribunals, NHS trusts and areas", foi_src.SOURCE_URL,
+                   "failed" if problems else "ok",
+                   "; ".join(problems) or f"{len(ref['layers']['police']['areas'])} forces, {len(ref['layers']['health']['areas'])} NHS areas, "
+                   f"{len(ref['points'].get('courts', []))} courts, {len(ref['points'].get('trusts', []))} trusts")
+            log.info("FOI reference (%.0fs)", time.time() - t0)
+        except Exception as exc:  # noqa: BLE001
+            log.exception("FOI reference failed")
+            record("foi", "FOI reference: police force areas, courts and tribunals, NHS trusts and areas", foi_src.SOURCE_URL, "failed", str(exc)[:300])
     return finish(out_dir, geo, seats, metrics, values, sources, demo=False, debates=debates, neighbourhoods=neighbourhoods,
                   petitions=petitions, history=history, councils=councils)
 

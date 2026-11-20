@@ -167,6 +167,60 @@ cd frontend && npm test
 The site will be at `https://<owner>.github.io/<repo>/`. Generated data are published with the site and kept
 as a 30-day workflow artifact; they are not committed, so the git history stays small.
 
+### FOI research section
+
+`foi.html` (linked as **FOI research** in the dashboard header) is a login-only area for FOI research. The team
+uploads FOI responses (CSV or Excel). Each response is matched to police force areas, courts and tribunals, NHS trusts
+or NHS areas, then mapped and ranked. Choosing a seat shows the force, courts or trusts that serve it. It has three tabs:
+**Policing** (by force), **Justice** (by court, or by criminal justice area, which follows police force areas) and
+**Health** (by trust, or by ICB / Welsh health board).
+
+- **Public reference data:** the boundaries and organisation lists it matches against are public. The pipeline writes
+  them to `data/foi/` (step `foi`).
+- **Private uploads:** the uploads themselves are private. They live in a [Supabase](https://supabase.com) project,
+  protected by its logins and row-level security:
+  - Only people on the team list can read or add data.
+  - Only the uploader or an admin can delete a dataset.
+  - Original files are kept in a private bucket.
+
+GitHub Pages only serves public files, so a password on the page alone could not protect anything. The protection is
+in the database.
+
+One-off setup (about 15 minutes, free tier):
+
+1. **Create the project:** create a Supabase project. Choose a UK or EU region, such as London (eu-west-2).
+2. **Create the tables:** open **SQL Editor → New query**, paste `supabase/schema.sql` and click **Run**.
+3. **Lock down sign-in.** Under **Authentication → Sign In / Providers**:
+   - Turn off **Allow new users to sign up**, so only invited people get accounts.
+   - Keep **Email** enabled.
+4. **Set the return address.** Under **Authentication → URL Configuration**, set **Site URL** to
+   `https://<owner>.github.io/<repo>/foi.html` and add the same address under **Redirect URLs**. This is the page
+   people land on from invite and password-reset emails.
+5. **Add your team.** For each person:
+   - In **Authentication → Users → Invite user**, enter their email. They get a link to choose a password.
+   - Add them to the team list in **SQL Editor**:
+     ```sql
+     insert into foi_members (email, name, role) values ('name@example.org', 'Their Name', 'admin');  -- or 'member'
+     ```
+   - To remove someone: `delete from foi_members where email = '...';`. This takes effect immediately.
+6. **Connect the site.** In **Project Settings → API**, copy the **Project URL** and the **anon public** key.
+   - In GitHub, go to **Settings → Secrets and variables → Actions → Variables**.
+   - Add them as repository *variables* named `SUPABASE_URL` and `SUPABASE_ANON_KEY`. The anon key is designed to
+     be public; row-level security does the protecting. Never put the `service_role` key anywhere in the site.
+   - Re-run the deploy.
+
+Locally, `npm run dev` opens `/foi.html` in demo mode: any login works and uploads stay in that browser. To use the
+real database, put the two values in `frontend/.env.local` as `VITE_SUPABASE_URL=...` and `VITE_SUPABASE_ANON_KEY=...`.
+
+**Upload format:** one row per force, court, trust or NHS area, with its name (or ONS / ODS code) in one column and
+figures in the others.
+- Title lines above the header and total rows are skipped.
+- Common name variants are recognised, e.g. "Avon & Somerset Constabulary" or "Newcastle upon Tyne Hospitals NHS FT".
+- Close matches and unmatched rows are shown for checking before anything is saved.
+- Withheld figures such as `<5` or `*` are kept as withheld, never as zero.
+- Count columns on force or NHS-area datasets can be shown per 100,000 residents. Residents are estimated from the
+  seats each area covers.
+
 ### Optional REST API
 
 ```bash
