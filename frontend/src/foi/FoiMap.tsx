@@ -116,11 +116,13 @@ export default function FoiMap({ shapes, items, reverse, selected, highlight, fl
         return { ...f, properties: { ...f.properties, c: colour(it?.value ?? null), ...flags(code) } };
       }),
     } : EMPTY;
-    const pts: GeoJSON.FeatureCollection = shapes ? EMPTY : {
+    // Places drawn as shapes aren't also drawn as dots; the rest (e.g. trusts without a catchment) are.
+    const shaped = new Set((shapes?.features ?? []).map((f) => String(f.properties?.code)));
+    const pts: GeoJSON.FeatureCollection = {
       type: "FeatureCollection",
       // Points with values draw on top of those without.
       features: [...items].sort((a, b) => Number(a.value !== null) - Number(b.value !== null) || Number(highlight.has(a.code)) - Number(highlight.has(b.code)))
-        .filter((i) => i.lat !== undefined)
+        .filter((i) => i.lat !== undefined && !shaped.has(i.code))
         .map((i) => ({ type: "Feature", properties: { code: i.code, c: colour(i.value), v: i.value === null ? 0 : 1, ...flags(i.code) },
           geometry: { type: "Point", coordinates: [i.lon!, i.lat!] } })),
     };

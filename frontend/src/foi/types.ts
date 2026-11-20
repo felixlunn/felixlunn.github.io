@@ -14,7 +14,11 @@ export interface RefArea {
 }
 
 export interface RefCourt { id: string; name: string; types: string[]; lat: number; lon: number; codes: string[]; area: string | null; seat: string | null }
-export interface RefTrust { code: string; name: string; kind: string; postcode: string; lat: number; lon: number; area: string | null; seat: string | null }
+export interface RefTrust {
+  code: string; name: string; kind: string; postcode: string; lat: number; lon: number; area: string | null; seat: string | null;
+  /** Acute trusts: seats in the trust's official catchment (OHID), with the share of each seat covered. */
+  catchment?: [string, number][];
+}
 
 export interface Reference {
   version: number;

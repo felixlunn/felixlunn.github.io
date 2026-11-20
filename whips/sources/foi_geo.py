@@ -17,6 +17,7 @@ from __future__ import annotations
 import logging
 import re
 
+import pandas as pd
 import requests
 from shapely.geometry import mapping, shape
 from shapely.ops import unary_union
@@ -24,7 +25,8 @@ from shapely.ops import unary_union
 from ..geo import SeatLocator
 from ..http import get_json
 from .boundaries import ARCGIS_ROOT, _round_coords
-from .lsoa import _services
+from ..ods import read_ods
+from .lsoa import _services, layer_url
 
 log = logging.getLogger(__name__)
 
@@ -34,6 +36,13 @@ COURTS_PAGE = "https://www.find-court-tribunal.service.gov.uk/"
 ODS_URL = "https://directory.spineservices.nhs.uk/ORD/2-0-0/organisations"
 ODS_PAGE = "https://digital.nhs.uk/services/organisation-data-service"
 POSTCODES = "https://api.postcodes.io/postcodes"
+GOVUK_SEARCH = "https://www.gov.uk/api/search.json"
+GOVUK_CONTENT = "https://www.gov.uk/api/content"
+CATCHMENT_PREFIX = "/government/statistics/nhs-acute-hospital-trust-catchment-populations"
+CATCHMENT_PAGE = "https://www.gov.uk/government/collections/nhs-acute-hospital-trust-catchment-populations"
+MSOA_PATTERN = re.compile(r"^(?:MSOA_2021_EW|Middle_layer_Super_Output_Areas_\(December_2021\)_Boundaries_EW)_(BSC|BGC|BFC|BFE)", re.I)
+MSOA_PREFERENCE = {"BSC": 0, "BGC": 1, "BFC": 2, "BFE": 3}  # trust catchments are large: the coarsest layer is plenty
+LAND_SIMPLIFY = 0.004
 
 RES_ORDER = {"BUC": 0, "BSC": 1, "BGC": 2}
 LAYERS = {
@@ -171,6 +180,73 @@ def load_trusts(s: requests.Session) -> list[dict]:
     return out
 
 
+def find_catchment_file(s: requests.Session) -> tuple[str, str]:
+    """(data tables .ods URL, title) of OHID's latest NHS acute trust catchment populations release."""
+    res = get_json(s, GOVUK_SEARCH, params={"q": "NHS acute hospital trust catchment populations", "count": 20}).get("results", [])
+    pages = sorted((r for r in res if str(r.get("link", "")).startswith(CATCHMENT_PREFIX)),
+                   key=lambda r: r.get("public_timestamp", ""), reverse=True)
+    for r in pages[:3]:
+        for a in get_json(s, GOVUK_CONTENT + r["link"]).get("details", {}).get("attachments", []):
+            if str(a.get("url", "")).endswith(".ods") and "data table" in str(a.get("title", "")).lower():
+                return a["url"], r.get("title", "")
+    raise LookupError("No NHS acute trust catchment data tables found on GOV.UK")
+
+
+def parse_fptp(sheet: pd.DataFrame) -> pd.DataFrame:
+    """Trust code, name and MSOA for each MSOA's main trust ("first past the post"), latest catchment year."""
+    head = next(i for i in range(min(20, len(sheet))) if (sheet.iloc[i].astype(str).str.strip() == "MSOA21CD").any())
+    t = sheet.iloc[head + 1:].copy()
+    t.columns = [re.sub(r"\s+", " ", str(c)).strip().lower() for c in sheet.iloc[head]]
+    col = lambda *w: next(c for c in t.columns if all(x in c for x in w))  # noqa: E731
+    year, fptp = col("catchment", "year"), col("first past")
+    t = t[t[fptp].astype(str).str.strip().str.upper() == "TRUE"]
+    t = t[t[year].astype(str) == max(t[year].astype(str))]
+    return pd.DataFrame({"code": t[col("trust", "code")].astype(str).str.strip(), "name": t[col("trust", "name")].astype(str).str.strip(),
+                         "msoa": t["msoa21cd"].astype(str).str.strip()}).drop_duplicates("msoa")
+
+
+def load_msoa_shapes(s: requests.Session, names: list[str]) -> dict:
+    hits = sorted((MSOA_PREFERENCE[m.group(1).upper()], n) for n in names if (m := MSOA_PATTERN.match(n)))
+    if not hits:
+        raise LookupError("No MSOA 2021 boundary service found on the ONS portal")
+    layer = layer_url(s, hits[0][1])
+    out, offset = {}, 0
+    while True:
+        data = get_json(s, f"{layer}/query", params={"where": "MSOA21CD LIKE 'E%'", "outFields": "MSOA21CD", "outSR": "4326",
+                                                     "f": "geojson", "resultOffset": offset, "resultRecordCount": 2000}, timeout=180)
+        batch = data.get("features", [])
+        for f in batch:
+            code = (f.get("properties") or {}).get("MSOA21CD")
+            if code and f.get("geometry"):
+                out[code] = shape(f["geometry"]).buffer(0)
+        if not batch or not (data.get("exceededTransferLimit") or data.get("properties", {}).get("exceededTransferLimit")):
+            return out
+        offset += len(batch)
+
+
+def catchment_areas(fptp: pd.DataFrame, msoas: dict) -> list[dict]:
+    """One shape per trust: the MSOAs whose residents mostly use it, merged."""
+    out = []
+    for (code, name), g in fptp.groupby(["code", "name"]):
+        parts = [msoas[m] for m in g["msoa"] if m in msoas]
+        if parts:
+            out.append({"code": code, "name": name, "geometry": unary_union(parts).buffer(0.0005).buffer(-0.0005)})
+    return out
+
+
+def load_catchments(s: requests.Session, names: list[str]) -> tuple[list[dict], str]:
+    url, title = find_catchment_file(s)
+    r = s.get(url, timeout=300)
+    r.raise_for_status()
+    sheets = read_ods(r.content, only={"All_admissions"})
+    fptp = parse_fptp(next(iter(sheets.values())))
+    areas = catchment_areas(fptp, load_msoa_shapes(s, names))
+    if len(areas) < 80:
+        raise ValueError(f"Expected ~120 trust catchments, got {len(areas)}")
+    log.info("Trust catchments: %d (%s)", len(areas), title)
+    return areas, title
+
+
 def area_of_points(points: list[dict], areas: list[dict]) -> None:
     """Tag each point with the area (police force / NHS area) it falls in."""
     from shapely.geometry import Point
@@ -189,7 +265,8 @@ def to_feature(a: dict, layer: str) -> dict:
 
 
 def assemble(geo: dict, seats: list[dict], population: dict[str, float], police: list[dict], health: list[dict],
-             courts: list[dict] | None, trusts: list[dict] | None, as_of: str) -> tuple[dict, dict]:
+             courts: list[dict] | None, trusts: list[dict] | None, as_of: str,
+             catchments: list[dict] | None = None) -> tuple[dict, dict]:
     """(reference JSON, areas GeoJSON) from loaded layers. Pure apart from geometry work: used by the demo too."""
     locator = SeatLocator(geo)
     layers, features = {}, []
@@ -208,9 +285,23 @@ def assemble(geo: dict, seats: list[dict], population: dict[str, float], police:
         points["courts"] = sorted(courts, key=lambda c: c["name"])
     if trusts is not None:
         area_of_points(trusts, health)
+        known = {t["code"] for t in trusts}
+        drawn = [c for c in (catchments or []) if c["code"] in known]
+        links = seat_overlaps(drawn, geo)
         for t in trusts:
             t["seat"] = locator.seat(t["lon"], t["lat"])
+            if t["code"] in links:  # official catchment: the seats whose residents mostly use the trust
+                t["catchment"] = links[t["code"]]
         points["trusts"] = sorted(trusts, key=lambda t: t["name"])
+        features += [to_feature(c, "trust") for c in drawn]
+    # The land of each jurisdiction (England & Wales, Scotland, Northern Ireland), for clipping approximate court
+    # areas to the coast in the browser without letting a court in one jurisdiction cover another.
+    nation = lambda c: c[0] if c[:1] in ("S", "N") else "EW"  # noqa: E731 - England, Wales (and demo seats)
+    for code in ("EW", "S", "N"):
+        parts = [shape(f["geometry"]).buffer(0) for f in geo["features"] if nation(f["properties"]["code"]) == code]
+        if parts:
+            land = unary_union(parts).buffer(0.002).simplify(LAND_SIMPLIFY, preserve_topology=True)
+            features.append(to_feature({"code": code, "name": code, "geometry": land}, "land"))
     ref = {"version": 1, "as_of": as_of, "layers": layers, "points": points,
            "seats": [{"code": st["code"], "name": st["name"], "mp": st.get("mp"), "party": st.get("party")} for st in seats]}
     return ref, {"type": "FeatureCollection", "features": features}
@@ -234,7 +325,13 @@ def load_foi_reference(s: requests.Session, geo: dict, seats: list[dict], popula
     except Exception as exc:
         log.exception("NHS trusts list failed")
         problems.append(f"NHS trusts: {exc}"[:200])
-    ref, areas = assemble(geo, seats, population, police, health, courts, trusts, as_of)
+    catchments = None
+    try:
+        catchments, _ = load_catchments(s, _services(s, MSOA_PATTERN))
+    except Exception as exc:  # noqa: BLE001
+        log.exception("Trust catchments failed")
+        problems.append(f"trust catchments: {exc}"[:200])
+    ref, areas = assemble(geo, seats, population, police, health, courts, trusts, as_of, catchments)
     return ref, areas, problems
 
 
@@ -274,4 +371,10 @@ def demo_reference(geo: dict, seats: list[dict], population: dict[str, float], r
     trusts = [{"code": f"DT{i:03d}", "name": f"Demo {('Hospitals', 'Hospitals', 'Partnership', 'Ambulance Service')[i % 4]} NHS Trust {i:03d}",
                "postcode": "", "kind": kinds[i % 4], "lat": round(c.y, 5), "lon": round(c.x, 5)}
               for i, c in enumerate(pick(90))]
-    return assemble(geo, seats, population, police, health, courts, trusts, "demo")
+    acute = [t for t in trusts if t["kind"] == "Acute & specialist"]
+    nearest: dict[str, list] = {}
+    for (code, c), f in zip(cent, feats):
+        t = min(acute, key=lambda t: (t["lon"] - c.x) ** 2 + (t["lat"] - c.y) ** 2)
+        nearest.setdefault(t["code"], []).append(shape(f["geometry"]).buffer(0.001))
+    catchments = [{"code": k, "name": k, "geometry": unary_union(v)} for k, v in nearest.items()]
+    return assemble(geo, seats, population, police, health, courts, trusts, "demo", catchments)

@@ -147,3 +147,5 @@
 .foi-drop.over { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, var(--surface-2)); }
 .foi-drop input[type=file] { font-size: 12px; max-width: 100%; }
 .foi-paste textarea { width: 100%; margin-top: 6px; padding: 7px 9px; border: 1px solid var(--border); border-radius: 7px; background: var(--surface-1); color: inherit; font: 12px ui-monospace, monospace; }
+.foi-map-note { position: absolute; top: 10px; left: 10px; right: 56px; z-index: 3; background: color-mix(in srgb, var(--surface-1) 92%, transparent);
+  border: 1px solid var(--border); border-radius: 8px; padding: 6px 9px; color: var(--text-2); max-width: 520px; }
