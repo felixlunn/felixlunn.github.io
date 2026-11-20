@@ -89,7 +89,11 @@ drop policy if exists "owners and admins delete datasets" on public.foi_datasets
 create policy "owners and admins delete datasets" on public.foi_datasets for delete to authenticated
   using (public.is_foi_member() and (created_by = auth.uid() or public.is_foi_admin()));
 
--- Nobody signed out can touch anything.
+-- Signed-in users can reach the tables (newer projects don't grant this automatically); the row-level
+-- security policies above then decide what each person may see or change. Nobody signed out can touch anything.
+grant usage on schema public to authenticated;
+grant select, insert, update, delete on public.foi_members, public.foi_datasets to authenticated;
+grant execute on function public.is_foi_member(), public.is_foi_admin() to authenticated;
 revoke all on public.foi_members, public.foi_datasets from anon;
 
 -- Private bucket for the original files (CSV / Excel) as received.
