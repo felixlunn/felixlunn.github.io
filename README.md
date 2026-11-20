@@ -175,7 +175,7 @@ or NHS areas, then mapped and ranked. Choosing a seat shows the force, courts or
 **Policing** (by force), **Justice** (by court, or by criminal justice area, which follows police force areas) and
 **Health** (by trust, or by ICB / Welsh health board).
 
-- **Public reference data:** the boundaries and organisation lists it matches against are public. The pipeline writes
+- **Public reference data:** the boundaries and organisation lists it matches against are public. They include OHID's acute trust catchment areas (each neighbourhood is assigned to the trust most of its residents are admitted to). Courts have no published catchments, so each court in a response is drawn over the land nearest to it among the courts in that response, marked as approximate. The pipeline writes
   them to `data/foi/` (step `foi`).
 - **Private uploads:** the uploads themselves are private. They live in a [Supabase](https://supabase.com) project,
   protected by its logins and row-level security:

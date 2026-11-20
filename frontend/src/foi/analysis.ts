@@ -76,12 +76,18 @@ export function forSeat(ref: Reference, g: Geography, seat: string): { code: str
     });
   }
   const pts = points(ref, g);
+  // Acute trusts: their official catchment says which seats they serve.
+  const fromCatchment = g === "nhs_trust" ? (ref.points.trusts ?? []).flatMap((t) => {
+    const hit = t.catchment?.find(([s]) => s === seat);
+    return hit ? [{ code: t.code, why: hit[1] >= 0.97 ? "its catchment covers the whole seat" : `its catchment covers ${Math.round(hit[1] * 100)}% of the seat` }] : [];
+  }) : [];
+  const done = new Set(fromCatchment.map((x) => x.code));
   const areaLayer = g === "court" ? ref.layers.police.areas : ref.layers.health.areas;
   const seatAreas = new Set(areaLayer.filter((a) => a.seats.some(([s]) => s === seat)).map((a) => a.code));
   const areaName = new Map(areaLayer.map((a) => [a.code, a.name]));
-  return pts.filter((p) => p.seat === seat || (p.area && seatAreas.has(p.area)))
+  return [...fromCatchment, ...pts.filter((p) => !done.has(p.code) && (p.seat === seat || (p.area && seatAreas.has(p.area))))
     .sort((a, b) => Number(b.seat === seat) - Number(a.seat === seat))
-    .map((p) => ({ code: p.code, why: p.seat === seat ? "in the seat" : `elsewhere in ${areaName.get(p.area!) ?? "the same area"}` }));
+    .map((p) => ({ code: p.code, why: p.seat === seat ? "head office in the seat" : `elsewhere in ${areaName.get(p.area!) ?? "the same area"}` }))];
 }
 
 export function fmtValue(v: number | null, col: Column | undefined, perHead = false): string {

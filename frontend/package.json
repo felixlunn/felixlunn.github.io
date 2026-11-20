@@ -12,12 +12,15 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.119.2",
+    "d3-delaunay": "^6.0.4",
     "maplibre-gl": "^4.7.1",
+    "polygon-clipping": "^0.15.7",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
   },
   "devDependencies": {
+    "@types/d3-delaunay": "^6.0.4",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
     "@vitejs/plugin-react": "^4.3.4",

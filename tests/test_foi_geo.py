@@ -43,7 +43,7 @@ def test_assemble_links_areas_and_points_to_seats():
     assert west["population"] == 200  # all of E1 and half of S1
     assert ref["points"]["courts"][0] | {"area": "P1", "seat": "E1"} == ref["points"]["courts"][0]
     assert ref["points"]["trusts"][0]["seat"] == "E2" and ref["points"]["trusts"][0]["area"] == "H1"
-    assert {ft["properties"]["layer"] for ft in areas["features"]} == {"police", "health"}
+    assert {ft["properties"]["layer"] for ft in areas["features"]} == {"police", "health", "land"}
 
 
 def test_demo_reference_is_complete():
@@ -55,4 +55,25 @@ def test_demo_reference_is_complete():
     ref, areas = f.demo_reference(geo, seats, {s["code"]: 1000 for s in seats}, np.random.default_rng(0))
     assert ref["layers"]["police"]["areas"] and ref["layers"]["health"]["areas"]
     assert all(c["seat"] for c in ref["points"]["courts"])
-    assert len(areas["features"]) == len(ref["layers"]["police"]["areas"]) + len(ref["layers"]["health"]["areas"])
+    layers = [ft["properties"]["layer"] for ft in areas["features"]]
+    assert layers.count("police") == len(ref["layers"]["police"]["areas"]) and layers.count("land") >= 1
+    with_catchment = [t for t in ref["points"]["trusts"] if t.get("catchment")]
+    assert with_catchment and layers.count("trust") == len(with_catchment)
+
+
+def test_catchments_from_first_past_the_post_rows():
+    import pandas as pd
+    sheet = pd.DataFrame([
+        ["Table 2: Patients admitted by MSOA", None, None, None, None, None],
+        ["Catchment\nyear", "Trust\ncode", "Trust\nname", "MSOA21CD", "Patients\nadmitted", "First past\nthe post (FPTP)"],
+        ["2023", "RA1", "Old Trust", "E02000001", "500", "TRUE"],
+        ["2024", "RA1", "West Trust", "E02000001", "400", "TRUE"],
+        ["2024", "RB2", "East Trust", "E02000001", "100", "FALSE"],
+        ["2024", "RB2", "East Trust", "E02000002", "300", "TRUE"],
+        ["2024", "RB2", "East Trust", "E02000003", "300", "TRUE"],
+    ])
+    fptp = f.parse_fptp(sheet)
+    assert sorted(map(tuple, fptp.values.tolist())) == [("RA1", "West Trust", "E02000001"), ("RB2", "East Trust", "E02000002"), ("RB2", "East Trust", "E02000003")]
+    shapes = {"E02000001": box(0, 0, 1, 1), "E02000002": box(1, 0, 2, 1), "E02000003": box(2, 0, 3, 1)}
+    areas = {a["code"]: a for a in f.catchment_areas(fptp, shapes)}
+    assert abs(areas["RB2"]["geometry"].area - 2) < 1e-6 and areas["RA1"]["geometry"].bounds == (0, 0, 1, 1)

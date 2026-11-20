@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { calculate, canPerHead, fmtValue, forSeat, overallRate, points, ranked, summary, type Op } from "./analysis";
 import { outlier, vsMedian } from "./stats";
+import { jurisdictionOf, nearestAreas } from "./cells";
 import type { Backend, User } from "./backend";
 import FoiMap, { type MapItem } from "./FoiMap";
 import { targets } from "./match";
@@ -234,13 +235,29 @@ function DatasetView({ d: saved, ref_, shapes, seat, backend, canEdit, onDeleted
   const seatLinks = useMemo(() => (seat ? forSeat(ref_, d.geography, seat) : []), [ref_, d.geography, seat]);
   const highlight = useMemo(() => new Set(seatLinks.map((l) => l.code)), [seatLinks]);
   const layer = d.geography === "police_force" || d.geography === "court" ? "police" : "health";
-  const layerShapes = useMemo(() => (IS_AREA[d.geography] ? { ...shapes, features: shapes.features.filter((f) => f.properties?.layer === layer) } : null), [shapes, d.geography, layer]);
+  // What to shade: official boundaries (forces, NHS areas), official trust catchments, or approximate court areas.
+  const layerShapes = useMemo((): GeoJSON.FeatureCollection | null => {
+    const of = (l: string) => ({ ...shapes, features: shapes.features.filter((f) => f.properties?.layer === l) });
+    if (IS_AREA[d.geography]) return of(layer);
+    if (d.geography === "nhs_trust") return of("trust");
+    const lands = Object.fromEntries(of("land").features.map((f) => [String(f.properties?.code), f.geometry]));
+    const inResponse = (ref_.points.courts ?? []).filter((c) => rowByCode.has(c.id))
+      .map((c) => ({ code: c.id, lon: c.lon, lat: c.lat, jurisdiction: jurisdictionOf(c.area) }));
+    return nearestAreas(inResponse, lands);
+  }, [shapes, d.geography, layer, ref_, rowByCode]);
+  const mapNote = d.geography === "court"
+    ? "Court areas are approximate: HMCTS doesn't publish catchments, so each court covers the land nearest to it among the courts in this response."
+    : d.geography === "nhs_trust"
+      ? "Shaded areas are each acute trust's catchment (OHID: where most local residents are admitted). Trusts without one (mental health, community, ambulance) are dots."
+      : null;
 
   const unit = ph ? " per 100,000 residents" : "";
   const items: MapItem[] = useMemo(() => {
     const val = new Map(rows.map((r) => [r.target.code, r]));
     const base = IS_AREA[d.geography] ? [...tByCode.values()].map((t) => ({ code: t.code, name: t.name, sub: undefined as string | undefined, lat: undefined as number | undefined, lon: undefined as number | undefined }))
-      : points(ref_, d.geography).map((p) => ({ code: p.code, name: p.name, sub: p.sub, lat: p.lat, lon: p.lon }));
+      // Courts and trusts: only those in the response (others would clutter the shaded areas as empty dots).
+      : points(ref_, d.geography).filter((p) => rowByCode.has(p.code) || d.geography === "nhs_trust" && !!ref_.points.trusts?.find((t) => t.code === p.code)?.catchment)
+        .map((p) => ({ code: p.code, name: p.name, sub: p.sub, lat: p.lat, lon: p.lon }));
     return base.map((b) => {
       const r = val.get(b.code);
       const o = r ? outlier(r.value, stats) : null;
@@ -248,7 +265,7 @@ function DatasetView({ d: saved, ref_, shapes, seat, backend, canEdit, onDeleted
         : `${fmtValue(r.value, col, ph)}${unit}${r.rank ? ` · ${r.rank} of ${stats.n}` : ""}${o ? ` · unusually ${o}` : ""}`;
       return { ...b, value: r?.value ?? null, label };
     });
-  }, [rows, tByCode, ref_, d.geography, col, ph, unit, stats]);
+  }, [rows, tByCode, ref_, d.geography, col, ph, unit, stats, rowByCode]);
   const notIn = useMemo(() => [...tByCode.values()].filter((t) => !rowByCode.has(t.code)), [tByCode, rowByCode]);
 
   const seatName = seat ? ref_.seats.find((s) => s.code === seat)?.name : null;
@@ -277,6 +294,7 @@ function DatasetView({ d: saved, ref_, shapes, seat, backend, canEdit, onDeleted
   return (
     <div className="foi-main">
       <div className="foi-map-wrap">
+        {mapNote && <div className="foi-map-note tiny">{mapNote}</div>}
         <FoiMap shapes={layerShapes} items={items} reverse={col?.direction === "higher_better"} selected={selected} highlight={highlight} flagged={flaggedSet} onSelect={setSelected} />
       </div>
       <section className="foi-detail">
