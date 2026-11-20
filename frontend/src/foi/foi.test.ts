@@ -68,3 +68,12 @@ describe("Matcher", () => {
     expect(t.match("Nottingham University Hospitals").code).toBe("RX1");
   });
 });
+
+describe("projectUrl", () => {
+  it("keeps only the project address", async () => {
+    const { projectUrl } = await import("./backend");
+    expect(projectUrl("https://abc.supabase.co/rest/v1/")).toBe("https://abc.supabase.co");
+    expect(projectUrl(" https://abc.supabase.co ")).toBe("https://abc.supabase.co");
+    expect(projectUrl("")).toBeUndefined();
+  });
+});
