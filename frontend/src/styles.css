@@ -403,3 +403,15 @@ select, input { font: inherit; color: var(--text-1); background: var(--surface-1
 .councils li { padding: .35rem 0; border-bottom: 1px solid var(--border); }
 .council-head { display: flex; justify-content: space-between; align-items: baseline; gap: .5rem; }
 .council-name { font-weight: 600; font-size: 14px; }
+
+/* Debates: the seat's local figures lead every card */
+.local-figs { margin: 4px 0 8px; padding: 6px 8px; background: var(--surface-2); border-radius: 8px; }
+.local-figs ul { list-style: none; margin: 2px 0 0; padding: 0; }
+.local-figs li { display: grid; grid-template-columns: auto 1fr; column-gap: 8px; padding: 3px 0; }
+.local-figs .lf-value { grid-row: span 2; font-size: 17px; font-weight: 700; font-variant-numeric: tabular-nums; min-width: 3.6em; color: var(--text-1); }
+.local-figs .lf-label { font-size: 12.5px; font-weight: 600; color: var(--text-1); }
+.local-figs .lf-rank { font-size: 11.5px; color: var(--text-2); }
+.local-figs li.stand .lf-value, .local-figs li.stand .lf-rank { color: var(--accent); }
+.local-seat { font-weight: 600; color: var(--text-2); text-transform: uppercase; letter-spacing: .03em; }
+.lead-flag { color: var(--accent); text-transform: none; letter-spacing: 0; }
+.debate-meta .party, .debate-meta .topic { opacity: .85; }

@@ -220,7 +220,7 @@ export default function App({ data, geo }: { data: DashboardData; geo: GeoJSON.F
         </div>
         {panelOpen && (
           <>
-            {tab === "debates" && <DebatesTab data={data} mySeat={mySeat} active={debateId} setActive={openDebate}
+            {tab === "debates" && <DebatesTab data={data} mySeat={mySeat ?? selected} history={past} active={debateId} setActive={openDebate}
               mapMetric={debateMetricId} setMapMetric={setDebateMetricId} onSelect={(i) => select(i)} />}
             {tab === "neighbourhoods" && <NeighbourhoodsTab data={data} seat={baseSeat} file={nbFile?.seat === nbSeatCode ? nbFile : null} status={nbStatus}
               metricId={nbMetric?.id ?? null} setMetricId={setNbMetricId} />}
