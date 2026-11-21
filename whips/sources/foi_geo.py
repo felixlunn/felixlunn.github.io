@@ -302,8 +302,12 @@ def assemble(geo: dict, seats: list[dict], population: dict[str, float], police:
         if parts:
             land = unary_union(parts).buffer(0.002).simplify(LAND_SIMPLIFY, preserve_topology=True)
             features.append(to_feature({"code": code, "name": code, "geometry": land}, "land"))
+    # Each seat's centre: lets the browser tell which court in a response is nearest to a seat.
+    centre = {f["properties"]["code"]: shape(f["geometry"]).representative_point() for f in geo["features"]}
     ref = {"version": 1, "as_of": as_of, "layers": layers, "points": points,
-           "seats": [{"code": st["code"], "name": st["name"], "mp": st.get("mp"), "party": st.get("party")} for st in seats]}
+           "seats": [{"code": st["code"], "name": st["name"], "mp": st.get("mp"), "party": st.get("party"),
+                      **({"lon": round(centre[st["code"]].x, 4), "lat": round(centre[st["code"]].y, 4)} if st["code"] in centre else {})}
+                     for st in seats]}
     return ref, {"type": "FeatureCollection", "features": features}
 
 
