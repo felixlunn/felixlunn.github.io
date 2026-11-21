@@ -140,5 +140,8 @@ describe("periods", () => {
     expect(y[views[0].change.key]).toBeNull(); // no 2024 figure
     expect(y[views[0].average.key]).toBe(15); // average of the years it has
     expect(withYearViews({ ...(d as object), columns: [(d as { columns: never[] }).columns[3]] } as never).views).toHaveLength(0);
+    // Uploaded before years were tagged: recognised from the column names.
+    const old = { ...(d as object), columns: (d as { columns: { period?: string; series?: string }[] }).columns.map(({ period: _p, series: _s, ...c }) => c) } as never;
+    expect(withYearViews(old).views[0].years.map((y) => y.period)).toEqual(["2022", "2023", "2024"]);
   });
 });
