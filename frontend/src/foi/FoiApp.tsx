@@ -1,14 +1,16 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { campaignLine, canPerHead, fmtValue, forSeat, inScope, ldOf, libDemServed, mainServer, overallRate, points, ranked, summary, type LdScope, type Ranked } from "./analysis";
+import { campaignLine, canPerHead, displayName, fmtValue, forSeat, inScope, ldOf, libDemServed, mainServer, overallRate, points, ranked, summary, type LdScope, type Ranked } from "./analysis";
 import { outlier, vsMedian } from "./stats";
-import { jurisdictionOf, nearestAreas } from "./cells";
+import { MAP_NOTE, mapShapes } from "./shapes";
+import OrgView, { OrgSidebar } from "./OrgView";
+import { headline, MODE_LABEL, ORG_KINDS, type Headline } from "./orgs";
 import { withYearViews, type YearView } from "./periods";
 import type { Backend, User } from "./backend";
 import FoiMap, { type MapItem } from "./FoiMap";
 import { targets } from "./match";
 import Upload from "./Upload";
 import { csv, download, slug } from "../lib/format";
-import { DEPARTMENTS, GEOGRAPHY_LABEL, IS_AREA, type Column, type Dataset, type Department, type NewDataset, type Reference, type Target } from "./types";
+import { DEPARTMENTS, GEOGRAPHY_LABEL, IS_AREA, type Column, type Dataset, type Department, type Geography, type NewDataset, type Reference, type Target } from "./types";
 
 const PLURAL: Record<Dataset["geography"], string> = { police_force: "police force areas", court: "courts and tribunals", nhs_trust: "NHS trusts", health_area: "NHS areas" };
 
@@ -113,6 +115,13 @@ function Workspace({ backend, user, admin, ref_, shapes }: { backend: Backend; u
   const [activeId, setActiveId] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [seat, setSeat] = useState<string>(() => { try { return localStorage.getItem("foi.seat") ?? ""; } catch { return ""; } });
+  // Two ways in: one dataset at a time, or one organisation (trust / ICB / force / court) across every dataset.
+  const [mode, setMode] = useState<"datasets" | "orgs">(() => { try { return localStorage.getItem("foi.mode") === "orgs" ? "orgs" : "datasets"; } catch { return "datasets"; } });
+  useEffect(() => { try { localStorage.setItem("foi.mode", mode); } catch { /* per visit */ } }, [mode]);
+  const [orgKind, setOrgKind] = useState<Geography>(ORG_KINDS[dept][0]);
+  const [orgCode, setOrgCode] = useState<string | null>(null);
+  useEffect(() => { setOrgKind(ORG_KINDS[dept][0]); setOrgCode(null); }, [dept]);
+  const heads = useMemo(() => (datasets ?? []).map((d) => headline(ref_, d)).filter((h): h is Headline => h !== null), [datasets, ref_]);
 
   const reload = useCallback(() => {
     setDatasets(null);
@@ -161,8 +170,15 @@ function Workspace({ backend, user, admin, ref_, shapes }: { backend: Backend; u
             <p className="small muted">{info.blurb}</p>
             <button className="btn primary block" onClick={() => setUploading(true)}>Upload an FOI response</button>
             {error && <p className="small bad">Couldn't load datasets: {error}</p>}
-            <h3 className="foi-h">{info.label} datasets</h3>
-            {datasets === null ? <p className="small muted">Loading…</p> : !datasets.length ? (
+            <div className="seg foi-mode" role="tablist" aria-label="View by">
+              <button role="tab" aria-selected={mode === "datasets"} className={mode === "datasets" ? "on" : ""} onClick={() => setMode("datasets")}><strong>By dataset</strong></button>
+              <button role="tab" aria-selected={mode === "orgs"} className={mode === "orgs" ? "on" : ""} onClick={() => setMode("orgs")}>
+                <strong>{MODE_LABEL[dept]}</strong>
+              </button>
+            </div>
+            {mode === "orgs" ? (
+              <OrgSidebar ref_={ref_} heads={heads} dept={dept} kind={orgKind} setKind={setOrgKind} code={orgCode} setCode={setOrgCode} />
+            ) : datasets === null ? <p className="small muted">Loading…</p> : !datasets.length ? (
               <p className="small muted">None yet. Upload the first FOI response for {info.label.toLowerCase()}.</p>
             ) : (
               <ul className="foi-list">
@@ -178,7 +194,10 @@ function Workspace({ backend, user, admin, ref_, shapes }: { backend: Backend; u
             )}
           </div>
         </aside>
-        {active ? (
+        {mode === "orgs" ? (
+          <OrgView ref_={ref_} shapes={shapes} heads={heads} kind={orgKind} code={orgCode} setCode={setOrgCode}
+            setKindAndCode={(g, c) => { setOrgKind(g); setOrgCode(c); }} onOpenDataset={(id) => { setActiveId(id); setMode("datasets"); }} />
+        ) : active ? (
           <DatasetView key={active.id} d={active} ref_={ref_} shapes={shapes} seat={seat || null} backend={backend} onPickSeat={setSeat}
             canEdit={admin || active.created_by === user.id} onDeleted={reload} />
         ) : (
@@ -277,20 +296,8 @@ function DatasetView({ d: saved, ref_, shapes, seat, backend, canEdit, onDeleted
   const highlight = useMemo(() => new Set(seatLinks.map((l) => l.code)), [seatLinks]);
   const layer = d.geography === "police_force" || d.geography === "court" ? "police" : "health";
   // What to shade: official boundaries (forces, NHS areas), official trust catchments, or approximate court areas.
-  const layerShapes = useMemo((): GeoJSON.FeatureCollection | null => {
-    const of = (l: string) => ({ ...shapes, features: shapes.features.filter((f) => f.properties?.layer === l) });
-    if (IS_AREA[d.geography]) return of(layer);
-    if (d.geography === "nhs_trust") return of("trust");
-    const lands = Object.fromEntries(of("land").features.map((f) => [String(f.properties?.code), f.geometry]));
-    const inResponse = (ref_.points.courts ?? []).filter((c) => rowByCode.has(c.id))
-      .map((c) => ({ code: c.id, lon: c.lon, lat: c.lat, jurisdiction: jurisdictionOf(c.area) }));
-    return nearestAreas(inResponse, lands);
-  }, [shapes, d.geography, layer, ref_, rowByCode]);
-  const mapNote = d.geography === "court"
-    ? "Court areas are approximate: HMCTS doesn't publish catchments, so each court covers the land nearest to it among the courts in this response."
-    : d.geography === "nhs_trust"
-      ? "Shaded areas are each acute trust's catchment (OHID: where most local residents are admitted). Trusts without one (mental health, community, ambulance) are dots."
-      : null;
+  const layerShapes = useMemo(() => mapShapes(ref_, shapes, d.geography, new Set(rowByCode.keys())), [ref_, shapes, d.geography, rowByCode]);
+  const mapNote = MAP_NOTE[d.geography] ?? null;
 
   const unit = ph ? " per 100,000 residents" : "";
   const items: MapItem[] = useMemo(() => {
@@ -646,8 +653,7 @@ function LibDemPanel({ ref_, d, col, rows, stats, ph, view, scope, setScope, plu
     const srv = servers.get(s.code);
     const r = srv ? byCode.get(srv.code) : undefined;
     const raw = srv ? names.get(srv.code)?.name ?? srv.code : null;
-    // Forces read better with "Police": "Kent Police", not "Kent" (Police Scotland, PSNI and the Met already have it).
-    const server = raw && d.geography === "police_force" && !/police/i.test(raw) ? `${raw} Police` : raw;
+    const server = raw && displayName(d.geography, raw);
     return {
       seat: s, srv, r, server,
       line: server ? campaignLine({ seat: s.name, server, measure, col, value: r?.value ?? null, suppressed: r?.suppressed, values, median: stats.median, plural, perHead: ph }) : null,

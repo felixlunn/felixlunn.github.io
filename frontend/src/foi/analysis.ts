@@ -192,21 +192,28 @@ const ORD = (n: number) => `${n}${n % 100 >= 11 && n % 100 <= 13 ? "th" : ["th",
 
 /** A sentence a campaign can use, e.g. "In Bath, Avon and Somerset's stop and search rose 12% from 2021/22 to 2024/25: a bigger rise than 30 of 43 police force areas (median +4%)." */
 export function campaignLine(o: {
-  seat: string; server: string; measure: string; col: Column; value: number | null; suppressed?: string;
+  /** Leave out for a line about the organisation itself ("Kent Police's stop and search rose…"). */
+  seat?: string; server: string; measure: string; col: Column; value: number | null; suppressed?: string;
   values: number[]; median: number | null; plural: string; perHead?: boolean;
 }): string {
   const { seat, server, col, value, values, plural } = o;
+  const lead = seat ? `In ${seat}, ${server}` : server;
   const measure = o.measure.charAt(0).toLowerCase() + o.measure.slice(1);
   const f = (v: number) => fmtValue(v, col, o.perHead);
-  if (value === null) return o.suppressed ? `In ${seat}, ${server} withheld its figure for ${measure} (${o.suppressed}).` : `In ${seat}, ${server} gave no figure for ${measure}.`;
+  if (value === null) return o.suppressed ? `${lead} withheld its figure for ${measure} (${o.suppressed}).` : `${lead} gave no figure for ${measure}.`;
   if (col.change) {
     const lower = values.filter((v) => v < value).length, higher = values.filter((v) => v > value).length;
     const moved = value > 0 ? `rose ${f(value).replace(/^\+/, "")}` : value < 0 ? `fell ${f(-value).replace(/^\+/, "")}` : "was unchanged";
     const cmp = value > 0 ? `a bigger rise than ${lower} of ${values.length} ${plural}` : value < 0 ? `a bigger fall than ${higher} of ${values.length} ${plural}` : `while the median moved ${f(o.median ?? 0)}`;
-    return `In ${seat}, ${server}'s ${measure} ${moved} from ${col.change.from} to ${col.change.to}: ${cmp}${o.median !== null && value !== 0 ? ` (median ${f(o.median)})` : ""}.`;
+    return `${lead}'s ${measure} ${moved} from ${col.change.from} to ${col.change.to}: ${cmp}${o.median !== null && value !== 0 ? ` (median ${f(o.median)})` : ""}.`;
   }
   const rank = values.filter((v) => v > value).length + 1;
   const pos = rank <= Math.ceil(values.length / 2) ? `the ${ORD(rank)} highest of ${values.length} ${plural}` : `the ${ORD(values.length - rank + 1)} lowest of ${values.length} ${plural}`;
   const unit = o.perHead ? " per 100,000 residents" : "";
-  return `In ${seat}, ${server}'s ${measure} was ${f(value)}${unit}: ${pos}${o.median !== null ? ` (median ${f(o.median)}${unit})` : ""}.`;
+  return `${lead}'s ${measure} was ${f(value)}${unit}: ${pos}${o.median !== null ? ` (median ${f(o.median)}${unit})` : ""}.`;
+}
+
+/** How an organisation reads in a sentence: forces get "Police" ("Kent Police"), others are as named. */
+export function displayName(g: Geography, name: string): string {
+  return g === "police_force" && !/police/i.test(name) ? `${name} Police` : name;
 }
