@@ -225,3 +225,37 @@
 .foi-ld { border: 0; padding: 0; margin: 0; background: none; }
 .foi-ld-head { margin-top: 0; }
 .foi-selected { margin-top: 4px; }
+
+/* By organisation */
+.foi-mode { grid-template-columns: 1fr 1fr; margin: 10px 0 8px; }
+.foi-mode > button { text-align: center; padding: 7px 6px; }
+.foi-mode strong { font-size: 12.5px; }
+.foi-kind { display: grid; grid-template-columns: 1fr 1fr; margin-bottom: 8px; }
+.foi-kind > button { text-align: center; }
+.foi-orgside-tools { display: flex; gap: 6px; margin-bottom: 6px; }
+.foi-orgside-tools input { flex: 1; min-width: 0; padding: 6px 9px; border: 1px solid var(--border); border-radius: 7px; background: var(--surface-2); color: inherit; font: inherit; font-size: 13px; }
+.foi-orglist { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; max-height: calc(100vh - 380px); overflow-y: auto; }
+.foi-orglist button { width: 100%; display: flex; justify-content: space-between; align-items: center; gap: 8px; text-align: left; padding: 6px 8px; border: 0;
+  border-radius: 6px; background: none; cursor: pointer; font: inherit; color: inherit; }
+.foi-orglist button:hover { background: var(--surface-2); }
+.foi-orglist button.on { background: color-mix(in srgb, var(--accent) 12%, transparent); box-shadow: inset 3px 0 0 var(--accent); }
+.foi-orgname { font-size: 13px; min-width: 0; }
+.foi-orgscore { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--text-2); font-variant-numeric: tabular-nums; flex: none; }
+.foi-orgscore .bar { width: 34px; height: 6px; border-radius: 3px; background: var(--surface-3); overflow: hidden; display: inline-block; }
+.foi-orgscore .bar span { display: block; height: 100%; background: #d73027; }
+.foi-worst { margin: 0; padding-left: 20px; display: grid; gap: 4px; font-size: 13px; }
+.foi-ldline { line-height: 1.8; }
+.foi-cards { display: grid; gap: 8px; margin: 8px 0 12px; }
+.foi-card { border: 1px solid var(--border); border-radius: 10px; padding: 8px 10px; background: var(--surface-1); }
+.foi-card.worse { box-shadow: inset 3px 0 0 #d73027; }
+.foi-card-top { display: flex; justify-content: space-between; gap: 6px; align-items: flex-start; }
+.foi-card-title { font-weight: 600; text-align: left; font-size: 13.5px; }
+.foi-card-body { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin: 2px 0; }
+.foi-card-value { font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.2; }
+.foi-card-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 2px; }
+.foi-spark { flex: none; overflow: visible; }
+.foi-spark path { fill: none; stroke: var(--accent); stroke-width: 1.8; }
+.foi-spark circle { fill: var(--accent); }
+.foi-kids { margin: 6px 0 10px; }
+.foi-kids ul { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 3px; font-size: 13px; }
+.foi-ldline .tag, .foi-unusual .tag { margin-right: 0; }

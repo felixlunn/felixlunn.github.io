@@ -195,3 +195,32 @@ describe("campaign lines and the body serving each seat", () => {
     expect(ldOf({ code: "E1", name: "", mp: null, party: "Liberal Democrat" })).toBe("held");
   });
 });
+
+describe("by organisation", () => {
+  it("takes each dataset's headline, scores the worse half, and links trusts to their ICB", async () => {
+    const { headline, scores, worseHalf, parentOf, orgList } = await import("./orgs");
+    const ref = {
+      version: 1, as_of: "", seats: [],
+      layers: { police: { label: "", areas: [] }, health: { label: "", areas: [{ code: "ICB1", name: "ICB One", aliases: [], population: 1, seats: [] }] } },
+      points: { trusts: ["T1", "T2", "T3"].map((c) => ({ code: c, name: c, kind: "", postcode: "", lat: 0, lon: 0, area: "ICB1", seat: null })) },
+    } as never;
+    const base = { department: "health", geography: "nhs_trust", foi_reference: null, authority: null, period: null, requested_on: null, received_on: null,
+      notes: null, unmatched: [], file_path: null, created_by: null, created_by_email: "", created_at: "", updated_at: "" };
+    const waits = { ...base, id: "w", title: "Waits", columns: [
+      { key: "a", label: "2023", unit: "count", direction: "higher_worse", period: "2023", series: "" },
+      { key: "b", label: "2024", unit: "count", direction: "higher_worse", period: "2024", series: "" }],
+      rows: [{ code: "T1", source_name: "", values: { a: 100, b: 200 } }, { code: "T2", source_name: "", values: { a: 100, b: 110 } }, { code: "T3", source_name: "", values: { a: 100, b: 90 } }] } as never;
+    const staff = { ...base, id: "s", title: "Staff", columns: [{ key: "n", label: "Nurses", unit: "count", direction: "higher_better" }],
+      rows: [{ code: "T1", source_name: "", values: { n: 10 } }, { code: "T2", source_name: "", values: { n: 50 } }, { code: "T3", source_name: "", values: { n: 30 } }] } as never;
+    const h1 = headline(ref, waits)!, h2 = headline(ref, staff)!;
+    expect(h1.col.label).toBe("% change 2023 to 2024"); // multi-year: the change is the headline
+    expect(h1.byCode.get("T1")!.value).toBe(100);
+    expect(worseHalf(h1, 100)).toBe(true); // rising waits, above the median (+10%)
+    expect(worseHalf(h2, 10)).toBe(true); // fewer nurses than the median (30)
+    const sc = scores([h1, h2], "nhs_trust");
+    expect(sc.get("T1")).toEqual({ worse: 2, of: 2 });
+    expect(sc.get("T2")).toEqual({ worse: 0, of: 2 });
+    expect(parentOf(ref, "nhs_trust", "T1")).toBe("ICB1");
+    expect(orgList(ref, [h1], "nhs_trust").map((t) => t.code)).toEqual(["T1", "T2", "T3"]);
+  });
+});
