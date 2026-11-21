@@ -75,9 +75,9 @@ export function fmtValue(v: number | null, col: Column | undefined, perHead = fa
   if (v === null) return "–";
   const abs = Math.abs(v);
   const dp = perHead ? 1 : abs >= 100 || Number.isInteger(v) ? 0 : abs >= 10 ? 1 : 2;
-  const s = v.toLocaleString("en-GB", { maximumFractionDigits: dp, minimumFractionDigits: 0 });
+  const s = v.toLocaleString("en-GB", { maximumFractionDigits: dp, minimumFractionDigits: 0 }).replace(/^-/, "−");
   const sign = col?.change && v > 0 ? "+" : "";
-  if (col?.unit === "money") return `${v < 0 ? "−" : sign}£${s.replace("-", "")}`;
+  if (col?.unit === "money") return `${v < 0 ? "−" : sign}£${s.replace("−", "")}`;
   if (col?.unit === "percent") return `${sign}${s}%`;
   return `${sign}${s}`;
 }

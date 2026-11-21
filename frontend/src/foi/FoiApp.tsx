@@ -308,7 +308,8 @@ function DatasetView({ d: saved, ref_, shapes, seat, backend, canEdit, onDeleted
     <div className="foi-main">
       <div className="foi-map-wrap">
         {mapNote && <div className="foi-map-note tiny">{mapNote}</div>}
-        <FoiMap shapes={layerShapes} items={items} reverse={col?.direction === "higher_better"} selected={selected} highlight={highlight} flagged={flaggedSet} onSelect={setSelected} />
+        <FoiMap shapes={layerShapes} items={items} reverse={col?.direction === "higher_better"} selected={selected} highlight={highlight} flagged={flaggedSet} onSelect={setSelected}
+          title={`${col?.label ?? ""}${unit}`} format={(v) => fmtValue(v, col, ph)} />
       </div>
       <section className="foi-detail">
         <div className="foi-detail-head">
