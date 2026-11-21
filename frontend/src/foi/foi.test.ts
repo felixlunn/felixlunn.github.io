@@ -172,3 +172,26 @@ describe("Lib Dem seats served", () => {
     expect(courts.has("c2")).toBe(false); // Fife is in Scotland: no English court serves it
   });
 });
+
+describe("campaign lines and the body serving each seat", () => {
+  it("writes level and change lines", async () => {
+    const { campaignLine } = await import("./analysis");
+    const lvl = campaignLine({ seat: "Bath", server: "Avon and Somerset", measure: "Officers in 2024", col: { key: "a", label: "2024", unit: "count", direction: "higher_better" },
+      value: 3000, values: [1000, 2000, 3000, 4000, 5000], median: 3000, plural: "police force areas" });
+    expect(lvl).toBe("In Bath, Avon and Somerset's officers in 2024 was 3,000: the 3rd highest of 5 police force areas (median 3,000).");
+    const chg = campaignLine({ seat: "Bath", server: "Avon and Somerset", measure: "Stop and search",
+      col: { key: "c", label: "", unit: "percent", direction: "higher_worse", change: { from: "2021/22", to: "2024/25", mode: "percent" } },
+      value: 12.5, values: [-5, 2, 12.5, 30], median: 7.25, plural: "police force areas" });
+    expect(chg).toBe("In Bath, Avon and Somerset's stop and search rose 12.5% from 2021/22 to 2024/25: a bigger rise than 2 of 4 police force areas (median +7.25%).");
+    expect(campaignLine({ seat: "Bath", server: "X", measure: "M", col: { key: "a", label: "", unit: "count", direction: "neutral" }, value: null, suppressed: "<5", values: [], median: null, plural: "" }))
+      .toBe("In Bath, X withheld its figure for m (<5).");
+  });
+  it("matches each seat to the area covering most of it", async () => {
+    const { mainServer, ldOf } = await import("./analysis");
+    const ref = { seats: [{ code: "E1", name: "Bath", mp: null, party: "Labour", ld: "target" }], points: {},
+      layers: { police: { label: "", areas: [{ code: "P1", name: "", aliases: [], population: 1, seats: [["E1", 0.3]] }, { code: "P2", name: "", aliases: [], population: 1, seats: [["E1", 0.7]] }] }, health: { label: "", areas: [] } } } as never;
+    expect(mainServer(ref, "police_force", new Set(["P1", "P2"])).get("E1")).toEqual({ code: "P2", share: 0.7 });
+    expect(mainServer(ref, "police_force", new Set(["P1"])).get("E1")?.code).toBe("P1");
+    expect(ldOf({ code: "E1", name: "", mp: null, party: "Liberal Democrat" })).toBe("held");
+  });
+});

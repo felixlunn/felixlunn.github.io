@@ -179,3 +179,19 @@
 .foi-filters .chip.ld.on { background: #faa61a; border-color: #faa61a; color: #111; }
 .foi-showing { font-size: 12px; color: var(--text-2); margin: -2px 0 8px; }
 .tag.ld { background: #faa61a; color: #111; }
+
+/* Lib Dem seats panel */
+.foi-ld { border: 2px solid #faa61a; border-radius: 12px; padding: 4px 12px 10px; margin: 10px 0 12px; background: color-mix(in srgb, #faa61a 6%, var(--surface-1)); }
+.foi-ld-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; margin: 8px 0 4px; }
+.foi-ld-head h3 { margin: 0; font-size: 15px; }
+.seg.mini { grid-template-columns: repeat(3, auto); border-radius: 8px; }
+.seg.mini > button { padding: 4px 9px; font-size: 12px; }
+.seg.mini > button.on { background: #faa61a; color: #111; }
+.foi-ld-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.foi-ld-table th { font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--text-2); font-weight: 600; text-align: left; padding: 4px 6px; border-bottom: 1px solid var(--border); }
+.foi-ld-table td { padding: 5px 6px; border-bottom: 1px solid var(--surface-3); vertical-align: top; }
+.foi-ld-table tbody tr { cursor: pointer; }
+.foi-ld-table tbody tr:hover { background: color-mix(in srgb, #faa61a 10%, transparent); }
+.foi-ld-table .copy { font-size: 15px; }
+.foi-ld-foot { display: flex; gap: 14px; flex-wrap: wrap; margin: 6px 0 2px; }
+.tag.tgt { background: color-mix(in srgb, #faa61a 25%, transparent); color: #8a5a00; }

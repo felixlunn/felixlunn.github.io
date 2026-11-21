@@ -25,7 +25,8 @@ export interface Reference {
   as_of: string;
   layers: { police: { label: string; areas: RefArea[] }; health: { label: string; areas: RefArea[] } };
   points: { courts?: RefCourt[]; trusts?: RefTrust[] };
-  seats: { code: string; name: string; mp: string | null; party: string | null; lon?: number; lat?: number }[];
+  /** ld: "held" (Lib Dem seat) or "target" (Lib Dems second in 2024). */
+  seats: { code: string; name: string; mp: string | null; party: string | null; lon?: number; lat?: number; ld?: "held" | "target" }[];
 }
 
 /** One thing an uploaded row can be matched to. */
