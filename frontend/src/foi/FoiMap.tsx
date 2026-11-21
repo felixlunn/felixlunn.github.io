@@ -16,6 +16,9 @@ interface Props {
   highlight: Set<string>;
   /** Outliers: outlined dashed (areas) or ringed (points). */
   flagged?: Set<string>;
+  /** The key: what is shown, and how to write its values. */
+  title?: string;
+  format?: (v: number) => string;
   onSelect: (code: string) => void;
 }
 
@@ -26,7 +29,7 @@ function css(name: string) { return getComputedStyle(document.documentElement).g
 
 const NONE = new Set<string>();
 
-export default function FoiMap({ shapes, items, reverse, selected, highlight, flagged = NONE, onSelect }: Props) {
+export default function FoiMap({ shapes, items, reverse, selected, highlight, flagged = NONE, title, format = (v) => v.toLocaleString("en-GB"), onSelect }: Props) {
   const el = useRef<HTMLDivElement>(null);
   const map = useRef<MLMap | null>(null);
   const [ready, setReady] = useState(false);
@@ -39,6 +42,19 @@ export default function FoiMap({ shapes, items, reverse, selected, highlight, fl
     const c = ramp();
     return { breaks: quantileBreaks(items.map((i) => i.value), c.length), colours: reverse ? [...c].reverse() : c };
   }, [items, reverse]);
+  // The key: one line per colour, with the range of values it covers (highest first).
+  const legend = useMemo(() => {
+    const vals = items.map((i) => i.value).filter((v): v is number => v !== null).sort((a, b) => a - b);
+    if (!vals.length) return [];
+    const used = breaks.length + 1;
+    const step = (colours.length - 1) / Math.max(used - 1, 1);
+    const out = [];
+    for (let k = 0; k < used; k++) {
+      const inClass = vals.filter((v) => classify(v, breaks) === k);
+      if (inClass.length) out.push({ colour: colours[Math.round(k * step)], lo: inClass[0], hi: inClass[inClass.length - 1] });
+    }
+    return out.reverse();
+  }, [items, breaks, colours]);
   const colour = (v: number | null) => {
     if (v === null) return css("--map-nodata");
     const used = breaks.length + 1;
@@ -142,12 +158,17 @@ export default function FoiMap({ shapes, items, reverse, selected, highlight, fl
           <div className="tt-value">{h.label}</div>
         </div>
       )}
-      {items.some((i) => i.value !== null) && <div className="foi-legend">
-        <span className="tiny muted">Lower</span>
-        {colours.slice(0, breaks.length + 1).map((c, i) => <span key={i} className="sw" style={{ background: c }} />)}
-        <span className="tiny muted">Higher</span>
-        <span className="sw" style={{ background: css("--map-nodata"), marginLeft: 8 }} /><span className="tiny muted">No figure</span>
-      </div>}
+      {legend.length > 0 && (
+        <div className="foi-legend">
+          {title && <div className="lg-title">{title}</div>}
+          <ul>
+            {legend.map((b, i) => (
+              <li key={i}><span className="sw" style={{ background: b.colour }} />{b.lo === b.hi ? format(b.lo) : `${format(b.lo)} – ${format(b.hi)}`}</li>
+            ))}
+            <li className="muted"><span className="sw" style={{ background: css("--map-nodata") }} />No figure</li>
+          </ul>
+        </div>
+      )}
     </div>
   );
 }
