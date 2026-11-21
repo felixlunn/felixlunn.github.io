@@ -1,5 +1,5 @@
 /**
- * "By organisation": every dataset's headline figure for one trust, ICB, force, court or criminal justice area,
+ * Area view: every dataset's headline figure for one trust, ICB, force, court or criminal justice area,
  * and an overview of which organisations most often fall in the worse half.
  */
 
@@ -24,8 +24,12 @@ export const KIND_LABEL: Record<Geography, { one: string; many: string; find: st
   health_area: { one: "ICB / health board", many: "ICBs", find: "Find an ICB or health board" },
 };
 
-/** The second viewing mode's name in each department. */
-export const MODE_LABEL: Record<Department, string> = { policing: "By force", justice: "By court / area", health: "By trust / ICB" };
+/** What "Area view" lets you pick in each department (shown as a tooltip). */
+export const AREA_VIEW_HINT: Record<Department, string> = {
+  policing: "Every dataset for one police force",
+  justice: "Every dataset for one court or criminal justice area",
+  health: "Every dataset for one NHS trust or ICB",
+};
 
 /** A dataset's headline: the % change when it covers several years, otherwise its first figure. */
 export interface Headline {

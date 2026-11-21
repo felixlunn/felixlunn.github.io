@@ -3,7 +3,7 @@ import { campaignLine, canPerHead, displayName, fmtValue, forSeat, inScope, ldOf
 import { outlier, vsMedian } from "./stats";
 import { MAP_NOTE, mapShapes } from "./shapes";
 import OrgView, { OrgSidebar } from "./OrgView";
-import { headline, MODE_LABEL, ORG_KINDS, type Headline } from "./orgs";
+import { AREA_VIEW_HINT, headline, ORG_KINDS, type Headline } from "./orgs";
 import { withYearViews, type YearView } from "./periods";
 import type { Backend, User } from "./backend";
 import FoiMap, { type MapItem } from "./FoiMap";
@@ -171,9 +171,9 @@ function Workspace({ backend, user, admin, ref_, shapes }: { backend: Backend; u
             <button className="btn primary block" onClick={() => setUploading(true)}>Upload an FOI response</button>
             {error && <p className="small bad">Couldn't load datasets: {error}</p>}
             <div className="seg foi-mode" role="tablist" aria-label="View by">
-              <button role="tab" aria-selected={mode === "datasets"} className={mode === "datasets" ? "on" : ""} onClick={() => setMode("datasets")}><strong>By dataset</strong></button>
-              <button role="tab" aria-selected={mode === "orgs"} className={mode === "orgs" ? "on" : ""} onClick={() => setMode("orgs")}>
-                <strong>{MODE_LABEL[dept]}</strong>
+              <button role="tab" aria-selected={mode === "datasets"} className={mode === "datasets" ? "on" : ""} onClick={() => setMode("datasets")} title="One FOI response at a time"><strong>Dataset view</strong></button>
+              <button role="tab" aria-selected={mode === "orgs"} className={mode === "orgs" ? "on" : ""} onClick={() => setMode("orgs")} title={AREA_VIEW_HINT[dept]}>
+                <strong>Area view</strong>
               </button>
             </div>
             {mode === "orgs" ? (

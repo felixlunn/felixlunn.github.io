@@ -14,7 +14,7 @@ function readScope(): LdScope {
   try { return (localStorage.getItem("foi.ldScope") as LdScope) || "held"; } catch { return "held"; }
 }
 
-/** Sidebar in "By organisation" mode: the kind (e.g. trusts or ICBs), a search, and the list, worst first. */
+/** Sidebar in Area view: the kind (e.g. trusts or ICBs), a search, and the list, worst first. */
 export function OrgSidebar({ ref_, heads, dept, kind, setKind, code, setCode }: {
   ref_: Reference; heads: Headline[]; dept: Department; kind: Geography; setKind: (g: Geography) => void; code: string | null; setCode: (c: string | null) => void;
 }) {
@@ -64,7 +64,7 @@ export function OrgSidebar({ ref_, heads, dept, kind, setKind, code, setCode }: 
   );
 }
 
-/** Map and profile in "By organisation" mode. */
+/** Map and profile in Area view. */
 export default function OrgView({ ref_, shapes, heads, kind, code, setCode, setKindAndCode, onOpenDataset }: {
   ref_: Reference; shapes: GeoJSON.FeatureCollection; heads: Headline[]; kind: Geography; code: string | null;
   setCode: (c: string | null) => void; setKindAndCode: (g: Geography, c: string) => void; onOpenDataset: (id: string) => void;
