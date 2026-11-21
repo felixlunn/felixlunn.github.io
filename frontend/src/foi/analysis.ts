@@ -126,13 +126,87 @@ export function seatsServed(ref: Reference, g: Geography, inResponse: Set<string
   return out;
 }
 
-/** Those serving at least one Lib Dem-held seat, with those seats' names. */
-export function libDemServed(ref: Reference, g: Geography, inResponse: Set<string>): Map<string, string[]> {
-  const ld = new Map(ref.seats.filter((s) => isLibDem(s.party)).map((s) => [s.code, s.name]));
+export type LdScope = "held" | "target" | "both";
+
+/** A seat's Lib Dem status: held, or a target (second in 2024). Older reference data: held from the MP's party. */
+export function ldOf(s: Reference["seats"][number]): "held" | "target" | undefined {
+  return s.ld ?? (isLibDem(s.party) ? "held" : undefined);
+}
+
+export function inScope(s: Reference["seats"][number], scope: LdScope): boolean {
+  const st = ldOf(s);
+  return scope === "both" ? !!st : st === scope;
+}
+
+/** Those serving at least one Lib Dem seat in scope (held, target or both), with those seats' names. */
+export function libDemServed(ref: Reference, g: Geography, inResponse: Set<string>, scope: LdScope = "held"): Map<string, string[]> {
+  const ld = new Map(ref.seats.filter((s) => inScope(s, scope)).map((s) => [s.code, s.name]));
   const out = new Map<string, string[]>();
   for (const [code, seats] of seatsServed(ref, g, inResponse)) {
     const names = [...seats].filter((s) => ld.has(s)).map((s) => ld.get(s)!);
     if (names.length) out.set(code, names.sort());
   }
   return out;
+}
+
+/**
+ * For each seat, the one force / NHS area / trust / court in a response that mainly serves it: the area covering
+ * most of it, the trust whose catchment covers most of it, or the nearest court (as drawn on the map).
+ */
+export function mainServer(ref: Reference, g: Geography, inResponse: Set<string>): Map<string, { code: string; share?: number }> {
+  const out = new Map<string, { code: string; share?: number }>();
+  const offer = (seat: string, code: string, share?: number) => {
+    const cur = out.get(seat);
+    if (!cur || (share ?? 0) > (cur.share ?? 0)) out.set(seat, { code, share });
+  };
+  if (g === "police_force" || g === "health_area") {
+    for (const a of (g === "police_force" ? ref.layers.police.areas : ref.layers.health.areas)) {
+      if (inResponse.has(a.code)) for (const [s, share] of a.seats) offer(s, a.code, share);
+    }
+  } else if (g === "nhs_trust") {
+    const trusts = (ref.points.trusts ?? []).filter((t) => inResponse.has(t.code));
+    for (const t of trusts) for (const [s, share] of t.catchment ?? []) offer(s, t.code, share);
+    for (const t of trusts) if (t.seat && !out.has(t.seat)) out.set(t.seat, { code: t.code });
+  } else {
+    // Courts: nearest in the response, the same rule as the shaded areas and seatsServed.
+    for (const [code, seats] of seatsServed(ref, g, inResponse)) {
+      for (const s of seats) if (!out.has(s)) out.set(s, { code });
+    }
+    const K = Math.cos((54 * Math.PI) / 180);
+    const courts = (ref.points.courts ?? []).filter((c) => inResponse.has(c.id));
+    for (const s of ref.seats) {
+      if (s.lon === undefined || s.lat === undefined) continue;
+      let best: string | null = null, bestD = Infinity;
+      for (const c of courts) {
+        if (jurisdiction(c.area) !== jurisdiction(s.code)) continue;
+        const dd = ((c.lon - s.lon) * K) ** 2 + (c.lat - s.lat) ** 2;
+        if (dd < bestD) { bestD = dd; best = c.id; }
+      }
+      if (best) out.set(s.code, { code: best });
+    }
+  }
+  return out;
+}
+
+const ORD = (n: number) => `${n}${n % 100 >= 11 && n % 100 <= 13 ? "th" : ["th", "st", "nd", "rd"][n % 10] ?? "th"}`;
+
+/** A sentence a campaign can use, e.g. "In Bath, Avon and Somerset's stop and search rose 12% from 2021/22 to 2024/25: a bigger rise than 30 of 43 police force areas (median +4%)." */
+export function campaignLine(o: {
+  seat: string; server: string; measure: string; col: Column; value: number | null; suppressed?: string;
+  values: number[]; median: number | null; plural: string; perHead?: boolean;
+}): string {
+  const { seat, server, col, value, values, plural } = o;
+  const measure = o.measure.charAt(0).toLowerCase() + o.measure.slice(1);
+  const f = (v: number) => fmtValue(v, col, o.perHead);
+  if (value === null) return o.suppressed ? `In ${seat}, ${server} withheld its figure for ${measure} (${o.suppressed}).` : `In ${seat}, ${server} gave no figure for ${measure}.`;
+  if (col.change) {
+    const lower = values.filter((v) => v < value).length, higher = values.filter((v) => v > value).length;
+    const moved = value > 0 ? `rose ${f(value).replace(/^\+/, "")}` : value < 0 ? `fell ${f(-value).replace(/^\+/, "")}` : "was unchanged";
+    const cmp = value > 0 ? `a bigger rise than ${lower} of ${values.length} ${plural}` : value < 0 ? `a bigger fall than ${higher} of ${values.length} ${plural}` : `while the median moved ${f(o.median ?? 0)}`;
+    return `In ${seat}, ${server}'s ${measure} ${moved} from ${col.change.from} to ${col.change.to}: ${cmp}${o.median !== null && value !== 0 ? ` (median ${f(o.median)})` : ""}.`;
+  }
+  const rank = values.filter((v) => v > value).length + 1;
+  const pos = rank <= Math.ceil(values.length / 2) ? `the ${ORD(rank)} highest of ${values.length} ${plural}` : `the ${ORD(values.length - rank + 1)} lowest of ${values.length} ${plural}`;
+  const unit = o.perHead ? " per 100,000 residents" : "";
+  return `In ${seat}, ${server}'s ${measure} was ${f(value)}${unit}: ${pos}${o.median !== null ? ` (median ${f(o.median)}${unit})` : ""}.`;
 }

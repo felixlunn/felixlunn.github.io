@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { canPerHead, fmtValue, forSeat, libDemServed, overallRate, points, ranked, summary, type Ranked } from "./analysis";
+import { campaignLine, canPerHead, fmtValue, forSeat, inScope, ldOf, libDemServed, mainServer, overallRate, points, ranked, summary, type LdScope, type Ranked } from "./analysis";
 import { outlier, vsMedian } from "./stats";
 import { jurisdictionOf, nearestAreas } from "./cells";
 import { withYearViews, type YearView } from "./periods";
@@ -8,7 +8,7 @@ import FoiMap, { type MapItem } from "./FoiMap";
 import { targets } from "./match";
 import Upload from "./Upload";
 import { csv, download, slug } from "../lib/format";
-import { DEPARTMENTS, GEOGRAPHY_LABEL, IS_AREA, type Dataset, type Department, type NewDataset, type Reference } from "./types";
+import { DEPARTMENTS, GEOGRAPHY_LABEL, IS_AREA, type Column, type Dataset, type Department, type NewDataset, type Reference, type Target } from "./types";
 
 const PLURAL: Record<Dataset["geography"], string> = { police_force: "police force areas", court: "courts and tribunals", nhs_trust: "NHS trusts", health_area: "NHS areas" };
 
@@ -179,7 +179,7 @@ function Workspace({ backend, user, admin, ref_, shapes }: { backend: Backend; u
           </div>
         </aside>
         {active ? (
-          <DatasetView key={active.id} d={active} ref_={ref_} shapes={shapes} seat={seat || null} backend={backend}
+          <DatasetView key={active.id} d={active} ref_={ref_} shapes={shapes} seat={seat || null} backend={backend} onPickSeat={setSeat}
             canEdit={admin || active.created_by === user.id} onDeleted={reload} />
         ) : (
           <div className="foi-main foi-empty">
@@ -195,7 +195,8 @@ function Workspace({ backend, user, admin, ref_, shapes }: { backend: Backend; u
 function SeatPicker({ ref_, seat, setSeat }: { ref_: Reference; seat: string; setSeat: (s: string) => void }) {
   const [q, setQ] = useState("");
   const current = ref_.seats.find((s) => s.code === seat);
-  const hits = q.length >= 2 ? ref_.seats.filter((s) => `${s.name} ${s.mp ?? ""}`.toLowerCase().includes(q.toLowerCase())).slice(0, 8) : [];
+  const hits = q.length >= 2 ? ref_.seats.filter((s) => `${s.name} ${s.mp ?? ""}`.toLowerCase().includes(q.toLowerCase()))
+    .sort((a, b) => Number(!ldOf(a)) - Number(!ldOf(b))).slice(0, 8) : [];
   return (
     <div className="foi-seat">
       {current ? (
@@ -208,7 +209,12 @@ function SeatPicker({ ref_, seat, setSeat }: { ref_: Reference; seat: string; se
           <input type="search" placeholder="Your seat or MP, to see what serves it" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Choose a seat" />
           {hits.length > 0 && (
             <ul className="foi-seat-hits">
-              {hits.map((s) => <li key={s.code}><button onClick={() => { setSeat(s.code); setQ(""); }}>{s.name}{s.mp ? <span className="tiny muted"> · {s.mp}</span> : null}</button></li>)}
+              {hits.map((s) => (
+                <li key={s.code}><button onClick={() => { setSeat(s.code); setQ(""); }}>
+                  {s.name}{ldOf(s) && <span className={`tag ${ldOf(s) === "held" ? "ld" : "tgt"}`}>{ldOf(s) === "held" ? "LD" : "LD target"}</span>}
+                  {s.mp ? <span className="tiny muted"> · {s.mp}</span> : null}
+                </button></li>
+              ))}
             </ul>
           )}
         </>
@@ -217,8 +223,9 @@ function SeatPicker({ ref_, seat, setSeat }: { ref_: Reference; seat: string; se
   );
 }
 
-function DatasetView({ d: saved, ref_, shapes, seat, backend, canEdit, onDeleted }: {
+function DatasetView({ d: saved, ref_, shapes, seat, backend, canEdit, onDeleted, onPickSeat }: {
   d: Dataset; ref_: Reference; shapes: GeoJSON.FeatureCollection; seat: string | null; backend: Backend; canEdit: boolean; onDeleted: () => void;
+  onPickSeat: (code: string) => void;
 }) {
   // Several years: an average per year and a % change are worked out and offered as the standard maps.
   const { d, views } = useMemo(() => withYearViews(saved), [saved]);
@@ -238,19 +245,21 @@ function DatasetView({ d: saved, ref_, shapes, seat, backend, canEdit, onDeleted
   // Filters on the average and % change maps: above / below average (or increase / decrease), and Lib Dem seats.
   const [dir, setDir] = useState<"all" | "up" | "down">("all");
   const [ldOnly, setLdOnly] = useState(false);
+  const [scope, setScope] = useState<LdScope>(() => { try { return (localStorage.getItem("foi.ldScope") as LdScope) || "held"; } catch { return "held"; } });
+  useEffect(() => { try { localStorage.setItem("foi.ldScope", scope); } catch { /* per visit */ } }, [scope]);
   const filtering = !!col?.derived;
-  const ld = useMemo(() => libDemServed(ref_, d.geography, new Set(d.rows.map((r) => r.code))), [ref_, d.geography, d.rows]);
+  const ld = useMemo(() => libDemServed(ref_, d.geography, new Set(d.rows.map((r) => r.code)), scope), [ref_, d.geography, d.rows, scope]);
   const isChange = col?.derived === "change";
   const pass = (r: Ranked) => {
-    if (!filtering) return true;
     if (ldOnly && !ld.has(r.target.code)) return false;
+    if (!filtering) return true;
     if (dir === "all") return true;
     if (r.value === null) return false;
     const mid = isChange ? 0 : stats.mean ?? 0;
     return dir === "up" ? r.value > mid : r.value < mid;
   };
   const visible = new Set(rows.filter(pass).map((r) => r.target.code));
-  const activeFilter = filtering && (dir !== "all" || ldOnly);
+  const activeFilter = (filtering && dir !== "all") || ldOnly;
   const overall = ph ? overallRate(rows) : null;
   // How far from the middle: a ratio for levels ("2.3× the median"), a difference for changes ("+12 points above").
   const vsMid = (v: number): string | null => {
@@ -347,29 +356,33 @@ function DatasetView({ d: saved, ref_, shapes, seat, backend, canEdit, onDeleted
         {d.notes && <p className="small foi-notes">{d.notes}</p>}
 
         <ViewPicker d={d} views={views} colKey={colKey} setColKey={setColKey} />
-        {filtering && (
-          <>
-            <div className="foi-filters" role="group" aria-label="Filter the map">
-              <span className="fl-label">Show</span>
+        <div className="foi-filters" role="group" aria-label="Filter the map">
+          <span className="fl-label">Show</span>
+          {filtering && (
+            <>
               <button className={`chip ${dir === "all" ? "on" : ""}`} onClick={() => setDir("all")}>All</button>
               <button className={`chip ${dir === "up" ? "on" : ""}`} onClick={() => setDir("up")}>{isChange ? "▲ Increase" : "Above average"}</button>
               <button className={`chip ${dir === "down" ? "on" : ""}`} onClick={() => setDir("down")}>{isChange ? "▼ Decrease" : "Below average"}</button>
-              <button className={`chip ld ${ldOnly ? "on" : ""}`} aria-pressed={ldOnly} onClick={() => setLdOnly(!ldOnly)}
-                title="Only those serving at least one Lib Dem-held seat">Lib Dem seats{ld.size ? ` (${ld.size})` : ""}</button>
-            </div>
-            {activeFilter && (
-              <p className="foi-showing">
-                Showing <strong>{visible.size}</strong> of {rows.length}
-                {dir !== "all" && <> · {isChange ? (dir === "up" ? "increased" : "decreased") : `${dir === "up" ? "above" : "below"} the average (${fmtValue(stats.mean, col, ph)})`}</>}
-                {ldOnly && <> · serving a Lib Dem seat</>}
-                {" "}<button className="link-btn" onClick={() => { setDir("all"); setLdOnly(false); }}>clear</button>
-              </p>
-            )}
-          </>
+            </>
+          )}
+          <button className={`chip ld ${ldOnly ? "on" : ""}`} aria-pressed={ldOnly} onClick={() => setLdOnly(!ldOnly)}
+            title="Only those serving at least one of these seats">Serving {scope === "held" ? "Lib Dem seats" : scope === "target" ? "Lib Dem targets" : "Lib Dem seats & targets"}{ld.size ? ` (${ld.size})` : ""}</button>
+        </div>
+        {activeFilter && (
+          <p className="foi-showing">
+            Showing <strong>{visible.size}</strong> of {rows.length}
+            {filtering && dir !== "all" && <> · {isChange ? (dir === "up" ? "increased" : "decreased") : `${dir === "up" ? "above" : "below"} the average (${fmtValue(stats.mean, col, ph)})`}</>}
+            {ldOnly && <> · serving {scope === "held" ? "a Lib Dem seat" : scope === "target" ? "a Lib Dem target" : "a Lib Dem seat or target"}</>}
+            {" "}<button className="link-btn" onClick={() => { setDir("all"); setLdOnly(false); }}>clear</button>
+          </p>
         )}
+
         {canPerHead(d, col) && (
           <label className="small foi-toggle"><input type="checkbox" checked={perHead} onChange={(e) => setPerHead(e.target.checked)} /> Per 100,000 residents (estimated from each area's seats)</label>
         )}
+
+        <LibDemPanel ref_={ref_} d={d} col={col} rows={rows} stats={stats} ph={ph} view={view} scope={scope} setScope={setScope}
+          plural={PLURAL[d.geography]} names={tByCode} onPick={(seatCode, server) => { onPickSeat(seatCode); setSelected(server); }} />
 
         <div className="foi-stats">
           <div><strong>{stats.n}<span className="of"> of {tByCode.size}</span></strong><span className="tiny muted">{PLURAL[d.geography]} with a figure</span></div>
@@ -570,5 +583,102 @@ function YearBars({ view, values }: { view: YearView; values: Record<string, num
         <figcaption className="tiny muted">{fmtValue(values[view.change.key]!, view.change)} from {view.years[0].period} to {view.years[view.years.length - 1].period}</figcaption>
       )}
     </figure>
+  );
+}
+
+/** The figure as it reads in a sentence: "stop and search (average per year, 2021/22–2024/25)". */
+function measureName(d: Dataset, col: Column, view: YearView | null): string {
+  const base = view?.series || d.title;
+  if (col.derived === "average" && view) return `${base} (average per year, ${view.years[0].period}–${view.years[view.years.length - 1].period})`;
+  if (col.derived === "change") return base;
+  if (col.period) return `${base} in ${col.period}`;
+  return col.label;
+}
+
+/**
+ * Lib Dem seats first: for each held (or target) seat, the body that mainly serves it, its figure and rank, a
+ * summary, and a campaign line to copy. Worst first, so the strongest angles are at the top.
+ */
+function LibDemPanel({ ref_, d, col, rows, stats, ph, view, scope, setScope, plural, names, onPick }: {
+  ref_: Reference; d: Dataset; col: Column | undefined; rows: Ranked[]; stats: ReturnType<typeof summary>; ph: boolean; view: YearView | null;
+  scope: LdScope; setScope: (s: LdScope) => void; plural: string; names: Map<string, Target>; onPick: (seat: string, server: string) => void;
+}) {
+  const [all, setAll] = useState(false);
+  const [copied, setCopied] = useState<string | null>(null);
+  const inResponse = useMemo(() => new Set(d.rows.map((r) => r.code)), [d.rows]);
+  const servers = useMemo(() => mainServer(ref_, d.geography, inResponse), [ref_, d.geography, inResponse]);
+  const counts = { held: ref_.seats.filter((s) => ldOf(s) === "held").length, target: ref_.seats.filter((s) => ldOf(s) === "target").length };
+  if (!col || !counts.held) return null;
+  const byCode = new Map(rows.map((r) => [r.target.code, r]));
+  const values = rows.map((r) => r.value).filter((v): v is number => v !== null);
+  const worseHigh = col.direction !== "higher_better";
+  const measure = measureName(d, col, view);
+  const list = ref_.seats.filter((s) => inScope(s, scope)).map((s) => {
+    const srv = servers.get(s.code);
+    const r = srv ? byCode.get(srv.code) : undefined;
+    const raw = srv ? names.get(srv.code)?.name ?? srv.code : null;
+    // Forces read better with "Police": "Kent Police", not "Kent" (Police Scotland, PSNI and the Met already have it).
+    const server = raw && d.geography === "police_force" && !/police/i.test(raw) ? `${raw} Police` : raw;
+    return {
+      seat: s, srv, r, server,
+      line: server ? campaignLine({ seat: s.name, server, measure, col, value: r?.value ?? null, suppressed: r?.suppressed, values, median: stats.median, plural, perHead: ph }) : null,
+    };
+  }).sort((a, b) => {
+    const av = a.r?.value ?? null, bv = b.r?.value ?? null;
+    if (av === null || bv === null) return Number(av === null) - Number(bv === null);
+    return worseHigh ? bv - av : av - bv;
+  });
+  const withFig = list.filter((x) => x.r?.value !== null && x.r?.value !== undefined);
+  const mid = col.change ? 0 : stats.mean;
+  const above = mid === null ? 0 : withFig.filter((x) => x.r!.value! > mid).length;
+  const below = mid === null ? 0 : withFig.filter((x) => x.r!.value! < mid).length;
+  const shown = all ? list : list.slice(0, 8);
+  const who = scope === "held" ? "Lib Dem seats" : scope === "target" ? "Lib Dem target seats" : "Lib Dem seats and targets";
+  const copy = async (text: string, id: string) => {
+    try { await navigator.clipboard.writeText(text); setCopied(id); setTimeout(() => setCopied(null), 1500); } catch { /* clipboard blocked */ }
+  };
+  const exportCsv = () => {
+    const head = ["Seat", "Status", "MP", "Served by", measure, "Rank", "Campaign line"];
+    const body = list.map((x) => [x.seat.name, ldOf(x.seat), x.seat.mp, x.server, x.r?.suppressed ?? x.r?.value ?? null, x.r?.rank ? `${x.r.rank} of ${stats.n}` : null, x.line]);
+    download(`${slug(d.title)}-lib-dem-seats.csv`, csv([head, ...body]));
+  };
+  return (
+    <section className="foi-ld">
+      <div className="foi-ld-head">
+        <h3>Lib Dem seats</h3>
+        <div className="seg mini" role="tablist" aria-label="Which seats">
+          <button className={scope === "held" ? "on" : ""} onClick={() => setScope("held")}>Held ({counts.held})</button>
+          {counts.target > 0 && <button className={scope === "target" ? "on" : ""} onClick={() => setScope("target")}>Targets ({counts.target})</button>}
+          {counts.target > 0 && <button className={scope === "both" ? "on" : ""} onClick={() => setScope("both")}>Both</button>}
+        </div>
+      </div>
+      <p className="small">
+        {withFig.length ? (
+          col.change
+            ? <><strong>{above}</strong> of {withFig.length} {who} are served by {plural} where it <strong>rose</strong>; <strong>{below}</strong> where it fell.</>
+            : <><strong>{above}</strong> of {withFig.length} {who} are served by {plural} <strong>above the average</strong> ({fmtValue(stats.mean, col, ph)}); {below} below.</>
+        ) : <>None of the {who} are served by anyone with a figure in this response.</>}
+        {list.length > withFig.length && <span className="muted"> {list.length - withFig.length} with no figure.</span>}
+      </p>
+      <table className="foi-ld-table">
+        <thead><tr><th>Seat</th><th>Served by</th><th className="num">{col.change ? "Change" : "Figure"}</th><th aria-label="Copy" /></tr></thead>
+        <tbody>
+          {shown.map((x) => (
+            <tr key={x.seat.code} onClick={() => x.srv && onPick(x.seat.code, x.srv.code)}>
+              <td><strong>{x.seat.name}</strong>{ldOf(x.seat) === "target" && <span className="tag tgt">target</span>}<div className="tiny muted">{x.seat.mp}</div></td>
+              <td className="small">{x.server ?? <span className="muted">none in response</span>}{x.r?.rank && <div className="tiny muted">{x.r.rank} of {stats.n}</div>}</td>
+              <td className="num">{x.r?.suppressed ? <span className="muted">withheld</span> : x.r?.value !== null && x.r?.value !== undefined ? <strong>{fmtValue(x.r.value, col, ph)}</strong> : "–"}</td>
+              <td>{x.line && <button className="icon-btn copy" title={x.line} aria-label={`Copy a line for ${x.seat.name}`} onClick={(e) => { e.stopPropagation(); copy(x.line!, x.seat.code); }}>{copied === x.seat.code ? "✓" : "⧉"}</button>}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <div className="foi-ld-foot">
+        {list.length > 8 && <button className="link-btn small" onClick={() => setAll(!all)}>{all ? "Show fewer" : `Show all ${list.length}`}</button>}
+        <button className="link-btn small" onClick={() => copy(list.map((x) => x.line).filter(Boolean).join("\n"), "all")}>{copied === "all" ? "✓ Copied" : "Copy all lines"}</button>
+        <button className="link-btn small" onClick={exportCsv}>Download CSV</button>
+      </div>
+      <p className="tiny muted">Worst first. Click a seat to see it on the map. Each seat is matched to the {plural.replace(/s$/, "")} that mainly serves it.</p>
+    </section>
   );
 }

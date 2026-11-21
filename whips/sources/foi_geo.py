@@ -264,6 +264,18 @@ def to_feature(a: dict, layer: str) -> dict:
             "geometry": {"type": g["type"], "coordinates": _round_coords(g["coordinates"], 4)}}
 
 
+LIB_DEM = re.compile(r"^(liberal democrats?|lib ?dems?|ld)$", re.I)
+
+
+def ld_status(seat: dict) -> dict:
+    """{"ld": "held"} for Lib Dem seats, {"ld": "target"} where the Lib Dems came second in 2024, else {}."""
+    if LIB_DEM.match((seat.get("party") or "").strip()):
+        return {"ld": "held"}
+    if LIB_DEM.match((seat.get("second_party_2024") or "").strip()):
+        return {"ld": "target"}
+    return {}
+
+
 def assemble(geo: dict, seats: list[dict], population: dict[str, float], police: list[dict], health: list[dict],
              courts: list[dict] | None, trusts: list[dict] | None, as_of: str,
              catchments: list[dict] | None = None) -> tuple[dict, dict]:
@@ -305,7 +317,7 @@ def assemble(geo: dict, seats: list[dict], population: dict[str, float], police:
     # Each seat's centre: lets the browser tell which court in a response is nearest to a seat.
     centre = {f["properties"]["code"]: shape(f["geometry"]).representative_point() for f in geo["features"]}
     ref = {"version": 1, "as_of": as_of, "layers": layers, "points": points,
-           "seats": [{"code": st["code"], "name": st["name"], "mp": st.get("mp"), "party": st.get("party"),
+           "seats": [{"code": st["code"], "name": st["name"], "mp": st.get("mp"), "party": st.get("party"), **ld_status(st),
                       **({"lon": round(centre[st["code"]].x, 4), "lat": round(centre[st["code"]].y, 4)} if st["code"] in centre else {})}
                      for st in seats]}
     return ref, {"type": "FeatureCollection", "features": features}
