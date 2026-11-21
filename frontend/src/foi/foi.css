@@ -139,13 +139,30 @@
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .tag.high { color: #ff8a80; } :root:not([data-theme="light"]) .tag.low { color: #9cc3ff; } }
 .foi-missing { margin: 6px 0 10px; }
 .foi-missing p { margin: 6px 0 0; color: var(--text-2); }
-.foi-calc { margin: 8px 0 4px; }
-.foi-calc-row { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
-.foi-calc-row select, .foi-calc-row input { padding: 6px 8px; border: 1px solid var(--border); border-radius: 7px; background: var(--surface-1); color: inherit; font: inherit; font-size: 13px; min-width: 0; }
-.foi-calc-row input { flex: 1; min-width: 160px; }
 .foi-drop { display: grid; gap: 4px; justify-items: center; text-align: center; padding: 18px 12px; border: 2px dashed var(--border); border-radius: 10px; cursor: pointer; background: var(--surface-2); }
 .foi-drop.over { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, var(--surface-2)); }
 .foi-drop input[type=file] { font-size: 12px; max-width: 100%; }
 .foi-paste textarea { width: 100%; margin-top: 6px; padding: 7px 9px; border: 1px solid var(--border); border-radius: 7px; background: var(--surface-1); color: inherit; font: 12px ui-monospace, monospace; }
 .foi-map-note { position: absolute; top: 10px; left: 10px; right: 56px; z-index: 3; background: color-mix(in srgb, var(--surface-1) 92%, transparent);
   border: 1px solid var(--border); border-radius: 8px; padding: 6px 9px; color: var(--text-2); max-width: 520px; }
+
+/* Multi-year: standard map views and per-area year chart */
+.foi-views { display: grid; gap: 8px; margin-bottom: 8px; }
+.foi-measure { display: flex; gap: 8px; align-items: center; }
+.foi-measure select { flex: 1; padding: 6px 8px; border: 1px solid var(--border); border-radius: 7px; background: var(--surface-1); color: inherit; font: inherit; }
+.seg { display: grid; grid-template-columns: 1fr 1fr 1fr; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+.seg > button, .seg > label { display: grid; gap: 1px; text-align: left; padding: 8px 10px; background: var(--surface-1); border: 0; border-right: 1px solid var(--border);
+  cursor: pointer; font: inherit; color: inherit; min-width: 0; }
+.seg > :last-child { border-right: 0; }
+.seg strong { font-size: 13px; }
+.seg span { font-size: 11px; color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.seg > .on { background: var(--accent); color: #fff; }
+.seg > .on span { color: color-mix(in srgb, #fff 80%, transparent); }
+.seg select { font: inherit; font-size: 12px; padding: 2px 4px; border: 1px solid var(--border); border-radius: 5px; background: var(--surface-1); color: var(--text-1); max-width: 100%; }
+.foi-bars { margin: 8px 0 4px; }
+.foi-bars svg { width: 100%; max-width: 280px; height: auto; display: block; }
+.foi-bars rect { fill: color-mix(in srgb, var(--accent) 55%, var(--surface-3)); }
+.foi-bars rect.last { fill: var(--accent); }
+.foi-bars text { font-size: 10.5px; fill: var(--text-2); font-variant-numeric: tabular-nums; }
+.foi-bars text.val { fill: var(--text-1); font-weight: 600; }
+@media (max-width: 600px) { .seg { grid-template-columns: 1fr; } .seg > button, .seg > label { border-right: 0; border-bottom: 1px solid var(--border); } }

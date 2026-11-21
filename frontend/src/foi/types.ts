@@ -50,6 +50,8 @@ export interface Column {
   series?: string;
   /** A change between two periods: shown with a sign (+/−). */
   change?: { from: string; to: string; mode: "percent" | "absolute" };
+  /** Worked out in the browser from the year columns (not stored): the average per year, or the % change. */
+  derived?: "average" | "change";
 }
 
 export type Cell = number | null;

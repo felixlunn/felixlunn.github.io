@@ -47,25 +47,6 @@ export function overallRate(rows: Ranked[]): number | null {
   return pop ? (num * 100_000) / pop : null;
 }
 
-export type Op = "/" | "-" | "+" | "*";
-
-/** A new column from two others, e.g. vacancies ÷ officers × 100. Missing or withheld inputs give no value. */
-export function calculate(d: Dataset, a: string, op: Op, b: string, scale: number, label: string): Dataset {
-  const key = `calc${d.columns.filter((c) => c.key.startsWith("calc")).length + 1}_${Date.now().toString(36)}`;
-  const ca = d.columns.find((c) => c.key === a);
-  const unit: Column["unit"] = op === "/" ? (scale === 100 ? "percent" : "rate") : ca?.unit ?? "other";
-  const rows = d.rows.map((r) => {
-    const x = r.values[a] ?? null, y = r.values[b] ?? null;
-    let v: number | null = null;
-    if (x !== null && y !== null) {
-      v = op === "/" ? (y === 0 ? null : x / y) : op === "-" ? x - y : op === "+" ? x + y : x * y;
-      if (v !== null) v *= scale;
-    }
-    return { ...r, values: { ...r.values, [key]: v } };
-  });
-  return { ...d, columns: [...d.columns, { key, label, unit, direction: ca?.direction ?? "neutral" }], rows };
-}
-
 /** The targets that serve a seat: the area(s) it lies in, or the courts / trusts in it and in its wider area. */
 export function forSeat(ref: Reference, g: Geography, seat: string): { code: string; why: string }[] {
   if (g === "police_force" || g === "health_area") {

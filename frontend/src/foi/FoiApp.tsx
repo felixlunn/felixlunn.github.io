@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { calculate, canPerHead, fmtValue, forSeat, overallRate, points, ranked, summary, type Op } from "./analysis";
+import { canPerHead, fmtValue, forSeat, overallRate, points, ranked, summary } from "./analysis";
 import { outlier, vsMedian } from "./stats";
 import { jurisdictionOf, nearestAreas } from "./cells";
-import { addChange, timeSeries } from "./periods";
+import { withYearViews, type YearView } from "./periods";
 import type { Backend, User } from "./backend";
 import FoiMap, { type MapItem } from "./FoiMap";
 import { targets } from "./match";
@@ -175,7 +175,6 @@ function Workspace({ backend, user, admin, ref_, shapes }: { backend: Backend; u
         </aside>
         {active ? (
           <DatasetView key={active.id} d={active} ref_={ref_} shapes={shapes} seat={seat || null} backend={backend}
-            others={(datasets ?? []).filter((x) => x.id !== active.id && x.geography === active.geography)}
             canEdit={admin || active.created_by === user.id} onDeleted={reload} />
         ) : (
           <div className="foi-main foi-empty">
@@ -213,18 +212,14 @@ function SeatPicker({ ref_, seat, setSeat }: { ref_: Reference; seat: string; se
   );
 }
 
-function DatasetView({ d: saved, ref_, shapes, seat, backend, canEdit, onDeleted, others }: {
+function DatasetView({ d: saved, ref_, shapes, seat, backend, canEdit, onDeleted }: {
   d: Dataset; ref_: Reference; shapes: GeoJSON.FeatureCollection; seat: string | null; backend: Backend; canEdit: boolean; onDeleted: () => void;
-  /** Other datasets of the same geography: candidates for "change since an earlier response". */
-  others: Dataset[];
 }) {
-  // Calculated columns are added here first, and saved to the dataset on request.
-  const [d, setD] = useState(saved);
-  const [savedCols, setSavedCols] = useState(saved.columns.length);
-  const unsaved = d.columns.length !== savedCols;
-  // Open on the change over time when the response covers several years (the headline for multi-year FOIs).
-  const [colKey, setColKey] = useState(d.columns.find((c) => c.change)?.key ?? d.columns[0]?.key ?? "");
+  // Several years: an average per year and a % change are worked out and offered as the standard maps.
+  const { d, views } = useMemo(() => withYearViews(saved), [saved]);
+  const [colKey, setColKey] = useState(views[0]?.change.key ?? d.columns[0]?.key ?? "");
   const col = d.columns.find((c) => c.key === colKey);
+  const view = views.find((v) => [v.average.key, v.change.key, ...v.years.map((y) => y.key)].includes(colKey)) ?? null;
   const [perHead, setPerHead] = useState(false);
   const ph = perHead && canPerHead(d, col);
   const [selected, setSelected] = useState<string | null>(null);
@@ -327,9 +322,7 @@ function DatasetView({ d: saved, ref_, shapes, seat, backend, canEdit, onDeleted
         </div>
         {d.notes && <p className="small foi-notes">{d.notes}</p>}
 
-        <div className="chips">
-          {d.columns.map((c) => <button key={c.key} className={`chip ${c.key === colKey ? "on" : ""}`} onClick={() => setColKey(c.key)}>{c.label}</button>)}
-        </div>
+        <ViewPicker d={d} views={views} colKey={colKey} setColKey={setColKey} />
         {canPerHead(d, col) && (
           <label className="small foi-toggle"><input type="checkbox" checked={perHead} onChange={(e) => setPerHead(e.target.checked)} /> Per 100,000 residents (estimated from each area's seats)</label>
         )}
@@ -372,13 +365,6 @@ function DatasetView({ d: saved, ref_, shapes, seat, backend, canEdit, onDeleted
             <p className="tiny">{notIn.slice(0, 60).map((t) => t.name).join(", ")}{notIn.length > 60 ? ` and ${notIn.length - 60} more` : ""}</p>
           </details>
         )}
-
-        <ChangeTool d={d} others={others}
-          onAdd={(next) => { setD(next); setColKey(next.columns[next.columns.length - 1].key); }} />
-
-        <Calculator d={d} canSave={canEdit} unsaved={unsaved}
-          onAdd={(next) => { setD(next); setColKey(next.columns[next.columns.length - 1].key); }}
-          onSave={async () => { try { const s2 = await backend.update(d.id, { columns: d.columns, rows: d.rows }); setD(s2); setSavedCols(s2.columns.length); } catch (e) { alert((e as Error).message); } }} />
 
         {seat && (
           <div className="foi-seatbox">
@@ -424,6 +410,7 @@ function DatasetView({ d: saved, ref_, shapes, seat, backend, canEdit, onDeleted
               <button className="icon-btn" onClick={() => setSelected(null)} aria-label="Close">✕</button>
             </div>
             {sel.sub && <div className="tiny muted">{sel.sub}</div>}
+            {view && selRow && <YearBars view={view} values={selRow.values} />}
             {!selRow ? <p className="small muted">Not in this response.</p> : (
               <table className="foi-kv"><tbody>
                 {d.columns.map((c) => <tr key={c.key}><th>{c.label}</th><td>{selRow.suppressed?.[c.key] ? `Withheld (${selRow.suppressed[c.key]})` : fmtValue(selRow.values[c.key], c)}</td></tr>)}
@@ -462,93 +449,79 @@ function DatasetView({ d: saved, ref_, shapes, seat, backend, canEdit, onDeleted
   );
 }
 
-const OPS: [Op, string][] = [["/", "÷"], ["-", "−"], ["+", "+"], ["*", "×"]];
-
-/** Add a column from two others, e.g. vacancies ÷ officers × 100 = vacancy rate %. */
-function Calculator({ d, canSave, unsaved, onAdd, onSave }: { d: Dataset; canSave: boolean; unsaved: boolean; onAdd: (d: Dataset) => void; onSave: () => void }) {
-  const [open, setOpen] = useState(false);
-  const [a, setA] = useState(d.columns[0]?.key ?? "");
-  const [b, setB] = useState(d.columns[1]?.key ?? d.columns[0]?.key ?? "");
-  const [op, setOp] = useState<Op>("/");
-  const [scale, setScale] = useState(100);
-  const name = (k: string) => d.columns.find((c) => c.key === k)?.label ?? k;
-  const [label, setLabel] = useState("");
-  const auto = `${name(a)} ${OPS.find(([o]) => o === op)![1]} ${name(b)}${scale !== 1 ? (scale === 100 && op === "/" ? " (%)" : ` × ${scale.toLocaleString("en-GB")}`) : ""}`;
-  if (d.columns.length < 2) return null;
+/**
+ * What to map. Multi-year responses get the standard views (average per year, % change, or one year) for each
+ * measure; any other figures are listed after them.
+ */
+function ViewPicker({ d, views, colKey, setColKey }: { d: Dataset; views: YearView[]; colKey: string; setColKey: (k: string) => void }) {
+  const inView = new Set(views.flatMap((v) => [v.average.key, v.change.key, ...v.years.map((y) => y.key)]));
+  const others = d.columns.filter((c) => !inView.has(c.key));
+  const current = views.find((v) => [v.average.key, v.change.key, ...v.years.map((y) => y.key)].includes(colKey));
+  const v = current ?? views[0];
+  const chips = (cols: typeof others) => (
+    <div className="chips">
+      {cols.map((c) => <button key={c.key} className={`chip ${c.key === colKey ? "on" : ""}`} onClick={() => setColKey(c.key)}>{c.label}</button>)}
+    </div>
+  );
+  if (!views.length) return chips(d.columns);
+  const year = v.years.find((y) => y.key === colKey);
+  // Switching measure keeps the same kind of view (average / change / latest year).
+  const sameKind = (next: YearView) => (colKey === v.change.key ? next.change.key : colKey === v.average.key ? next.average.key : next.years[next.years.length - 1].key);
   return (
-    <div className="foi-calc">
-      {!open ? (
-        <button className="link-btn small" onClick={() => setOpen(true)}>+ Calculate a new figure from two columns (e.g. a rate or %)</button>
-      ) : (
-        <>
-          <div className="foi-calc-row">
-            <select aria-label="First column" value={a} onChange={(e) => setA(e.target.value)}>{d.columns.map((c) => <option key={c.key} value={c.key}>{c.label}</option>)}</select>
-            <select aria-label="Operation" value={op} onChange={(e) => setOp(e.target.value as Op)}>{OPS.map(([o, l]) => <option key={o} value={o}>{l}</option>)}</select>
-            <select aria-label="Second column" value={b} onChange={(e) => setB(e.target.value)}>{d.columns.map((c) => <option key={c.key} value={c.key}>{c.label}</option>)}</select>
-            <select aria-label="Multiply by" value={scale} onChange={(e) => setScale(Number(e.target.value))}>
-              <option value={1}>as is</option><option value={100}>× 100 (%)</option><option value={1000}>× 1,000</option><option value={100000}>× 100,000</option>
-            </select>
-          </div>
-          <div className="foi-calc-row">
-            <input aria-label="Name" placeholder={auto} value={label} onChange={(e) => setLabel(e.target.value)} />
-            <button className="btn primary" onClick={() => { onAdd(calculate(d, a, op, b, scale, label.trim() || auto)); setLabel(""); setOpen(false); }}>Add</button>
-            <button className="btn" onClick={() => setOpen(false)}>Cancel</button>
-          </div>
-        </>
+    <div className="foi-views">
+      {views.length > 1 && (
+        <label className="foi-measure small">
+          <span className="muted">Figure</span>
+          <select value={v.series} onChange={(e) => setColKey(sameKind(views.find((x) => x.series === e.target.value)!))}>
+            {views.map((x) => <option key={x.series} value={x.series}>{x.series || "Figures"}</option>)}
+          </select>
+        </label>
       )}
-      {unsaved && (
-        <p className="tiny">
-          New figures are shown here only.{" "}
-          {canSave ? <button className="link-btn" onClick={onSave}>Save them to the dataset for the team</button> : "Only the uploader or an admin can save them."}
-        </p>
-      )}
+      <div className="seg" role="tablist" aria-label="Map view">
+        <button role="tab" aria-selected={current === v && colKey === v.average.key} className={colKey === v.average.key ? "on" : ""} onClick={() => setColKey(v.average.key)}>
+          <strong>Average per year</strong><span>{v.years[0].period}–{v.years[v.years.length - 1].period}</span>
+        </button>
+        <button role="tab" aria-selected={colKey === v.change.key} className={colKey === v.change.key ? "on" : ""} onClick={() => setColKey(v.change.key)}>
+          <strong>% change</strong><span>{v.years[0].period} → {v.years[v.years.length - 1].period}</span>
+        </button>
+        <label className={`seg-year ${year ? "on" : ""}`}>
+          <strong>One year</strong>
+          <select aria-label="Year" value={year?.key ?? ""} onChange={(e) => e.target.value && setColKey(e.target.value)}>
+            {!year && <option value="">Choose…</option>}
+            {v.years.map((y) => <option key={y.key} value={y.key}>{y.period}</option>)}
+          </select>
+        </label>
+      </div>
+      {others.length > 0 && (<><div className="tiny muted">Other figures</div>{chips(others)}</>)}
     </div>
   );
 }
 
-/**
- * Change over time: pick two figures (two years in this response, or this response and an earlier one of the same
- * kind) and map the % or absolute change for every area with both.
- */
-function ChangeTool({ d, others, onAdd }: { d: Dataset; others: Dataset[]; onAdd: (d: Dataset) => void }) {
-  const series = timeSeries(d.columns);
-  const options = [
-    ...d.columns.filter((c) => !c.change).map((c) => ({ id: `${d.id}|${c.key}`, label: c.label, d, col: c })),
-    ...others.flatMap((o) => o.columns.filter((c) => !c.change).map((c) => ({ id: `${o.id}|${c.key}`, label: `${o.title}${o.period ? ` (${o.period})` : ""}: ${c.label}`, d: o, col: c }))),
-  ];
-  const firstSeries = series[0]?.cols;
-  const [from, setFrom] = useState(firstSeries ? `${d.id}|${firstSeries[0].key}` : options.find((o) => o.d.id !== d.id)?.id ?? "");
-  const [to, setTo] = useState(firstSeries ? `${d.id}|${firstSeries[firstSeries.length - 1].key}` : options[0]?.id ?? "");
-  const [mode, setMode] = useState<"percent" | "absolute">("percent");
-  const [open, setOpen] = useState(false);
-  if (!series.length && !others.length) return null;
-  const pick = (id: string) => options.find((o) => o.id === id);
+/** A small bar chart of one area's figure in each year. */
+function YearBars({ view, values }: { view: YearView; values: Record<string, number | null> }) {
+  const pts = view.years.map((y) => ({ label: y.period!, v: values[y.key] ?? null }));
+  const max = Math.max(0, ...pts.map((p) => p.v ?? 0));
+  if (!max) return null;
+  const W = 300, H = 70, gap = 8, bw = (W - gap * (pts.length - 1)) / pts.length;
   return (
-    <div className="foi-calc foi-change">
-      {!open ? (
-        <button className="link-btn small" onClick={() => setOpen(true)}>
-          {series.length ? "↗ Change over time: compare any two years" : "↗ Change since an earlier response of the same kind"}
-        </button>
-      ) : (
-        <>
-          <div className="foi-calc-row">
-            <label className="tiny muted">From <select aria-label="From" value={from} onChange={(e) => setFrom(e.target.value)}>{options.map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}</select></label>
-            <label className="tiny muted">to <select aria-label="To" value={to} onChange={(e) => setTo(e.target.value)}>{options.map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}</select></label>
-            <select aria-label="Show" value={mode} onChange={(e) => setMode(e.target.value as "percent" | "absolute")}>
-              <option value="percent">% change</option><option value="absolute">change (difference)</option>
-            </select>
-          </div>
-          <div className="foi-calc-row">
-            <button className="btn primary" disabled={!pick(from) || !pick(to) || from === to} onClick={() => {
-              const a = pick(from)!, b = pick(to)!;
-              onAdd(addChange(d, { d: a.d, col: a.col }, { d: b.d, col: b.col }, mode));
-              setOpen(false);
-            }}>Show on the map</button>
-            <button className="btn" onClick={() => setOpen(false)}>Cancel</button>
-          </div>
-          <p className="tiny muted">Areas need a figure in both to get a change. Comparing two responses only makes sense if they asked the same question.</p>
-        </>
+    <figure className="foi-bars" aria-label={`${view.series || "Figure"} by year`}>
+      <svg viewBox={`0 -16 ${W} ${H + 40}`} role="img">
+        {pts.map((p, i) => {
+          const h = p.v === null ? 0 : Math.max(2, (p.v / max) * H);
+          const x = i * (bw + gap);
+          return (
+            <g key={p.label}>
+              {p.v === null ? <text x={x + bw / 2} y={H - 2} textAnchor="middle" className="nd">–</text>
+                : <rect x={x} y={H - h} width={bw} height={h} rx={3} className={i === pts.length - 1 ? "last" : ""} />}
+              {p.v !== null && <text x={x + bw / 2} y={H - h - 4} textAnchor="middle" className="val">{fmtValue(p.v, view.years[i])}</text>}
+              <text x={x + bw / 2} y={H + 16} textAnchor="middle" className="yr">{p.label}</text>
+            </g>
+          );
+        })}
+      </svg>
+      {values[view.change.key] !== null && values[view.change.key] !== undefined && (
+        <figcaption className="tiny muted">{fmtValue(values[view.change.key]!, view.change)} from {view.years[0].period} to {view.years[view.years.length - 1].period}</figcaption>
       )}
-    </div>
+    </figure>
   );
 }

@@ -1,8 +1,8 @@
 import { useMemo, useState } from "react";
 import { Matcher, targets, type Match } from "./match";
 import { numericShare, parseCsv, parseValue, readFile, toTable, type Table } from "./parse";
-import { autoChanges, parsePeriod, seriesName } from "./periods";
-import { DEPARTMENTS, GEOGRAPHY_LABEL, type Cell, type Column, type DataRow, type Dataset, type Department, type Direction, type Geography, type NewDataset, type Reference } from "./types";
+import { parsePeriod, seriesName } from "./periods";
+import { DEPARTMENTS, GEOGRAPHY_LABEL, type Cell, type Column, type DataRow, type Department, type Direction, type Geography, type NewDataset, type Reference } from "./types";
 
 interface Props {
   ref_: Reference;
@@ -194,10 +194,7 @@ export default function Upload({ ref_, department, onCancel, onSave }: Props) {
         byCode.set(code, row);
       });
     }
-    // Several years: add the % change from the first to the last automatically.
-    const withChange = autoChanges({ columns, rows: [...byCode.values()] } as unknown as Dataset);
-    columns = withChange.columns;
-    const rows = withChange.rows;
+    const rows = [...byCode.values()];
     const nul = (s: string) => s.trim() || null;
     setBusy(true);
     setError(null);
@@ -302,7 +299,7 @@ export default function Upload({ ref_, department, onCancel, onSave }: Props) {
             {(() => {
               const years = periodCol !== null ? new Set(table.rows.map((r) => parsePeriod(r[periodCol] ?? "")?.label).filter(Boolean)).size
                 : new Set(Object.values(cols).map((c) => c.period).filter(Boolean)).size;
-              return years >= 2 ? <p className="tiny ok">{years} years found: the % change from the first to the last will be added and mapped automatically.</p> : null;
+              return years >= 2 ? <p className="tiny ok">{years} years found: maps of the average per year and the % change from the first year to the last will be made automatically.</p> : null;
             })()}
             <div className="foi-field"><span>Figures to keep</span></div>
             <div className="foi-cols">
