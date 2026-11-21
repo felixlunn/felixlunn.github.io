@@ -145,3 +145,30 @@ describe("periods", () => {
     expect(withYearViews(old).views[0].years.map((y) => y.period)).toEqual(["2022", "2023", "2024"]);
   });
 });
+
+describe("Lib Dem seats served", () => {
+  it("links forces, trusts and courts to Lib Dem seats", async () => {
+    const { libDemServed, isLibDem } = await import("./analysis");
+    expect(isLibDem("Liberal Democrat")).toBe(true);
+    expect(isLibDem("Labour")).toBe(false);
+    const ref = {
+      version: 1, as_of: "", seats: [
+        { code: "E1", name: "Bath", mp: null, party: "Liberal Democrat", lon: 0, lat: 0 },
+        { code: "E2", name: "Leeds", mp: null, party: "Labour", lon: 2, lat: 0 },
+        { code: "S1", name: "Fife", mp: null, party: "Liberal Democrat", lon: 2.2, lat: 2 },
+      ],
+      layers: { police: { label: "", areas: [{ code: "P1", name: "West", aliases: [], population: 1, seats: [["E1", 1]] }, { code: "P2", name: "East", aliases: [], population: 1, seats: [["E2", 1]] }] },
+        health: { label: "", areas: [] } },
+      points: {
+        trusts: [{ code: "T1", name: "T1", kind: "", postcode: "", lat: 0, lon: 2, area: null, seat: "E2", catchment: [["E1", 0.6], ["E2", 1]] }],
+        courts: [{ id: "c1", name: "West", types: [], lat: 0, lon: 0.2, codes: [], area: "E23", seat: "E1" },
+          { id: "c2", name: "East", types: [], lat: 0, lon: 2, codes: [], area: "E23", seat: "E2" }],
+      },
+    } as never;
+    expect([...libDemServed(ref, "police_force", new Set()).keys()]).toEqual(["P1"]);
+    expect(libDemServed(ref, "nhs_trust", new Set()).get("T1")).toEqual(["Bath"]);
+    const courts = libDemServed(ref, "court", new Set(["c1", "c2"]));
+    expect(courts.get("c1")).toEqual(["Bath"]); // nearest court to Bath
+    expect(courts.has("c2")).toBe(false); // Fife is in Scotland: no English court serves it
+  });
+});

@@ -25,7 +25,7 @@ export interface Reference {
   as_of: string;
   layers: { police: { label: string; areas: RefArea[] }; health: { label: string; areas: RefArea[] } };
   points: { courts?: RefCourt[]; trusts?: RefTrust[] };
-  seats: { code: string; name: string; mp: string | null; party: string | null }[];
+  seats: { code: string; name: string; mp: string | null; party: string | null; lon?: number; lat?: number }[];
 }
 
 /** One thing an uploaded row can be matched to. */

@@ -81,3 +81,58 @@ export function fmtValue(v: number | null, col: Column | undefined, perHead = fa
   if (col?.unit === "percent") return `${sign}${s}%`;
   return `${sign}${s}`;
 }
+
+const LIB_DEM = /^(liberal democrats?|lib ?dems?|ld)$/i;
+export const isLibDem = (party: string | null | undefined) => LIB_DEM.test((party ?? "").trim());
+
+const jurisdiction = (code: string | null | undefined) => (code?.startsWith("S") ? "S" : code?.startsWith("N") ? "N" : "EW");
+
+/**
+ * The seats each force, NHS area, trust or court in a response serves:
+ * - forces and NHS areas: the seats they overlap;
+ * - acute trusts: the seats in their catchment (others: the seat their head office is in);
+ * - courts: the seats nearer to them than to any other court in the response (as drawn on the map), and the seat
+ *   they're in.
+ */
+export function seatsServed(ref: Reference, g: Geography, inResponse: Set<string>): Map<string, Set<string>> {
+  const out = new Map<string, Set<string>>();
+  const add = (code: string, seat: string | null | undefined) => {
+    if (!seat) return;
+    if (!out.has(code)) out.set(code, new Set());
+    out.get(code)!.add(seat);
+  };
+  if (g === "police_force" || g === "health_area") {
+    for (const a of (g === "police_force" ? ref.layers.police.areas : ref.layers.health.areas)) for (const [s] of a.seats) add(a.code, s);
+  } else if (g === "nhs_trust") {
+    for (const t of ref.points.trusts ?? []) {
+      if (t.catchment?.length) for (const [s] of t.catchment) add(t.code, s);
+      else add(t.code, t.seat);
+    }
+  } else {
+    const courts = (ref.points.courts ?? []).filter((c) => inResponse.has(c.id));
+    for (const c of courts) add(c.id, c.seat);
+    const K = Math.cos((54 * Math.PI) / 180);
+    for (const s of ref.seats) {
+      if (s.lon === undefined || s.lat === undefined) continue;
+      let best: string | null = null, bestD = Infinity;
+      for (const c of courts) {
+        if (jurisdiction(c.area) !== jurisdiction(s.code)) continue;
+        const dd = ((c.lon - s.lon) * K) ** 2 + (c.lat - s.lat) ** 2;
+        if (dd < bestD) { bestD = dd; best = c.id; }
+      }
+      if (best) add(best, s.code);
+    }
+  }
+  return out;
+}
+
+/** Those serving at least one Lib Dem-held seat, with those seats' names. */
+export function libDemServed(ref: Reference, g: Geography, inResponse: Set<string>): Map<string, string[]> {
+  const ld = new Map(ref.seats.filter((s) => isLibDem(s.party)).map((s) => [s.code, s.name]));
+  const out = new Map<string, string[]>();
+  for (const [code, seats] of seatsServed(ref, g, inResponse)) {
+    const names = [...seats].filter((s) => ld.has(s)).map((s) => ld.get(s)!);
+    if (names.length) out.set(code, names.sort());
+  }
+  return out;
+}

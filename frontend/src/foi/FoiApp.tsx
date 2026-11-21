@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { canPerHead, fmtValue, forSeat, overallRate, points, ranked, summary } from "./analysis";
+import { canPerHead, fmtValue, forSeat, libDemServed, overallRate, points, ranked, summary, type Ranked } from "./analysis";
 import { outlier, vsMedian } from "./stats";
 import { jurisdictionOf, nearestAreas } from "./cells";
 import { withYearViews, type YearView } from "./periods";
@@ -234,6 +234,23 @@ function DatasetView({ d: saved, ref_, shapes, seat, backend, canEdit, onDeleted
   const stats = useMemo(() => summary(rows), [rows]);
   const flagged = useMemo(() => rows.map((r) => ({ r, o: outlier(r.value, stats) })).filter((x) => x.o !== null), [rows, stats]);
   const flaggedSet = useMemo(() => new Set(flagged.map((x) => x.r.target.code)), [flagged]);
+
+  // Filters on the average and % change maps: above / below average (or increase / decrease), and Lib Dem seats.
+  const [dir, setDir] = useState<"all" | "up" | "down">("all");
+  const [ldOnly, setLdOnly] = useState(false);
+  const filtering = !!col?.derived;
+  const ld = useMemo(() => libDemServed(ref_, d.geography, new Set(d.rows.map((r) => r.code))), [ref_, d.geography, d.rows]);
+  const isChange = col?.derived === "change";
+  const pass = (r: Ranked) => {
+    if (!filtering) return true;
+    if (ldOnly && !ld.has(r.target.code)) return false;
+    if (dir === "all") return true;
+    if (r.value === null) return false;
+    const mid = isChange ? 0 : stats.mean ?? 0;
+    return dir === "up" ? r.value > mid : r.value < mid;
+  };
+  const visible = new Set(rows.filter(pass).map((r) => r.target.code));
+  const activeFilter = filtering && (dir !== "all" || ldOnly);
   const overall = ph ? overallRate(rows) : null;
   // How far from the middle: a ratio for levels ("2.3× the median"), a difference for changes ("+12 points above").
   const vsMid = (v: number): string | null => {
@@ -303,12 +320,13 @@ function DatasetView({ d: saved, ref_, shapes, seat, backend, canEdit, onDeleted
     try { await backend.remove(d); onDeleted(); } catch (e) { alert((e as Error).message); }
   };
 
-  const shown = rows.filter((r) => !filter || r.target.name.toLowerCase().includes(filter.toLowerCase()));
+  const shown = rows.filter((r) => pass(r) && (!filter || r.target.name.toLowerCase().includes(filter.toLowerCase())));
+  const dimmed = activeFilter ? new Set(items.map((i) => i.code).filter((c) => !visible.has(c))) : undefined;
   return (
     <div className="foi-main">
       <div className="foi-map-wrap">
         {mapNote && <div className="foi-map-note tiny">{mapNote}</div>}
-        <FoiMap shapes={layerShapes} items={items} reverse={col?.direction === "higher_better"} selected={selected} highlight={highlight} flagged={flaggedSet} onSelect={setSelected}
+        <FoiMap shapes={layerShapes} items={items} reverse={col?.direction === "higher_better"} selected={selected} highlight={highlight} flagged={flaggedSet} dimmed={dimmed} onSelect={setSelected}
           title={`${col?.label ?? ""}${unit}`} format={(v) => fmtValue(v, col, ph)} />
       </div>
       <section className="foi-detail">
@@ -329,6 +347,26 @@ function DatasetView({ d: saved, ref_, shapes, seat, backend, canEdit, onDeleted
         {d.notes && <p className="small foi-notes">{d.notes}</p>}
 
         <ViewPicker d={d} views={views} colKey={colKey} setColKey={setColKey} />
+        {filtering && (
+          <>
+            <div className="foi-filters" role="group" aria-label="Filter the map">
+              <span className="fl-label">Show</span>
+              <button className={`chip ${dir === "all" ? "on" : ""}`} onClick={() => setDir("all")}>All</button>
+              <button className={`chip ${dir === "up" ? "on" : ""}`} onClick={() => setDir("up")}>{isChange ? "▲ Increase" : "Above average"}</button>
+              <button className={`chip ${dir === "down" ? "on" : ""}`} onClick={() => setDir("down")}>{isChange ? "▼ Decrease" : "Below average"}</button>
+              <button className={`chip ld ${ldOnly ? "on" : ""}`} aria-pressed={ldOnly} onClick={() => setLdOnly(!ldOnly)}
+                title="Only those serving at least one Lib Dem-held seat">Lib Dem seats{ld.size ? ` (${ld.size})` : ""}</button>
+            </div>
+            {activeFilter && (
+              <p className="foi-showing">
+                Showing <strong>{visible.size}</strong> of {rows.length}
+                {dir !== "all" && <> · {isChange ? (dir === "up" ? "increased" : "decreased") : `${dir === "up" ? "above" : "below"} the average (${fmtValue(stats.mean, col, ph)})`}</>}
+                {ldOnly && <> · serving a Lib Dem seat</>}
+                {" "}<button className="link-btn" onClick={() => { setDir("all"); setLdOnly(false); }}>clear</button>
+              </p>
+            )}
+          </>
+        )}
         {canPerHead(d, col) && (
           <label className="small foi-toggle"><input type="checkbox" checked={perHead} onChange={(e) => setPerHead(e.target.checked)} /> Per 100,000 residents (estimated from each area's seats)</label>
         )}
@@ -351,9 +389,11 @@ function DatasetView({ d: saved, ref_, shapes, seat, backend, canEdit, onDeleted
             <p className="small muted">Too few figures to judge what's unusual (needs at least 8).</p>
           ) : !flagged.length ? (
             <p className="small muted">Nothing unusual: every figure is within the normal spread.</p>
+          ) : !flagged.some(({ r }) => pass(r)) ? (
+            <p className="small muted">None of the unusual figures match the filters ({flagged.length} without them).</p>
           ) : (
             <ul>
-              {flagged.map(({ r, o }) => (
+              {flagged.filter(({ r }) => pass(r)).map(({ r, o }) => (
                 <li key={r.target.code}>
                   <span className={`tag ${o}`}>{o === "high" ? "▲ high" : "▼ low"}</span>
                   <button className="link-btn" onClick={() => setSelected(r.target.code)}>{r.target.name}</button>{" "}
@@ -421,6 +461,7 @@ function DatasetView({ d: saved, ref_, shapes, seat, backend, canEdit, onDeleted
               <table className="foi-kv"><tbody>
                 {d.columns.map((c) => <tr key={c.key}><th>{c.label}</th><td>{selRow.suppressed?.[c.key] ? `Withheld (${selRow.suppressed[c.key]})` : fmtValue(selRow.values[c.key], c)}</td></tr>)}
                 <tr><th>Name in the response</th><td>{selRow.source_name}</td></tr>
+                {ld.has(sel.code) && <tr><th>Lib Dem seats it serves</th><td>{ld.get(sel.code)!.join(", ")}</td></tr>}
                 {linkedSeats(sel.code) !== null && <tr><th>Seats it covers</th><td>{linkedSeats(sel.code)}</td></tr>}
                 {sel.population ? <tr><th>Residents (est.)</th><td>{sel.population.toLocaleString("en-GB")}</td></tr> : null}
               </tbody></table>
@@ -438,7 +479,7 @@ function DatasetView({ d: saved, ref_, shapes, seat, backend, canEdit, onDeleted
             {shown.map((r) => (
               <tr key={r.target.code} className={`${highlight.has(r.target.code) ? "mine" : ""} ${selected === r.target.code ? "sel" : ""}`} onClick={() => setSelected(r.target.code)}>
                 <td className="muted rk">{r.rank ?? ""}</td>
-                <td>{r.target.name}{flaggedSet.has(r.target.code) && <span className={`tag ${outlier(r.value, stats)}`}>{outlier(r.value, stats) === "high" ? "▲" : "▼"}</span>}</td>
+                <td>{r.target.name}{ld.has(r.target.code) && <span className="tag ld" title={`Serves Lib Dem seat${ld.get(r.target.code)!.length > 1 ? "s" : ""}: ${ld.get(r.target.code)!.join(", ")}`}>LD</span>}{flaggedSet.has(r.target.code) && <span className={`tag ${outlier(r.value, stats)}`}>{outlier(r.value, stats) === "high" ? "▲" : "▼"}</span>}</td>
                 <td className="num">{r.suppressed ? <span className="muted">withheld ({r.suppressed})</span> : fmtValue(r.value, col, ph)}</td>
               </tr>
             ))}
