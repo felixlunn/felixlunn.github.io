@@ -195,3 +195,33 @@
 .foi-ld-table .copy { font-size: 15px; }
 .foi-ld-foot { display: flex; gap: 14px; flex-wrap: wrap; margin: 6px 0 2px; }
 .tag.tgt { background: color-mix(in srgb, #faa61a 25%, transparent); color: #8a5a00; }
+
+/* Tidier detail panel: compact header with a menu, tabs, one-line stats */
+.foi-dh { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; margin-bottom: 10px; }
+.foi-dh h2 { font-size: 18px; }
+.foi-dh-text { min-width: 0; }
+.foi-menu { position: relative; flex: none; }
+.foi-menu summary { list-style: none; cursor: pointer; font-size: 20px; line-height: 1; padding: 2px 9px 6px; border: 1px solid var(--border); border-radius: 8px; color: var(--text-2); }
+.foi-menu summary::-webkit-details-marker { display: none; }
+.foi-menu[open] summary { background: var(--surface-2); }
+.foi-menu-list { position: absolute; right: 0; top: calc(100% + 4px); z-index: 20; display: grid; min-width: 210px; padding: 4px; background: var(--surface-1);
+  border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 8px 24px rgb(0 0 0 / .15); }
+.foi-menu-list button { text-align: left; background: none; border: 0; padding: 8px 10px; border-radius: 6px; cursor: pointer; font: inherit; font-size: 13px; color: inherit; }
+.foi-menu-list button:hover { background: var(--surface-2); }
+.foi-menu-list button.bad { color: var(--bad); }
+.foi-filters .seg.mini { display: inline-grid; grid-template-columns: repeat(3, auto); }
+.foi-filters .seg.mini > button { padding: 4px 9px; font-size: 12px; border-right: 1px solid var(--border); }
+.foi-filters .seg.mini > button:last-child { border-right: 0; }
+.foi-filters .seg.mini > button.on { background: var(--accent); color: #fff; }
+.foi-tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--border); margin: 12px 0 10px; }
+.foi-tabs button { background: none; border: 0; border-bottom: 2px solid transparent; padding: 8px 10px; font: inherit; font-size: 13px; font-weight: 600; color: var(--text-2); cursor: pointer; margin-bottom: -1px; }
+.foi-tabs button.on { color: var(--accent); border-bottom-color: var(--accent); }
+.foi-tabs button:first-child.on { color: #b06f00; border-bottom-color: #faa61a; }
+.foi-statline { line-height: 1.6; color: var(--text-2); margin: 0 0 6px; }
+.foi-statline strong { color: var(--text-1); font-variant-numeric: tabular-nums; }
+.foi-unusual { margin: 0 0 8px; line-height: 1.8; }
+.foi-about .foi-kv { margin-bottom: 10px; }
+/* Inside its tab the Lib Dem panel doesn't need its own frame */
+.foi-ld { border: 0; padding: 0; margin: 0; background: none; }
+.foi-ld-head { margin-top: 0; }
+.foi-selected { margin-top: 4px; }
