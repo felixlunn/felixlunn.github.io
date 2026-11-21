@@ -65,7 +65,14 @@ export interface YearView {
  * Multi-year responses: for each measure with two or more years, add (in the browser, not saved) its average per
  * year and its % change from the first year to the last. Returns the dataset with these columns, and the views.
  */
-export function withYearViews(d: Dataset): { d: Dataset; views: YearView[] } {
+export function withYearViews(saved: Dataset): { d: Dataset; views: YearView[] } {
+  // Datasets uploaded before years were tagged: recognise them from the column names now.
+  const tagged = saved.columns.map((c) => {
+    if (c.period || c.change || c.derived) return c;
+    const p = parsePeriod(c.label);
+    return p ? { ...c, period: p.label, series: seriesName(c.label) } : c;
+  });
+  const d = { ...saved, columns: tagged };
   const views: YearView[] = [];
   const columns = [...d.columns];
   const extra: Record<string, Record<string, Cell>> = {};
@@ -88,6 +95,6 @@ export function withYearViews(d: Dataset): { d: Dataset; views: YearView[] } {
     columns.push(average, change);
     views.push({ series, years: cols, average, change });
   }
-  if (!views.length) return { d, views };
+  if (!views.length) return { d: saved, views };
   return { d: { ...d, columns, rows: d.rows.map((r) => ({ ...r, values: { ...r.values, ...extra[r.code] } })) }, views };
 }
