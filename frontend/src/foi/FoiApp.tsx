@@ -245,6 +245,8 @@ function DatasetView({ d: saved, ref_, shapes, seat, backend, canEdit, onDeleted
   // Filters on the average and % change maps: above / below average (or increase / decrease), and Lib Dem seats.
   const [dir, setDir] = useState<"all" | "up" | "down">("all");
   const [ldOnly, setLdOnly] = useState(false);
+  const [tab, setTab] = useState<"ld" | "all" | "about">(() => { try { return (localStorage.getItem("foi.tab") as "ld" | "all" | "about") || "ld"; } catch { return "ld"; } });
+  useEffect(() => { try { localStorage.setItem("foi.tab", tab); } catch { /* per visit */ } }, [tab]);
   const [scope, setScope] = useState<LdScope>(() => { try { return (localStorage.getItem("foi.ldScope") as LdScope) || "held"; } catch { return "held"; } });
   useEffect(() => { try { localStorage.setItem("foi.ldScope", scope); } catch { /* per visit */ } }, [scope]);
   const filtering = !!col?.derived;
@@ -339,34 +341,36 @@ function DatasetView({ d: saved, ref_, shapes, seat, backend, canEdit, onDeleted
           title={`${col?.label ?? ""}${unit}`} format={(v) => fmtValue(v, col, ph)} />
       </div>
       <section className="foi-detail">
-        <div className="foi-detail-head">
-          <div>
+        <header className="foi-dh">
+          <div className="foi-dh-text">
             <h2>{d.title}</h2>
-            <div className="tiny muted">
-              {[GEOGRAPHY_LABEL[d.geography], d.authority && `answered by ${d.authority}`, d.period, d.foi_reference && `ref. ${d.foi_reference}`,
-                d.received_on && `received ${d.received_on}`, `added by ${d.created_by_email || "unknown"} on ${d.created_at.slice(0, 10)}`].filter(Boolean).join(" · ")}
+            <div className="tiny muted">{[GEOGRAPHY_LABEL[d.geography], d.authority, d.period || d.received_on].filter(Boolean).join(" · ")}</div>
+          </div>
+          <details className="foi-menu">
+            <summary aria-label="More actions" title="Download, original file, delete">⋯</summary>
+            <div className="foi-menu-list">
+              <button onClick={exportCsv}>Download the data (CSV)</button>
+              {d.file_path && <button onClick={openFile}>Open the original file</button>}
+              {canEdit && <button className="bad" onClick={remove}>Delete this dataset</button>}
             </div>
-          </div>
-          <div className="foi-actions">
-            <button className="btn" onClick={exportCsv}>Download CSV</button>
-            {d.file_path && <button className="btn" onClick={openFile}>Original file</button>}
-            {canEdit && <button className="btn danger" onClick={remove}>Delete</button>}
-          </div>
-        </div>
-        {d.notes && <p className="small foi-notes">{d.notes}</p>}
+          </details>
+        </header>
 
         <ViewPicker d={d} views={views} colKey={colKey} setColKey={setColKey} />
         <div className="foi-filters" role="group" aria-label="Filter the map">
-          <span className="fl-label">Show</span>
           {filtering && (
-            <>
-              <button className={`chip ${dir === "all" ? "on" : ""}`} onClick={() => setDir("all")}>All</button>
-              <button className={`chip ${dir === "up" ? "on" : ""}`} onClick={() => setDir("up")}>{isChange ? "▲ Increase" : "Above average"}</button>
-              <button className={`chip ${dir === "down" ? "on" : ""}`} onClick={() => setDir("down")}>{isChange ? "▼ Decrease" : "Below average"}</button>
-            </>
+            <span className="seg mini">
+              <button className={dir === "all" ? "on" : ""} onClick={() => setDir("all")}>All</button>
+              <button className={dir === "up" ? "on" : ""} onClick={() => setDir("up")}>{isChange ? "▲ Up" : "Above avg"}</button>
+              <button className={dir === "down" ? "on" : ""} onClick={() => setDir("down")}>{isChange ? "▼ Down" : "Below avg"}</button>
+            </span>
           )}
           <button className={`chip ld ${ldOnly ? "on" : ""}`} aria-pressed={ldOnly} onClick={() => setLdOnly(!ldOnly)}
-            title="Only those serving at least one of these seats">Serving {scope === "held" ? "Lib Dem seats" : scope === "target" ? "Lib Dem targets" : "Lib Dem seats & targets"}{ld.size ? ` (${ld.size})` : ""}</button>
+            title="Only those serving at least one of these seats">{scope === "held" ? "Lib Dem seats" : scope === "target" ? "Lib Dem targets" : "Lib Dem seats & targets"}{ld.size ? ` (${ld.size})` : ""}</button>
+          {canPerHead(d, col) && (
+            <button className={`chip ${perHead ? "on" : ""}`} aria-pressed={perHead} onClick={() => setPerHead(!perHead)}
+              title="Estimated from the residents of the seats each area covers">Per 100,000</button>
+          )}
         </div>
         {activeFilter && (
           <p className="foi-showing">
@@ -375,91 +379,6 @@ function DatasetView({ d: saved, ref_, shapes, seat, backend, canEdit, onDeleted
             {ldOnly && <> · serving {scope === "held" ? "a Lib Dem seat" : scope === "target" ? "a Lib Dem target" : "a Lib Dem seat or target"}</>}
             {" "}<button className="link-btn" onClick={() => { setDir("all"); setLdOnly(false); }}>clear</button>
           </p>
-        )}
-
-        {canPerHead(d, col) && (
-          <label className="small foi-toggle"><input type="checkbox" checked={perHead} onChange={(e) => setPerHead(e.target.checked)} /> Per 100,000 residents (estimated from each area's seats)</label>
-        )}
-
-        <LibDemPanel ref_={ref_} d={d} col={col} rows={rows} stats={stats} ph={ph} view={view} scope={scope} setScope={setScope}
-          plural={PLURAL[d.geography]} names={tByCode} onPick={(seatCode, server) => { onPickSeat(seatCode); setSelected(server); }} />
-
-        <div className="foi-stats">
-          <div><strong>{stats.n}<span className="of"> of {tByCode.size}</span></strong><span className="tiny muted">{PLURAL[d.geography]} with a figure</span></div>
-          {!ph && col?.unit !== "rate" && col?.unit !== "percent" && <div><strong>{fmtValue(stats.total, col)}</strong><span className="tiny muted">total</span></div>}
-          {overall !== null && <div><strong>{fmtValue(overall, col, true)}</strong><span className="tiny muted">overall, per 100,000</span></div>}
-          <div><strong>{fmtValue(stats.mean, col, ph || !!stats.mean && stats.mean % 1 !== 0)}</strong><span className="tiny muted">average (mean)</span></div>
-          <div><strong>{fmtValue(stats.median, col, ph)}</strong><span className="tiny muted">median</span></div>
-          <div><strong>{fmtValue(stats.q1, col, true)} – {fmtValue(stats.q3, col, true)}</strong><span className="tiny muted">middle half</span></div>
-          <div><strong>{fmtValue(stats.min, col, ph)} – {fmtValue(stats.max, col, ph)}</strong><span className="tiny muted">range</span></div>
-          {stats.withheld > 0 && <div><strong>{stats.withheld}</strong><span className="tiny muted">withheld</span></div>}
-        </div>
-        {(ph || unit) && <p className="tiny muted">Figures shown{unit}.</p>}
-
-        <div className="foi-outliers">
-          <h3 className="foi-h">Stands out</h3>
-          {stats.high === null ? (
-            <p className="small muted">Too few figures to judge what's unusual (needs at least 8).</p>
-          ) : !flagged.length ? (
-            <p className="small muted">Nothing unusual: every figure is within the normal spread.</p>
-          ) : !flagged.some(({ r }) => pass(r)) ? (
-            <p className="small muted">None of the unusual figures match the filters ({flagged.length} without them).</p>
-          ) : (
-            <ul>
-              {flagged.filter(({ r }) => pass(r)).map(({ r, o }) => (
-                <li key={r.target.code}>
-                  <span className={`tag ${o}`}>{o === "high" ? "▲ high" : "▼ low"}</span>
-                  <button className="link-btn" onClick={() => setSelected(r.target.code)}>{r.target.name}</button>{" "}
-                  <strong>{fmtValue(r.value, col, ph)}</strong> <span className="tiny muted">{vsMid(r.value!)}</span>
-                </li>
-              ))}
-            </ul>
-          )}
-          <p className="tiny muted">Unusual means more than 1.5 times the middle half's spread above or below it (Tukey's rule), outlined on the map.</p>
-        </div>
-
-        {notIn.length > 0 && notIn.length < tByCode.size && (
-          <details className="small foi-missing">
-            <summary>{notIn.length} {notIn.length === 1 ? PLURAL[d.geography].replace(/s$/, "") : PLURAL[d.geography]} not in this response</summary>
-            <p className="tiny">{notIn.slice(0, 60).map((t) => t.name).join(", ")}{notIn.length > 60 ? ` and ${notIn.length - 60} more` : ""}</p>
-          </details>
-        )}
-
-        {seat && (
-          <div className="foi-seatbox">
-            <h3 className="foi-h">For {seatName}</h3>
-            {!seatLinks.length ? <p className="small muted">Nothing in this geography is linked to the seat.</p> : (() => {
-              const withRow = seatLinks.filter((l) => rowByCode.has(l.code));
-              const without = seatLinks.filter((l) => !rowByCode.has(l.code));
-              return (
-                <>
-                  {withRow.length > 0 && (
-                    <ul>
-                      {withRow.slice(0, 12).map((l) => {
-                        const r = rows.find((x) => x.target.code === l.code);
-                        return (
-                          <li key={l.code}>
-                            <button className="link-btn" onClick={() => setSelected(l.code)}>{tByCode.get(l.code)?.name ?? l.code}</button>{" "}
-                            <span className="tiny muted">({l.why})</span>:{" "}
-                            {!r || r.suppressed ? <span className="small">withheld{r?.suppressed ? ` (${r.suppressed})` : ""}</span> : <strong>{fmtValue(r.value, col, ph)}{unit}</strong>}
-                            {r?.rank && <span className="tiny muted"> · {r.rank} of {stats.n}{r.value !== null && vsMid(r.value) ? `; ${vsMid(r.value)}` : ""}</span>}
-                            {r && outlier(r.value, stats) && <span className={`tag ${outlier(r.value, stats)}`}>unusually {outlier(r.value, stats)}</span>}
-                          </li>
-                        );
-                      })}
-                      {withRow.length > 12 && <li className="tiny muted">and {withRow.length - 12} more in the wider area</li>}
-                    </ul>
-                  )}
-                  {without.length > 0 && (
-                    <p className="tiny muted">
-                      {withRow.length ? "Also serving the seat, but not in this response: " : "None of those serving the seat are in this response: "}
-                      {without.slice(0, 6).map((l) => tByCode.get(l.code)?.name ?? l.code).join(", ")}{without.length > 6 ? ` and ${without.length - 6} more` : ""}.
-                    </p>
-                  )}
-                </>
-              );
-            })()}
-          </div>
         )}
 
         {sel && (
@@ -471,38 +390,148 @@ function DatasetView({ d: saved, ref_, shapes, seat, backend, canEdit, onDeleted
             {sel.sub && <div className="tiny muted">{sel.sub}</div>}
             {view && selRow && <YearBars view={view} values={selRow.values} />}
             {!selRow ? <p className="small muted">Not in this response.</p> : (
-              <table className="foi-kv"><tbody>
-                {d.columns.map((c) => <tr key={c.key}><th>{c.label}</th><td>{selRow.suppressed?.[c.key] ? `Withheld (${selRow.suppressed[c.key]})` : fmtValue(selRow.values[c.key], c)}</td></tr>)}
-                <tr><th>Name in the response</th><td>{selRow.source_name}</td></tr>
-                {ld.has(sel.code) && <tr><th>Lib Dem seats it serves</th><td>{ld.get(sel.code)!.join(", ")}</td></tr>}
-                {linkedSeats(sel.code) !== null && <tr><th>Seats it covers</th><td>{linkedSeats(sel.code)}</td></tr>}
-                {sel.population ? <tr><th>Residents (est.)</th><td>{sel.population.toLocaleString("en-GB")}</td></tr> : null}
-              </tbody></table>
+              <>
+                <table className="foi-kv"><tbody>
+                  {col && <tr><th>{col.label}</th><td><strong>{selRow.suppressed?.[col.key] ? `Withheld (${selRow.suppressed[col.key]})` : fmtValue(selRow.values[col.key] ?? null, col)}</strong>
+                    {(() => { const r = rows.find((x) => x.target.code === sel.code); return r?.rank ? <span className="tiny muted"> · {r.rank} of {stats.n}</span> : null; })()}</td></tr>}
+                  {ld.has(sel.code) && <tr><th>Lib Dem seats it serves</th><td>{ld.get(sel.code)!.join(", ")}</td></tr>}
+                  {sel.population ? <tr><th>Residents (est.)</th><td>{sel.population.toLocaleString("en-GB")}</td></tr> : null}
+                </tbody></table>
+                <details className="tiny foi-allfig">
+                  <summary>All figures</summary>
+                  <table className="foi-kv"><tbody>
+                    {d.columns.map((c) => <tr key={c.key}><th>{c.label}</th><td>{selRow.suppressed?.[c.key] ? `Withheld (${selRow.suppressed[c.key]})` : fmtValue(selRow.values[c.key] ?? null, c)}</td></tr>)}
+                    <tr><th>Name in the response</th><td>{selRow.source_name}</td></tr>
+                    {linkedSeats(sel.code) !== null && <tr><th>Seats it covers</th><td>{linkedSeats(sel.code)}</td></tr>}
+                  </tbody></table>
+                </details>
+              </>
             )}
           </div>
         )}
 
-        <div className="foi-table-head">
-          <h3 className="foi-h">Ranking: {col?.label}{unit}</h3>
-          <input type="search" placeholder="Filter" value={filter} onChange={(e) => setFilter(e.target.value)} aria-label="Filter the ranking" />
+
+        <div className="foi-tabs" role="tablist">
+          {([["ld", "Lib Dem seats"], ["all", `All ${PLURAL[d.geography]}`], ["about", "About"]] as const).map(([k, label]) => (
+            <button key={k} role="tab" aria-selected={tab === k} className={tab === k ? "on" : ""} onClick={() => setTab(k)}>{label}</button>
+          ))}
         </div>
-        <table className="foi-rank">
-          <thead><tr><th className="rk">#</th><th>{GEOGRAPHY_LABEL[d.geography]}</th><th className="num">{ph ? "Per 100,000" : "Figure"}</th></tr></thead>
-          <tbody>
-            {shown.map((r) => (
-              <tr key={r.target.code} className={`${highlight.has(r.target.code) ? "mine" : ""} ${selected === r.target.code ? "sel" : ""}`} onClick={() => setSelected(r.target.code)}>
-                <td className="muted rk">{r.rank ?? ""}</td>
-                <td>{r.target.name}{ld.has(r.target.code) && <span className="tag ld" title={`Serves Lib Dem seat${ld.get(r.target.code)!.length > 1 ? "s" : ""}: ${ld.get(r.target.code)!.join(", ")}`}>LD</span>}{flaggedSet.has(r.target.code) && <span className={`tag ${outlier(r.value, stats)}`}>{outlier(r.value, stats) === "high" ? "▲" : "▼"}</span>}</td>
-                <td className="num">{r.suppressed ? <span className="muted">withheld ({r.suppressed})</span> : fmtValue(r.value, col, ph)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        {d.unmatched.length > 0 && (
-          <details className="small foi-unmatched">
-            <summary>{d.unmatched.length} {d.unmatched.length === 1 ? "row" : "rows"} in the file couldn't be matched (not mapped)</summary>
-            <ul>{d.unmatched.map((u, i) => <li key={i}>{u.source_name}</li>)}</ul>
-          </details>
+
+        {tab === "ld" && (
+          <>
+            {seat && (
+              <div className="foi-seatbox">
+                <h3 className="foi-h">For {seatName}</h3>
+                {!seatLinks.length ? <p className="small muted">Nothing in this geography is linked to the seat.</p> : (() => {
+                  const withRow = seatLinks.filter((l) => rowByCode.has(l.code));
+                  const without = seatLinks.filter((l) => !rowByCode.has(l.code));
+                  return (
+                    <>
+                      {withRow.length > 0 && (
+                        <ul>
+                          {withRow.slice(0, 12).map((l) => {
+                            const r = rows.find((x) => x.target.code === l.code);
+                            return (
+                              <li key={l.code}>
+                                <button className="link-btn" onClick={() => setSelected(l.code)}>{tByCode.get(l.code)?.name ?? l.code}</button>{" "}
+                                <span className="tiny muted">({l.why})</span>:{" "}
+                                {!r || r.suppressed ? <span className="small">withheld{r?.suppressed ? ` (${r.suppressed})` : ""}</span> : <strong>{fmtValue(r.value, col, ph)}{unit}</strong>}
+                                {r?.rank && <span className="tiny muted"> · {r.rank} of {stats.n}{r.value !== null && vsMid(r.value) ? `; ${vsMid(r.value)}` : ""}</span>}
+                                {r && outlier(r.value, stats) && <span className={`tag ${outlier(r.value, stats)}`}>unusually {outlier(r.value, stats)}</span>}
+                              </li>
+                            );
+                          })}
+                          {withRow.length > 12 && <li className="tiny muted">and {withRow.length - 12} more in the wider area</li>}
+                        </ul>
+                      )}
+                      {without.length > 0 && (
+                        <p className="tiny muted">
+                          {withRow.length ? "Also serving the seat, but not in this response: " : "None of those serving the seat are in this response: "}
+                          {without.slice(0, 6).map((l) => tByCode.get(l.code)?.name ?? l.code).join(", ")}{without.length > 6 ? ` and ${without.length - 6} more` : ""}.
+                        </p>
+                      )}
+                    </>
+                  );
+                })()}
+              </div>
+            )}
+
+            <LibDemPanel ref_={ref_} d={d} col={col} rows={rows} stats={stats} ph={ph} view={view} scope={scope} setScope={setScope}
+              plural={PLURAL[d.geography]} names={tByCode} onPick={(seatCode, server) => { onPickSeat(seatCode); setSelected(server); }} />
+          </>
+        )}
+
+        {tab === "all" && (
+          <>
+            <p className="foi-statline small">
+              <strong>{stats.n}</strong> of {tByCode.size} with a figure
+              {!ph && col?.unit !== "rate" && col?.unit !== "percent" && <> · total <strong>{fmtValue(stats.total, col)}</strong></>}
+              {overall !== null && <> · overall <strong>{fmtValue(overall, col, true)}</strong> per 100,000</>}
+              {" "}· average <strong>{fmtValue(stats.mean, col, ph || !!stats.mean && stats.mean % 1 !== 0)}</strong>
+              {" "}· median <strong>{fmtValue(stats.median, col, ph)}</strong>
+              {" "}· range <strong>{fmtValue(stats.min, col, ph)}</strong> to <strong>{fmtValue(stats.max, col, ph)}</strong>
+              {stats.withheld > 0 && <> · {stats.withheld} withheld</>}
+            </p>
+            {flagged.some(({ r }) => pass(r)) && (
+              <p className="foi-unusual small">
+                <span className="muted">Unusual:</span>{" "}
+                {flagged.filter(({ r }) => pass(r)).map(({ r, o }, i) => (
+                  <span key={r.target.code}>{i > 0 && ", "}
+                    <button className="link-btn" title={vsMid(r.value!) ?? ""} onClick={() => setSelected(r.target.code)}>{r.target.name}</button>{" "}
+                    <span className={`tag ${o}`}>{o === "high" ? "▲" : "▼"} {fmtValue(r.value, col, ph)}</span>
+                  </span>
+                ))}
+              </p>
+            )}
+            <div className="foi-table-head">
+              <span className="tiny muted">{col?.label}{unit}</span>
+              <input type="search" placeholder="Find" value={filter} onChange={(e) => setFilter(e.target.value)} aria-label="Find in the ranking" />
+            </div>
+            <table className="foi-rank">
+              <thead><tr><th className="rk">#</th><th>{GEOGRAPHY_LABEL[d.geography]}</th><th className="num">{ph ? "Per 100,000" : "Figure"}</th></tr></thead>
+              <tbody>
+                {shown.map((r) => (
+                  <tr key={r.target.code} className={`${highlight.has(r.target.code) ? "mine" : ""} ${selected === r.target.code ? "sel" : ""}`} onClick={() => setSelected(r.target.code)}>
+                    <td className="muted rk">{r.rank ?? ""}</td>
+                    <td>{r.target.name}{ld.has(r.target.code) && <span className="tag ld" title={`Serves ${ld.get(r.target.code)!.join(", ")}`}>LD</span>}{flaggedSet.has(r.target.code) && <span className={`tag ${outlier(r.value, stats)}`}>{outlier(r.value, stats) === "high" ? "▲" : "▼"}</span>}</td>
+                    <td className="num">{r.suppressed ? <span className="muted">withheld ({r.suppressed})</span> : fmtValue(r.value, col, ph)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </>
+        )}
+
+        {tab === "about" && (
+          <div className="foi-about">
+            <table className="foi-kv"><tbody>
+              <tr><th>Each row is a</th><td>{GEOGRAPHY_LABEL[d.geography]}</td></tr>
+              {d.authority && <tr><th>Answered by</th><td>{d.authority}</td></tr>}
+              {d.foi_reference && <tr><th>FOI reference</th><td>{d.foi_reference}</td></tr>}
+              {d.period && <tr><th>Period covered</th><td>{d.period}</td></tr>}
+              {d.requested_on && <tr><th>Request sent</th><td>{d.requested_on}</td></tr>}
+              {d.received_on && <tr><th>Response received</th><td>{d.received_on}</td></tr>}
+              <tr><th>Added by</th><td>{d.created_by_email || "unknown"} on {d.created_at.slice(0, 10)}</td></tr>
+            </tbody></table>
+            {d.notes && <p className="small foi-notes">{d.notes}</p>}
+            {notIn.length > 0 && notIn.length < tByCode.size && (
+              <details className="small foi-missing">
+                <summary>{notIn.length} {notIn.length === 1 ? PLURAL[d.geography].replace(/s$/, "") : PLURAL[d.geography]} not in this response</summary>
+                <p className="tiny">{notIn.slice(0, 60).map((t) => t.name).join(", ")}{notIn.length > 60 ? ` and ${notIn.length - 60} more` : ""}</p>
+              </details>
+            )}
+            {d.unmatched.length > 0 && (
+              <details className="small foi-unmatched">
+                <summary>{d.unmatched.length} {d.unmatched.length === 1 ? "row" : "rows"} in the file couldn't be matched (not mapped)</summary>
+                <ul>{d.unmatched.map((u, i) => <li key={i}>{u.source_name}</li>)}</ul>
+              </details>
+            )}
+            <p className="tiny muted">
+              Unusual figures (▲ ▼, dashed on the map) are more than 1.5 times the middle half's spread beyond it (Tukey's rule), with at least 8 figures.
+              {canPerHead(d, col) && " Per 100,000 figures use residents estimated from the seats each area covers."}
+              {mapNote && ` ${mapNote}`}
+            </p>
+          </div>
         )}
       </section>
     </div>
@@ -645,7 +674,7 @@ function LibDemPanel({ ref_, d, col, rows, stats, ph, view, scope, setScope, plu
   return (
     <section className="foi-ld">
       <div className="foi-ld-head">
-        <h3>Lib Dem seats</h3>
+        <span className="tiny muted">Which seats</span>
         <div className="seg mini" role="tablist" aria-label="Which seats">
           <button className={scope === "held" ? "on" : ""} onClick={() => setScope("held")}>Held ({counts.held})</button>
           {counts.target > 0 && <button className={scope === "target" ? "on" : ""} onClick={() => setScope("target")}>Targets ({counts.target})</button>}
