@@ -218,7 +218,7 @@ figures in the others.
 - Common name variants are recognised, e.g. "Avon & Somerset Constabulary" or "Newcastle upon Tyne Hospitals NHS FT".
 - Close matches and unmatched rows are shown for checking before anything is saved.
 - Withheld figures such as `<5` or `*` are kept as withheld, never as zero.
-- Several years are recognised either as year columns ("2023", "2023/24", "Q2 2024"…) or as one row per area per year with a Year column, which is reshaped. The % change from the first to the last year is added and mapped automatically, and **Change over time** compares any two years, including against an earlier response of the same kind.
+- Several years are recognised either as year columns ("2023", "2023/24", "Q2 2024"…) or as one row per area per year with a Year column, which is reshaped. Each measure then gets two standard maps, made automatically: **average per year** and **% change** from the first year to the last, alongside each single year; clicking an area shows its figures by year as a small chart.
 - Count columns on force or NHS-area datasets can be shown per 100,000 residents. Residents are estimated from the
   seats each area covers.
 
