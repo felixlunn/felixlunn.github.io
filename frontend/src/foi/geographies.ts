@@ -2,7 +2,7 @@
  * Everything the FOI section knows about each kind of organisation, in one place: how it's named, whether it's an
  * area (drawn as shapes, can be shown per head) or a place (courts, trusts), its map layer, how it nests (a trust in
  * an NHS area, a court in a criminal justice area), and which departments use it. Adding a geography means adding
- * an entry here (and its reference data in whips/sources/foi_geo.py).
+ * an entry here (and its reference data in whips/sources/foi_geo/).
  */
 
 import type { Department, Geography } from "./types";
