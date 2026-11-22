@@ -210,7 +210,8 @@ in the database.
 One-off setup (about 15 minutes, free tier):
 
 1. **Create the project:** create a Supabase project. Choose a UK or EU region, such as London (eu-west-2).
-2. **Create the tables:** open **SQL Editor → New query**, paste `supabase/schema.sql` and click **Run**.
+2. **Create the tables:** open **SQL Editor → New query**, paste `supabase/schema.sql` and click **Run**. When a later update changes
+   the schema, its pull request says so: paste and run the file again (it is safe to re-run, and upgrades existing tables).
 3. **Lock down sign-in.** Under **Authentication → Sign In / Providers**:
    - Turn off **Allow new users to sign up**, so only invited people get accounts.
    - Keep **Email** enabled.
