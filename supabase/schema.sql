@@ -47,6 +47,9 @@ create table if not exists public.foi_datasets (
   rows jsonb not null check (jsonb_typeof(rows) = 'array'),
   -- Rows that could not be matched: [{"source_name": "...", "values": {...}}]
   unmatched jsonb not null default '[]'::jsonb,
+  -- Saved by the site at upload, so the dataset list loads without the rows:
+  -- {"rows": 45, "unmatched": 2, "headline": {"col": {...}, "median": 412, "n": 43}}
+  summary jsonb,
   file_path text,
   created_by uuid default auth.uid() references auth.users (id) on delete set null,
   created_by_email text not null default lower(coalesce(auth.jwt() ->> 'email', '')),
@@ -55,6 +58,13 @@ create table if not exists public.foi_datasets (
 );
 
 create index if not exists foi_datasets_department on public.foi_datasets (department, created_at desc);
+
+-- Upgrades for databases set up with an earlier version of this file.
+-- Nov 2026: dataset summaries. Older datasets get their sizes; their headline figure shows once re-uploaded.
+alter table public.foi_datasets add column if not exists summary jsonb;
+update public.foi_datasets
+  set summary = jsonb_build_object('rows', jsonb_array_length(rows), 'unmatched', jsonb_array_length(unmatched), 'headline', null)
+  where summary is null;
 
 create or replace function public.foi_touch() returns trigger language plpgsql as $$
 begin

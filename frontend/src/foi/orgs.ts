@@ -3,11 +3,11 @@
  * and an overview of which organisations most often fall in the worse half.
  */
 
-import { ranked, summary, type Ranked } from "./analysis";
+import { fmtValue, ranked, summary, type Ranked } from "./analysis";
 import { targets } from "./match";
 import { withYearViews, type YearView } from "./periods";
 import { GEO } from "./geographies";
-import type { Column, Dataset, Geography, Reference, Target } from "./types";
+import type { Column, Dataset, DatasetSummary, Geography, NewDataset, Reference, Target } from "./types";
 
 /** A dataset's headline: the % change when it covers several years, otherwise its first figure. */
 export interface Headline {
@@ -33,6 +33,24 @@ export function headline(ref: Reference, saved: Dataset): Headline | null {
     }
   }
   return null;
+}
+
+/** What's saved with a dataset at upload: its size and headline figure, so the list needn't load the rows. */
+export function summarise(ref: Reference, d: NewDataset): DatasetSummary {
+  const h = headline(ref, { ...d, id: "", created_by: null, created_by_email: "", created_at: "", updated_at: "" });
+  return {
+    rows: d.rows.length,
+    unmatched: d.unmatched.length,
+    headline: h ? { col: h.col, median: h.stats.median, n: h.stats.n } : null,
+  };
+}
+
+/** The saved headline in words, e.g. "Median 412 · Stop and search" or "Median +3.2% · % change 2019 → 2024". */
+export function headlineText(s: DatasetSummary | null): string | null {
+  const h = s?.headline;
+  if (!h || h.median === null) return null;
+  const what = h.col.change ? `% change ${h.col.change.from} → ${h.col.change.to}` : h.col.label;
+  return `Median ${fmtValue(h.median, h.col)} · ${what}`;
 }
 
 /** Is this value in the worse half (worse than the median)? null when the figure has no "better" direction. */

@@ -39,8 +39,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 90
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
           cache: pip
@@ -49,7 +49,7 @@ jobs:
       # Census 2021 never changes: keep fetched tables between runs (each run saves a fresh
       # copy; tables are refetched only when a metric needs categories the cache lacks).
       - name: Restore census cache
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: .cache/census
           key: census-v1-${{ github.run_id }}
@@ -57,7 +57,7 @@ jobs:
 
       # Slow sources that change rarely (police.uk, EPC, NHS, ...) are reused for a few days; see whips/cache.py.
       - name: Restore saved sources
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: .cache/sources
           key: sources-v1-${{ github.run_id }}
@@ -120,7 +120,7 @@ jobs:
           fi
 
       - name: Keep a copy of the data
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: dashboard-data
           path: frontend/public/data

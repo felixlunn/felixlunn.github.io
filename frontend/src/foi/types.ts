@@ -79,6 +79,8 @@ export interface Dataset {
   columns: Column[];
   rows: DataRow[];
   unmatched: { source_name: string; values: Record<string, Cell> }[];
+  /** Saved at upload, so datasets can be listed without their rows. null on datasets saved before summaries. */
+  summary: DatasetSummary | null;
   file_path: string | null;
   created_by: string | null;
   created_by_email: string;
@@ -87,3 +89,14 @@ export interface Dataset {
 }
 
 export type NewDataset = Omit<Dataset, "id" | "created_by" | "created_by_email" | "created_at" | "updated_at">;
+
+/** A dataset as listed: everything but its rows, which load when it's opened (or when Area view needs them). */
+export type DatasetInfo = Omit<Dataset, "rows" | "unmatched">;
+
+export interface DatasetSummary {
+  rows: number;
+  unmatched: number;
+  /** The headline figure (the % change when the response covers several years, otherwise its first figure):
+   * which column it is, and its median across the organisations in the response. */
+  headline: { col: Column; median: number | null; n: number } | null;
+}

@@ -43,5 +43,12 @@ describe("datasets are cleaned up on load", () => {
     expect(d.unmatched).toEqual([]);
     expect(problems).toHaveLength(2);
     expect(normaliseDataset({ id: "b", title: "T", department: "nope", geography: "nhs_trust" })).toBeNull();
+    expect(d.summary).toBeNull(); // saved before summaries existed
+    const col = { key: "c", label: "C", unit: "count", direction: "neutral" };
+    const ok = { rows: 4, unmatched: 0, headline: { col, median: 2, n: 4 } };
+    const withSummary = (summary: unknown) => normaliseDataset({ id: "c", title: "T", department: "health", geography: "nhs_trust", summary })!.summary;
+    expect(withSummary(ok)).toEqual(ok);
+    expect(withSummary({ rows: 4, unmatched: 0, headline: { col: {}, median: 2 } })).toEqual({ rows: 4, unmatched: 0, headline: null });
+    expect(withSummary({ rows: "4" })).toBeNull();
   });
 });

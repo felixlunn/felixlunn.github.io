@@ -2,19 +2,22 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { usePersistentState } from "../lib/usePersistentState";
 import { type LdScope } from "./analysis";
 import OrgView, { OrgSidebar } from "./OrgView";
-import { headline, type Headline } from "./orgs";
+import { headline, headlineText, type Headline } from "./orgs";
 import type { Backend, User } from "./backend";
 import FoiMap from "./FoiMap";
 import Upload from "./Upload";
 import { DEPARTMENT, DEPARTMENTS, GEO } from "./geographies";
-import { type Dataset, type Department, type Geography, type NewDataset, type Reference } from "./types";
+import { type Dataset, type DatasetInfo, type Department, type Geography, type NewDataset, type Reference } from "./types";
 import { SeatPicker } from "./SeatPicker";
 import { DatasetView } from "./DatasetView";
 /** The FOI workspace: departments, the two views (Dataset view / Area view), uploads and the seat picker. */
 
 export function Workspace({ backend, user, admin, ref_, shapes }: { backend: Backend; user: User; admin: boolean; ref_: Reference; shapes: GeoJSON.FeatureCollection }) {
   const [dept, setDept] = useState<Department>(() => (["policing", "justice", "health"].includes(location.hash.slice(1)) ? location.hash.slice(1) as Department : "policing"));
-  const [datasets, setDatasets] = useState<Dataset[] | null>(null);
+  // The list: every dataset without its rows. Rows load when a dataset is opened, or all at once for Area view.
+  const [datasets, setDatasets] = useState<DatasetInfo[] | null>(null);
+  const [loaded, setLoaded] = useState<Map<string, Dataset>>(() => new Map());
+  const [allLoaded, setAllLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -26,23 +29,46 @@ export function Workspace({ backend, user, admin, ref_, shapes }: { backend: Bac
   const [orgKind, setOrgKind] = useState<Geography>(DEPARTMENT[dept].geographies[0]);
   const [orgCode, setOrgCode] = useState<string | null>(null);
   useEffect(() => { setOrgKind(DEPARTMENT[dept].geographies[0]); setOrgCode(null); }, [dept]);
-  const heads = useMemo(() => (datasets ?? []).map((d) => headline(ref_, d)).filter((h): h is Headline => h !== null), [datasets, ref_]);
+  const heads = useMemo(() => (allLoaded ? (datasets ?? []) : []).map((d) => loaded.get(d.id)).filter((d): d is Dataset => !!d)
+    .map((d) => headline(ref_, d)).filter((h): h is Headline => h !== null), [allLoaded, datasets, loaded, ref_]);
+  const keep = useCallback((ds: Dataset[]) => setLoaded((m) => new Map([...m, ...ds.map((d) => [d.id, d] as const)])), []);
 
   const reload = useCallback(() => {
     setDatasets(null);
+    setLoaded(new Map());
+    setAllLoaded(false);
     backend.list(dept).then((ds) => { setDatasets(ds); setError(null); setActiveId((id) => (ds.some((d) => d.id === id) ? id : ds[0]?.id ?? null)); })
       .catch((e: Error) => { setError(e.message); setDatasets([]); });
   }, [backend, dept]);
   useEffect(reload, [reload]);
+
+  // Dataset view: load the open dataset's rows.
+  useEffect(() => {
+    if (mode !== "datasets" || !activeId || loaded.has(activeId)) return;
+    let live = true;
+    backend.get(activeId).then((d) => { if (live) keep([d]); }).catch((e: Error) => { if (live) setError(e.message); });
+    return () => { live = false; };
+  }, [mode, activeId, loaded, backend, keep]);
+
+  // Area view compares every dataset, so it loads them all (once per department).
+  useEffect(() => {
+    if (mode !== "orgs" || allLoaded || datasets === null) return;
+    let live = true;
+    backend.all(dept).then((ds) => { if (live) { keep(ds); setAllLoaded(true); } }).catch((e: Error) => { if (live) setError(e.message); });
+    return () => { live = false; };
+  }, [mode, allLoaded, datasets, backend, dept, keep]);
+  const areaReady = allLoaded || datasets?.length === 0;
   useEffect(() => { history.replaceState(null, "", `#${dept}`); }, [dept]);
 
-  const active = datasets?.find((d) => d.id === activeId) ?? null;
+  const activeInfo = datasets?.find((d) => d.id === activeId) ?? null;
+  const active = activeId ? loaded.get(activeId) ?? null : null;
   const info = DEPARTMENTS.find((d) => d.id === dept)!;
 
   const save = async (d: NewDataset, file: File | null) => {
     const created = await backend.create(d, file);
     setUploading(false);
     reload();
+    keep([created]);
     setActiveId(created.id);
   };
 
@@ -80,7 +106,7 @@ export function Workspace({ backend, user, admin, ref_, shapes }: { backend: Bac
                 <strong>Area view</strong>
               </button>
             </div>
-            {mode === "orgs" ? (
+            {mode === "orgs" && !areaReady ? <p className="small muted">Loading every dataset…</p> : mode === "orgs" ? (
               <OrgSidebar ref_={ref_} heads={heads} dept={dept} scope={scope} kind={orgKind} setKind={setOrgKind} code={orgCode} setCode={setOrgCode} />
             ) : datasets === null ? <p className="small muted">Loading…</p> : !datasets.length ? (
               <p className="small muted">None yet. Upload the first FOI response for {info.label.toLowerCase()}.</p>
@@ -90,7 +116,8 @@ export function Workspace({ backend, user, admin, ref_, shapes }: { backend: Bac
                   <li key={d.id}>
                     <button className={d.id === activeId ? "on" : ""} onClick={() => setActiveId(d.id)}>
                       <span className="foi-list-title">{d.title}</span>
-                      <span className="tiny muted">{GEO[d.geography].label} · {d.rows.length} rows · {d.period || d.received_on || d.created_at.slice(0, 10)}</span>
+                      <span className="tiny muted">{GEO[d.geography].label} · {d.summary?.rows ?? "?"} rows · {d.period || d.received_on || d.created_at.slice(0, 10)}</span>
+                      {headlineText(d.summary) && <span className="tiny muted foi-list-head">{headlineText(d.summary)}</span>}
                     </button>
                   </li>
                 ))}
@@ -98,7 +125,12 @@ export function Workspace({ backend, user, admin, ref_, shapes }: { backend: Bac
             )}
           </div>
         </aside>
-        {mode === "orgs" ? (
+        {(mode === "orgs" && !areaReady) || (mode === "datasets" && activeInfo && !active) ? (
+          <div className="foi-main foi-empty">
+            <FoiMap shapes={null} items={[]} reverse={false} selected={null} highlight={new Set()} onSelect={() => {}} />
+            <p className="foi-loading small">{mode === "orgs" ? "Loading every dataset for Area view…" : `Loading ${activeInfo!.title}…`}</p>
+          </div>
+        ) : mode === "orgs" ? (
           <OrgView ref_={ref_} shapes={shapes} heads={heads} scope={scope} kind={orgKind} code={orgCode} setCode={setOrgCode}
             setKindAndCode={(g, c) => { setOrgKind(g); setOrgCode(c); }} onOpenDataset={(id) => { setActiveId(id); setMode("datasets"); }} />
         ) : active ? (

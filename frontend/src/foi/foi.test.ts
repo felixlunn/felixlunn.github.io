@@ -222,5 +222,26 @@ describe("by organisation", () => {
     expect(sc.get("T2")).toEqual({ worse: 0, of: 2 });
     expect(parentOf(ref, "nhs_trust", "T1")).toBe("ICB1");
     expect(orgList(ref, [h1], "nhs_trust").map((t) => t.code)).toEqual(["T1", "T2", "T3"]);
+
+    // Saved at upload: the size and the headline's median, so the list needn't load rows.
+    const { summarise, headlineText } = await import("./orgs");
+    const s1 = summarise(ref, { ...(waits as object), unmatched: [{ source_name: "X", values: {} }], summary: null } as never);
+    expect(s1).toMatchObject({ rows: 3, unmatched: 1, headline: { median: 10, n: 3 } });
+    expect(headlineText(s1)).toBe("Median +10% · % change 2023 → 2024");
+    expect(headlineText(summarise(ref, { ...(staff as object), summary: null } as never))).toBe("Median 30 · Nurses");
+    expect(headlineText({ rows: 3, unmatched: 0, headline: null })).toBeNull();
+  });
+});
+
+describe("listing datasets without their rows", () => {
+  it("drops rows but keeps (or works out) the summary", async () => {
+    const { withoutRows } = await import("./backend");
+    const d = { id: "a", rows: [{ code: "x", source_name: "", values: {} }], unmatched: [], summary: null } as never;
+    expect(withoutRows(d)).toEqual({ id: "a", summary: { rows: 1, unmatched: 0, headline: null } });
+    const { noSummaryColumn } = await import("./backend");
+    expect(noSummaryColumn({ code: "42703", message: "column foi_datasets.summary does not exist" })).toBe(true);
+    expect(noSummaryColumn({ code: "PGRST204", message: "Could not find the 'summary' column of 'foi_datasets' in the schema cache" })).toBe(true);
+    expect(noSummaryColumn({ code: "42501", message: "permission denied for table foi_datasets" })).toBe(false);
+    expect(noSummaryColumn(null)).toBe(false);
   });
 });
