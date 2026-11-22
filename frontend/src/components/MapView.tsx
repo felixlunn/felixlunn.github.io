@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import maplibregl, { type GeoJSONSource, type Map as MLMap } from "maplibre-gl";
+import maplibregl from "../lib/maplibre";
+import { type ExpressionSpecification, type GeoJSONSource, type Map as MLMap } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import type { Choropleth, Seat } from "../types";
-import { classify, isDark, quantileBreaks, ramp } from "../lib/colors";
+import { classify, isDark } from "../lib/colors";
+import { useColours } from "../lib/useColours";
 import { usePersistentState } from "../lib/usePersistentState";
 import { osmStyle, UK_BOUNDS } from "../lib/basemap";
 
@@ -52,19 +54,6 @@ function bbox(geom: GeoJSON.Geometry): [number, number, number, number] {
   };
   if ("coordinates" in geom) walk(geom.coordinates);
   return [minX, minY, maxX, maxY];
-}
-
-export function useColours(ch: Choropleth) {
-  return useMemo(() => {
-    const colours = ramp();
-    const breaks = quantileBreaks(ch.values, colours.length);
-    const palette = colours;
-    // With fewer distinct breaks than classes, use the darker end of the ramp evenly.
-    const used = palette.slice(0, breaks.length + 1);
-    const step = (palette.length - 1) / Math.max(used.length - 1, 1);
-    const pick = (k: number) => palette[Math.round(k * step)];
-    return { breaks, pick, classes: breaks.length + 1 };
-  }, [ch]);
 }
 
 export default function MapView({ geo, seats, choropleth, selected, mine = null, overlay = null, focus, onSelect }: Props) {
@@ -205,7 +194,7 @@ export default function MapView({ geo, seats, choropleth, selected, mine = null,
       expr.push(s.code, choropleth.categories ? (choropleth.categories[v]?.colour ?? cssVar("--map-nodata")) : pick(classify(v, breaks)));
     });
     expr.push(cssVar("--map-nodata"));
-    m.setPaintProperty("fill", "fill-color", expr.length > 3 ? expr : cssVar("--map-nodata"));
+    m.setPaintProperty("fill", "fill-color", expr.length > 3 ? (expr as ExpressionSpecification) : cssVar("--map-nodata"));
     m.setFilter("highlight", ["in", ["get", "code"], ["literal", choropleth.highlight ?? []]]);
   }, [choropleth, breaks, pick, seats, ready]);
 
@@ -238,7 +227,7 @@ export default function MapView({ geo, seats, choropleth, selected, mine = null,
     const expr: unknown[] = ["match", ["get", "code"]];
     for (const [code, colour] of Object.entries(overlay.colours)) expr.push(code, colour);
     expr.push(cssVar("--map-nodata"));
-    m.setPaintProperty("sub-fill", "fill-color", expr.length > 3 ? expr : cssVar("--map-nodata"));
+    m.setPaintProperty("sub-fill", "fill-color", expr.length > 3 ? (expr as ExpressionSpecification) : cssVar("--map-nodata"));
   }, [overlay, ready]);
 
   useEffect(() => {
