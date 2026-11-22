@@ -18,7 +18,6 @@ import argparse
 import json
 import logging
 import math
-import re
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -31,6 +30,7 @@ from .cache import cached
 from .context import BuildContext
 from .history import assemble_history
 from .http import session
+from .parties import is_lib_dem
 from .metrics import CENSUS_METRICS, THEMES, MetricMeta, census_meta, source_url
 from .registry import BY_ID, SOURCES, expected_days, skip_names
 from .sources import boundaries as bsrc
@@ -42,8 +42,6 @@ from .sources import scotland as scotland_src
 
 log = logging.getLogger("whips.build")
 
-# Neighbourhood (LSOA) profiles are published for seats held by this party.
-NEIGHBOURHOOD_PARTY = re.compile(r"^(liberal democrats?|lib ?dems?|ld)$", re.I)
 
 SKIPPABLE = skip_names()  # every --skip name, from the registry
 
@@ -141,7 +139,8 @@ def build(out_dir: Path, skip: set[str] | None = None) -> dict:
     if c.lsoa_frames:
         src = BY_ID["neighbourhoods"]
         try:
-            chosen = {st["code"]: st["name"] for st in seats if st.get("party") and NEIGHBOURHOOD_PARTY.match(st["party"].strip())}
+            # Neighbourhood (LSOA) profiles are published for Lib Dem-held seats.
+            chosen = {st["code"]: st["name"] for st in seats if is_lib_dem(st.get("party"))}
             neighbourhoods = lsoa_src.write_seat_files(c.s, out_dir, chosen, c.lsoa_lookup(), c.lsoa_frames, c.imd_deciles)
             c.record(src.id, src.name, src.url, "ok",
                      f"{len(neighbourhoods['seats'])} Lib Dem seats in England & Wales; {neighbourhoods['lsoas']} LSOAs", "March 2021")
