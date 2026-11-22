@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import { rankOf } from "./analytics";
 import type { DashboardData } from "../types";
 
-// Same fixture as tests/test_engine.py::tiny so the two engines can be compared.
 const data = {
   seats: ["A", "B", "C", "D", "E"].map((c, i) => ({ code: c, name: c, country: "England", region: i < 2 ? "North" : "South" })),
   metrics: ["x", "y"].map((id) => ({ id, label: id, unit: "%", tags: ["census"], theme: "people" })),

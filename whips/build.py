@@ -25,7 +25,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from . import engine, freshness
+from . import freshness, peers
 from .cache import cached
 from .context import BuildContext
 from .history import assemble_history
@@ -204,8 +204,7 @@ def finish(out_dir: Path, geo: dict, seats: list[dict], metrics: list[dict], val
            sources: list[dict], demo: bool, debates: list[dict] | None = None, neighbourhoods: dict | None = None,
            petitions: dict | None = None, history: dict | None = None, councils: dict | None = None) -> dict:
     """Add peer groups and write all output files."""
-    ds = engine.Dataset.from_json({"seats": seats, "metrics": metrics, "values": values})
-    groups, group_meta = engine.peer_groups(ds)
+    groups, group_meta = peers.peer_groups(seats, metrics, values)
     for seat, g in zip(seats, groups):
         seat["peer_group"] = g
     data = {
