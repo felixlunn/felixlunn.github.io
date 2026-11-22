@@ -17,12 +17,11 @@ import re
 import pandas as pd
 import requests
 
-from ..http import get_json
+from .. import govuk
 from ..metrics import MetricMeta
 
 log = logging.getLogger(__name__)
 
-CONTENT = "https://www.gov.uk/api/content/government/statistics"
 PAGES = {"gas": "lower-and-middle-super-output-areas-gas-consumption",
          "elec": "lower-and-middle-super-output-areas-electricity-consumption"}
 SOURCE_URL = "https://www.gov.uk/government/collections/sub-national-gas-consumption-data"
@@ -42,7 +41,7 @@ ENERGY_METRICS = [
 
 
 def find_file(s: requests.Session, kind: str) -> str:
-    for a in get_json(s, f"{CONTENT}/{PAGES[kind]}").get("details", {}).get("attachments", []):
+    for a in govuk.attachments(s, f"/government/statistics/{PAGES[kind]}"):
         if str(a.get("title", "")).lower().startswith("lsoa domestic") and str(a.get("url", "")).endswith(".xlsx"):
             return a["url"]
     raise LookupError(f"No LSOA domestic {kind} file found")

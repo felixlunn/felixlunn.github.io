@@ -17,7 +17,7 @@ import re
 import pandas as pd
 import requests
 
-from ..http import get_json
+from .. import govuk
 from ..history import council_periods
 from ..metrics import MetricMeta
 from .councils import apportion, averaged
@@ -70,7 +70,7 @@ def load_air(s: requests.Session, weights: pd.DataFrame) -> tuple[dict[str, pd.D
 # --- renewables ------------------------------------------------------------------------------------
 
 def renewables_file(s: requests.Session) -> str:
-    for a in get_json(s, RENEWABLES).get("details", {}).get("attachments", []):
+    for a in govuk.attachments(s, RENEWABLES):
         if "by local authority" in str(a.get("title", "")).lower() and str(a.get("url", "")).endswith(".xlsx"):
             return a["url"]
     raise LookupError("No renewable electricity by local authority workbook found")

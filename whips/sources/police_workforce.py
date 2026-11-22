@@ -14,7 +14,7 @@ import re
 import pandas as pd
 import requests
 
-from ..http import get_json
+from .. import govuk
 from ..metrics import MetricMeta
 from ..ods import find_table, read_ods
 from .courts import area_key, seat_areas
@@ -22,7 +22,6 @@ from .courts import area_key, seat_areas
 log = logging.getLogger(__name__)
 
 COLLECTION = "https://www.gov.uk/api/content/government/collections/police-workforce-england-and-wales"
-CONTENT = "https://www.gov.uk/api/content"
 SOURCE_URL = "https://www.gov.uk/government/collections/police-workforce-england-and-wales"
 
 POLICE_WORKFORCE_METRICS = [
@@ -34,10 +33,10 @@ POLICE_WORKFORCE_METRICS = [
 
 
 def find_file(s: requests.Session) -> tuple[str, str]:
-    docs = [d for d in get_json(s, COLLECTION).get("links", {}).get("documents", [])
+    docs = [d for d in govuk.documents(s, COLLECTION)
             if re.search(r"police-workforce-england-and-wales-\d", d.get("base_path", ""))]
     for d in sorted(docs, key=lambda d: d.get("public_updated_at", ""), reverse=True)[:3]:
-        for a in get_json(s, CONTENT + d["base_path"]).get("details", {}).get("attachments", []):
+        for a in govuk.attachments(s, d["base_path"]):
             t = str(a.get("title", "")).lower()
             if t.endswith("data tables") and str(a.get("url", "")).endswith(".ods"):
                 return a["url"], d.get("title", "").split(": ")[-1]

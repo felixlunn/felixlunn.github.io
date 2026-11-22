@@ -17,7 +17,7 @@ import re
 import pandas as pd
 import requests
 
-from ..http import get_json
+from .. import govuk
 from ..metrics import MetricMeta
 
 log = logging.getLogger(__name__)
@@ -47,7 +47,7 @@ def _when(title: str) -> datetime.datetime:
 
 
 def find_file(s: requests.Session) -> tuple[str, str]:
-    files = [a for a in get_json(s, DATASET).get("details", {}).get("attachments", [])
+    files = [a for a in govuk.attachments(s, DATASET)
              if "latest inspections" in str(a.get("title", "")).lower() and str(a.get("url", "")).endswith(".csv")]
     if not files:
         raise LookupError("No Ofsted latest inspections file found")

@@ -16,7 +16,7 @@ import re
 import pandas as pd
 import requests
 
-from ..http import get_json
+from .. import govuk
 from ..metrics import MetricMeta
 from ..ods import find_table, read_ods, sheet_names
 
@@ -43,7 +43,7 @@ TRAVEL_METRICS = [
 
 def find_files(s: requests.Session) -> dict[str, str]:
     urls = {}
-    for a in get_json(s, DATASET).get("details", {}).get("attachments", []):
+    for a in govuk.attachments(s, DATASET):
         url = str(a.get("url", ""))
         for mid, (table, _, _) in SERVICES.items():
             if url.endswith(f"/{table}.ods"):

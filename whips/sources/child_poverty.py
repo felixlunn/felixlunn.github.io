@@ -14,7 +14,7 @@ import re
 import pandas as pd
 import requests
 
-from ..http import get_json
+from .. import govuk
 from ..history import with_history
 from ..metrics import MetricMeta
 from ..ods import find_table, read_ods
@@ -22,7 +22,6 @@ from ..ods import find_table, read_ods
 log = logging.getLogger(__name__)
 
 COLLECTION = "https://www.gov.uk/api/content/government/collections/children-in-low-income-families-local-area-statistics"
-CONTENT = "https://www.gov.uk/api/content"
 SOURCE_URL = "https://www.gov.uk/government/collections/children-in-low-income-families-local-area-statistics"
 
 CHILD_POVERTY_METRICS = [
@@ -38,10 +37,10 @@ CHILD_POVERTY_METRICS = [
 
 
 def find_file(s: requests.Session) -> str:
-    docs = sorted(get_json(s, COLLECTION).get("links", {}).get("documents", []),
+    docs = sorted(govuk.documents(s, COLLECTION),
                   key=lambda d: d.get("public_updated_at", ""), reverse=True)
     for d in docs[:3]:
-        for a in get_json(s, CONTENT + d["base_path"]).get("details", {}).get("attachments", []):
+        for a in govuk.attachments(s, d["base_path"]):
             if str(a.get("url", "")).endswith((".ods", ".xlsx")):
                 return a["url"]
     raise LookupError("No children in low income families local area tables found")

@@ -13,7 +13,7 @@ import re
 import pandas as pd
 import requests
 
-from ..http import get_json
+from .. import govuk
 from ..history import council_periods, year_columns
 from ..metrics import MetricMeta
 from ..ods import find_table, read_ods
@@ -35,7 +35,7 @@ COUNCIL_TAX_METRICS = [
 
 
 def find_file(s: requests.Session) -> str:
-    for a in get_json(s, DATASET).get("details", {}).get("attachments", []):
+    for a in govuk.attachments(s, DATASET):
         if str(a.get("title", "")).lower().startswith("band d council tax") and str(a.get("url", "")).endswith(".ods"):
             return a["url"]
     raise LookupError("No Band D council tax table found")

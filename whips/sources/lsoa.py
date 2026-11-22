@@ -21,8 +21,7 @@ import pandas as pd
 import requests
 from shapely.geometry import mapping, shape
 
-from ..http import get_json
-from .boundaries import ARCGIS_ROOT, _round_coords, portal_services
+from .. import arcgis
 
 log = logging.getLogger(__name__)
 
@@ -31,11 +30,6 @@ log = logging.getLogger(__name__)
 BOUNDARY_PATTERN = re.compile(r"^(?:Lower_layer_Super_Output_Areas_December_2021_Boundaries_EW|LSOA_2021_EW)_(BFC|BGC|BFE|BSC)", re.I)
 WARD_PATTERN = re.compile(r"^LSOA21_WD(\d{2})_LAD(\d{2})_EW_LU", re.I)
 BATCH = 150  # LSOA codes per ArcGIS "IN (...)" query
-
-
-def _services(s: requests.Session, *wanted: re.Pattern) -> list[str]:
-    """The ONS portal's feature services, listed until each ``wanted`` pattern is found (see portal_services)."""
-    return portal_services(s, *wanted)
 
 
 # Boundary versions, most preferred first. ONS has withdrawn the clipped full (BFC) and 20m generalised (BGC) LSOA
@@ -59,17 +53,11 @@ def find_boundary_services(names: list[str]) -> tuple[str, str | None]:
     return by_res[best], (by_res.get("BSC") if best == "BFE" else None)
 
 
-def layer_url(s: requests.Session, service: str) -> str:
-    """The service's first layer: not always layer 0 (the BFE service's only layer is 3)."""
-    layers = get_json(s, f"{ARCGIS_ROOT}/{service}/FeatureServer", params={"f": "json"}).get("layers") or [{"id": 0}]
-    return f"{ARCGIS_ROOT}/{service}/FeatureServer/{layers[0]['id']}"
-
-
 def find_ward_service(names: list[str]) -> str:
     hits = sorted(((int(WARD_PATTERN.match(n).group(1)), n) for n in names if WARD_PATTERN.match(n)), reverse=True)
     if not hits:
         raise LookupError("No LSOA 2021 to ward lookup found on the ONS portal")
-    return f"{ARCGIS_ROOT}/{hits[0][1]}/FeatureServer/0"
+    return arcgis.layer(hits[0][1])
 
 
 def _query_in(s: requests.Session, layer: str, field: str, codes: list[str], **params) -> list[dict]:
@@ -122,7 +110,7 @@ def load_geometries(s: requests.Session, layer: str, codes: list[str], coast_lay
     out = {}
     for code, geom in shapes.items():
         g = mapping(trim_to_coast(geom, coarse.get(code)).simplify(SIMPLIFY, preserve_topology=True))
-        out[code] = {"type": g["type"], "coordinates": _round_coords(g["coordinates"], 5)}
+        out[code] = {"type": g["type"], "coordinates": arcgis.round_coords(g["coordinates"], 5)}
     return out
 
 
@@ -167,11 +155,11 @@ def write_seat_files(s: requests.Session, out_dir: Path, seats: dict[str, str], 
     if not by_seat:
         raise ValueError("None of the chosen seats has LSOAs in England & Wales")
     wanted = sorted(c for cs in by_seat.values() for c in cs)
-    names = _services(s, BOUNDARY_PATTERN, WARD_PATTERN)
+    names = arcgis.services(s, BOUNDARY_PATTERN, WARD_PATTERN)
     wards = load_wards(s, find_ward_service(names), wanted)
     detail, coast = find_boundary_services(names)
     log.info("Neighbourhood boundaries: %s%s", detail, f" trimmed to the coast with {coast}" if coast else "")
-    geoms = load_geometries(s, layer_url(s, detail), wanted, layer_url(s, coast) if coast else None)
+    geoms = load_geometries(s, arcgis.first_layer(s, detail), wanted, arcgis.first_layer(s, coast) if coast else None)
     vals, pct = metric_values(frames)
     folder = out_dir / "lsoa"
     folder.mkdir(parents=True, exist_ok=True)
