@@ -2,10 +2,20 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { dataUrl } from "../lib/dataUrl";
 import { getBackend } from "./backend";
+import { checkReference } from "./contract";
 import FoiApp from "./FoiApp";
 import type { Reference } from "./types";
 import "../styles.css";
 import "./foi.css";
+
+/** The reference file, checked against the format this code reads (see contract.ts). */
+function checkedReference(r: unknown): Reference {
+  const problems = checkReference(r);
+  const version = problems.find((p) => p.startsWith("reference.version"));
+  if (version) throw new Error(version);
+  if (problems.length) console.warn("foi/reference.json doesn't match what the site expects:", problems);
+  return r as Reference;
+}
 
 const root = createRoot(document.getElementById("root")!);
 root.render(<div className="boot">Loading FOI research…</div>);
@@ -13,7 +23,7 @@ root.render(<div className="boot">Loading FOI research…</div>);
 async function load() {
   const [backend, ref, shapes] = await Promise.all([
     getBackend(),
-    fetch(dataUrl("foi/reference.json")).then((r) => { if (!r.ok) throw new Error(`foi/reference.json: HTTP ${r.status}`); return r.json() as Promise<Reference>; }),
+    fetch(dataUrl("foi/reference.json")).then((r) => { if (!r.ok) throw new Error(`foi/reference.json: HTTP ${r.status}`); return r.json().then(checkedReference); }),
     fetch(dataUrl("foi/areas.geojson")).then((r) => { if (!r.ok) throw new Error(`foi/areas.geojson: HTTP ${r.status}`); return r.json() as Promise<GeoJSON.FeatureCollection>; }),
   ]);
   return { backend, ref, shapes };
