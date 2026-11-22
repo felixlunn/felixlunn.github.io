@@ -222,7 +222,11 @@
 .foi-tabs button:first-child.on { color: #b06f00; border-bottom-color: #faa61a; }
 .foi-statline { line-height: 1.6; color: var(--text-2); margin: 0 0 6px; }
 .foi-statline strong { color: var(--text-1); font-variant-numeric: tabular-nums; }
-.foi-unusual { margin: 0 0 8px; line-height: 1.8; }
+.foi-unusual { margin: 0 0 10px; display: grid; gap: 2px; }
+.foi-unusual ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 3px; }
+.foi-unusual li { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.foi-unusual li .link-btn { text-align: left; overflow-wrap: anywhere; }
+.foi-unusual li .tag { flex: none; }
 .foi-about .foi-kv { margin-bottom: 10px; }
 /* Inside its tab the Lib Dem panel doesn't need its own frame */
 .foi-ld { border: 0; padding: 0; margin: 0; background: none; }
@@ -262,3 +266,22 @@
 .foi-kids { margin: 6px 0 10px; }
 .foi-kids ul { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 3px; font-size: 13px; }
 .foi-ldline .tag, .foi-unusual .tag { margin-right: 0; }
+
+/* The full ranking folds away inside the card */
+.foi-fold { display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; text-align: left; border: 0; background: none; padding: 4px 0;
+  color: inherit; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
+.foi-fold:hover { color: var(--accent); }
+.foi-fold-arrow { width: 10px; color: var(--text-2); }
+
+/* A key the user sets: clickable bands, and the boundary editor */
+.foi-legend .lg-band { display: flex; align-items: center; gap: 7px; width: 100%; padding: 1px 4px; margin: 0 -4px; border: 1px solid transparent;
+  border-radius: 4px; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.foi-legend .lg-band:hover:not(:disabled) { background: var(--surface-2); }
+.foi-legend .lg-band.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, var(--surface-1)); font-weight: 600; }
+.foi-legend .lg-band:disabled { opacity: .5; cursor: default; }
+.foi-legend .lg-n { margin-left: auto; padding-left: 8px; color: var(--text-2); }
+.foi-legend .lg-actions { display: flex; gap: 12px; align-items: center; margin-top: 6px; font-size: 11.5px; }
+.foi-legend .lg-hint { margin-top: 2px; }
+.foi-legend .lg-editor { display: grid; gap: 5px; width: 220px; }
+.foi-legend .lg-row { display: flex; gap: 4px; align-items: center; }
+.foi-legend .lg-row input { flex: 1; min-width: 0; padding: 4px 7px; border: 1px solid var(--border); border-radius: 5px; background: var(--surface-2); color: inherit; font: inherit; font-size: 12px; }

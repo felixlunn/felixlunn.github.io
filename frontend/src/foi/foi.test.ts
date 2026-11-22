@@ -245,3 +245,16 @@ describe("listing datasets without their rows", () => {
     expect(noSummaryColumn(null)).toBe(false);
   });
 });
+
+describe("a key the user sets", () => {
+  it("reads numbers as people type them and makes bands from them", async () => {
+    const { parseNumber, cleanBreaks, bands, bandCounts } = await import("./key");
+    expect(["50", "+50%", "£1,200", "−3.5", ".5", "abc", "", "5-"].map(parseNumber)).toEqual([50, 50, 1200, -3.5, 0.5, null, null, null]);
+    expect(cleanBreaks(["50", "", "10", "50", "x"])).toEqual([10, 50]);
+    const fmt = (v: number) => `${v > 0 ? "+" : ""}${v}%`;
+    // One boundary splits the map in two: "more than 50%" is the top band.
+    expect(bands([50], fmt)).toEqual([{ k: 1, label: "+50% or more" }, { k: 0, label: "Under +50%" }]);
+    expect(bands([0, 50], fmt).map((b) => b.label)).toEqual(["+50% or more", "0% to under +50%", "Under 0%"]);
+    expect(bandCounts([-5, 0, 20, 50, 80, null], [0, 50])).toEqual([1, 2, 2]); // a value on a boundary goes up
+  });
+});
