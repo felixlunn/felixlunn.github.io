@@ -12,12 +12,12 @@ export default defineConfig({
   define: { "import.meta.env.VITE_BUILD_ID": JSON.stringify(BUILD_ID) },
   build: {
     target: "es2020",
-    chunkSizeWarningLimit: 900, // maplibre-gl is ~800 kB on its own and loads in parallel
+    chunkSizeWarningLimit: 1200, // maplibre-gl is ~1.1 MB on its own (300 kB gzipped) and loads in parallel
     rollupOptions: {
       // Two pages: the public dashboard, and the login-only FOI research section (with its own code chunk).
       input: { main: "index.html", foi: "foi.html" },
       output: {
-        manualChunks: { maplibre: ["maplibre-gl"] },
+        manualChunks: (id: string) => (id.includes("/node_modules/maplibre-gl/") ? "maplibre" : undefined),
       },
     },
   },

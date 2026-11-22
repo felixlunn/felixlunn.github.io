@@ -1,5 +1,5 @@
 import type { Choropleth } from "../types";
-import { useColours } from "./MapView";
+import { useColours } from "../lib/useColours";
 import SourceLink from "./SourceLink";
 
 export default function Legend({ ch }: { ch: Choropleth }) {

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import maplibregl, { type GeoJSONSource, type Map as MLMap } from "maplibre-gl";
+import maplibregl from "../lib/maplibre";
+import { type GeoJSONSource, type Map as MLMap } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { osmStyle, UK_BOUNDS } from "../lib/basemap";
 import { classify, quantileBreaks, ramp } from "../lib/colors";
