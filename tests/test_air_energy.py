@@ -3,7 +3,7 @@ import io
 import pandas as pd
 import pytest
 
-from whips.sources.air_energy import parse_air, renewable_counts
+from datadash.sources.air_energy import parse_air, renewable_counts
 
 AIR = """Indicator ID,Area Code,Area Type,Category Type,Time period,Time period Sortable,Value
 93861,E92000001,England,,2023,20230000,5.2

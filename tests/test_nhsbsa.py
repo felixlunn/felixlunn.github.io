@@ -1,7 +1,7 @@
 import pandas as pd
 import pytest
 
-from whips.sources import nhsbsa
+from datadash.sources import nhsbsa
 
 
 def fake_sql(responses):

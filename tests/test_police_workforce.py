@@ -1,7 +1,7 @@
 import pandas as pd
 import pytest
 
-from whips.sources.police_workforce import by_force, seat_frames
+from datadash.sources.police_workforce import by_force, seat_frames
 
 
 def test_force_rates_grouped_like_court_areas():

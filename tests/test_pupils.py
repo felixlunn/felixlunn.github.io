@@ -1,4 +1,4 @@
-from whips.sources.pupils import headline_rows
+from datadash.sources.pupils import headline_rows
 
 
 class FakeDS:

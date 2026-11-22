@@ -1,7 +1,7 @@
 import pandas as pd
 import pytest
 
-from whips.sources.roads import place, seat_frames
+from datadash.sources.roads import place, seat_frames
 
 
 class FakeLocator:

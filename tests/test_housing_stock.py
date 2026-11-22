@@ -1,7 +1,7 @@
 import pandas as pd
 import pytest
 
-from whips.sources.housing_stock import net_additions, taxbase_table
+from datadash.sources.housing_stock import net_additions, taxbase_table
 
 
 def test_taxbase_table_picks_total_of_named_table():
@@ -28,7 +28,7 @@ def test_net_additions_averages_latest_years():
 
 
 def test_councils_reporting_zero_are_missing_not_zero():
-    from whips.sources.housing_stock import reported_share
+    from datadash.sources.housing_stock import reported_share
     w = pd.DataFrame({"pcon": ["A", "B", "B"], "lad": ["E1", "E1", "E2"], "of_council": [0.5, 0.5, 1.0]})
     f = reported_share(pd.Series({"E1": 10.0, "E2": 0.0}, name="second"), pd.Series({"E1": 100.0, "E2": 300.0}), w)
     assert (f["num"] / f["den"]).to_dict() == pytest.approx({"A": 10.0, "B": 10.0})  # E2's 300 homes not diluting B

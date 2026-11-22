@@ -5,8 +5,8 @@ import pandas as pd
 import pytest
 from shapely.geometry import Polygon
 
-from whips.metrics import CENSUS_METRICS, CensusMetric
-from whips.sources import nomis, parliament, police
+from datadash.metrics import CENSUS_METRICS, CensusMetric
+from datadash.sources import nomis, parliament, police
 
 TENURE_LABELS = [
     (0, "Total: All households", 100),
@@ -253,7 +253,7 @@ def test_load_census_skips_failed_table_and_uses_fallback(monkeypatch):
 
 
 def test_aggregate_lsoa_and_lookup_parsing():
-    from whips.sources import boundaries
+    from datadash.sources import boundaries
     lookup = boundaries.parse_lookup([
         {"attributes": {"LSOA21CD": "E01000001", "PCON24CD": "E14000001", "ObjectId": 1}},
         {"attributes": {"lsoa21cd": "E01000002", "pcon24cd": "E14000001"}},
@@ -323,7 +323,7 @@ def test_fetch_csv_retries_empty_then_raises(monkeypatch):
 
 
 def test_bres_industry_shares_and_density():
-    from whips.sources import nomis_extra
+    from datadash.sources import nomis_extra
     rows = []
     for code, total, manuf, health in [("E1", 1000, 100, 200), ("E2", 500, None, 50)]:
         rows += [{"GEOGRAPHY_CODE": code, "INDUSTRY": 37748736, "value": total},
@@ -342,7 +342,7 @@ def test_bres_industry_shares_and_density():
 
 
 def test_census_cache_only_reused_for_covered_patterns(tmp_path, monkeypatch):
-    monkeypatch.setenv("WHIPS_CENSUS_CACHE", str(tmp_path))
+    monkeypatch.setenv("DATADASH_CENSUS_CACHE", str(tmp_path))
     tidy = nomis.tidy_census(nomis_csv(TENURE_LABELS))
     nomis.store_table("TS054", tidy, [("^owned",)])
     assert nomis.cached_table("TS054", [("^owned",)]) is not None

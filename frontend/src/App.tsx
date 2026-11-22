@@ -41,8 +41,8 @@ export default function App({ data, geo }: { data: DashboardData; geo: GeoJSON.F
   };
   const [mySeat, setMySeatState] = useState<number | null>(() => {
     const fromLink = codeIndex.get(initial.office ?? "");
-    if (fromLink !== undefined) { store("whips.mySeat", initial.office); return fromLink; }
-    return codeIndex.get(stored("whips.mySeat") ?? "") ?? null;
+    if (fromLink !== undefined) { store("dash.mySeat", initial.office); return fromLink; }
+    return codeIndex.get(stored("dash.mySeat") ?? "") ?? null;
   });
 
   const [tab, setTab] = useState<Tab>((TABS.some((t) => t.id === initial.tab) ? initial.tab : "debates") as Tab);
@@ -58,7 +58,7 @@ export default function App({ data, geo }: { data: DashboardData; geo: GeoJSON.F
 
   const setMySeat = useCallback((i: number | null) => {
     setMySeatState(i);
-    store("whips.mySeat", i === null ? null : data.seats[i].code);
+    store("dash.mySeat", i === null ? null : data.seats[i].code);
     if (i !== null) setFocus((f) => ({ code: data.seats[i].code, n: (f?.n ?? 0) + 1 }));
   }, [data]);
   // Debates: which debate is open, and which of its metrics shades the map.

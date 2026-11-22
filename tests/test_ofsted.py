@@ -1,7 +1,7 @@
 import pandas as pd
 import pytest
 
-from whips.sources.ofsted import seat_frames
+from datadash.sources.ofsted import seat_frames
 
 
 def test_pupil_weighted_good_share_and_concerns():

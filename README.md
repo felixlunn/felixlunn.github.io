@@ -81,11 +81,11 @@ All data are open, refreshed automatically **every day** by GitHub Actions (a fu
 | [Scotland's Census 2022](https://www.scotlandscensus.gov.uk/) (National Records of Scotland) | 72 census figures for Scottish seats (age, ethnicity, religion, tenure, housing, heating, cars, health, care, work, commuting, households), summed from output areas | Scotland | Once (2022) |
 | [Open Council Data UK](https://opencouncildata.co.uk/) | Councils covering each seat (district, unitary and county): who controls them, seats by party, and the next election. Shown in the seat briefing | Great Britain | Yearly (after May elections) |
 
-Every figure on the dashboard has an (i) link to its publisher's page for the dataset (`SOURCE_LINKS` in `whips/metrics.py`; a test fails if a metric's source has no link).
+Every figure on the dashboard has an (i) link to its publisher's page for the dataset (`SOURCE_LINKS` in `datadash/metrics.py`; a test fails if a metric's source has no link).
 
-Where a source publishes earlier years, the build also keeps up to 12 past periods per figure in `history.json` (loaded only when needed). The app shows the change since the previous period next to each figure, a trend line with the national figure, a quotable sentence, a "What's changed" list in each seat briefing, and a map of change. Councils created since 2019 take their predecessors' figures for earlier years (`SUCCESSORS` in `whips/history.py`).
+Where a source publishes earlier years, the build also keeps up to 12 past periods per figure in `history.json` (loaded only when needed). The app shows the change since the previous period next to each figure, a trend line with the national figure, a quotable sentence, a "What's changed" list in each seat briefing, and a map of change. Councils created since 2019 take their predecessors' figures for earlier years (`SUCCESSORS` in `datadash/history.py`).
 
-**Refresh speed and alerts.** Slow sources that change rarely (police.uk, EPC, NHS and others, see `whips/cache.py`) are reused for a few days between refreshes; any change to the pipeline code discards the saved copies. If a source fails to update, its last saved copy is shown and flagged. The deploy workflow opens a GitHub issue when the refresh fails, when a source fails, or when a figure vanishes or loses more than a fifth of its seats compared with the live site, and closes it when everything updates again.
+**Refresh speed and alerts.** Slow sources that change rarely (police.uk, EPC, NHS and others, see `datadash/cache.py`) are reused for a few days between refreshes; any change to the pipeline code discards the saved copies. If a source fails to update, its last saved copy is shown and flagged. The deploy workflow opens a GitHub issue when the refresh fails, when a source fails, or when a figure vanishes or loses more than a fifth of its seats compared with the live site, and closes it when everything updates again.
 
 Census 2021 covers England and Wales; Scottish seats use Scotland's Census 2022 for the 72 figures defined the same way, and Northern Irish seats show "No data" for census metrics. Wherever a metric is a ratio,
 the national figure is the true combined rate (total numerator / total denominator), not an average of seat
@@ -99,7 +99,7 @@ the header shows which source failed.
 
 ```
 Refresh data (daily)
-  └─ python -m whips.build      fetch every source in whips/registry.py → metrics, peer groups
+  └─ python -m datadash.build      fetch every source in datadash/registry.py → metrics, peer groups
        └─ frontend/public/data/  data.json · boundaries.geojson · constituencies.csv · lsoa/ · foi/
   └─ Publish site
 Publish site (every push, ~2 minutes)
@@ -112,7 +112,7 @@ summarising takes well under a millisecond, so no server or cache is needed. The
 MapLibre loads in parallel as its own chunk.
 
 ```
-whips/                Python package
+datadash/                Python package
   metrics.py          catalogue of themes and metrics (add new census metrics here)
   sources/            one adapter per data source
   registry.py         every source: name, link, metrics, loader, update cycle, cache period, --skip name
@@ -127,8 +127,8 @@ frontend/             Vite + React + TypeScript + MapLibre GL
 
 ### Adding a data source
 
-1. Write `whips/sources/<name>.py` with its `MetricMeta` list and a loader returning `({metric id: num/den frame}, period)`.
-2. Add one `Source(...)` entry to `SOURCES` in `whips/registry.py`: name, link, detail, metrics, loader (it can use
+1. Write `datadash/sources/<name>.py` with its `MetricMeta` list and a loader returning `({metric id: num/den frame}, period)`.
+2. Add one `Source(...)` entry to `SOURCES` in `datadash/registry.py`: name, link, detail, metrics, loader (it can use
    the build context: `c.s`, `c.geo`, `c.population`, `c.lsoa_lookup()`, `c.council_weights()`…), and optionally
    `every` (publisher's update cycle, for the overdue check) and `keep` (days a download may be reused).
 
@@ -149,7 +149,7 @@ pip install -e ".[dev]"
 ```
 
 ```bash
-python -m whips.build --out frontend/public/data
+python -m datadash.build --out frontend/public/data
 ```
 
 This fetches real data from the live APIs and takes about 10-20 minutes, mostly police.uk. Add `--skip police`
@@ -179,7 +179,7 @@ cd frontend && npm test
 Two workflows keep the site up to date:
 
 - **Refresh data** (`refresh.yml`) rebuilds every dataset daily at 03:17 UTC, on demand, and whenever the pipeline
-  code (`whips/`) changes. It saves the result as the `dashboard-data` artifact (kept 30 days), raises an issue for
+  code (`datadash/`) changes. It saves the result as the `dashboard-data` artifact (kept 30 days), raises an issue for
   sources that failed or stopped updating, then publishes.
 - **Publish site** (`publish.yml`) runs on every push to `main`: it builds the latest code with the most recent
   refreshed data and publishes it in about two minutes. Site-only changes never wait for a data refresh.
@@ -259,7 +259,7 @@ figures in the others.
 These parts of the original plan are not built yet:
 
 - **Rail performance** (station delays and cancellations; station usage is included). Needs Rail Data Marketplace / HSP credentials; add
-  them as a repository secret and write a `whips/sources/rail.py` adapter.
+  them as a repository secret and write a `datadash/sources/rail.py` adapter.
 - **Schools**: DfE Explore Education Statistics (KS4 / Progress 8) and Ofsted. Most data are school- or
   local-authority-level, so they need a school → constituency lookup.
 - **Health services**: NHS GP access and waiting lists by ICB, apportioned to constituencies.

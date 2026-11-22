@@ -1,4 +1,4 @@
-from whips.sources.debates import parse_events, topics_for
+from datadash.sources.debates import parse_events, topics_for
 
 
 def ev(i, day, cat, title, typ="Main Chamber", sort=0, time="", **kw):

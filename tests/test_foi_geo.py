@@ -1,8 +1,8 @@
 import numpy as np
 from shapely.geometry import box
 
-from whips.demo import build_demo  # noqa: F401 - imported for the demo FOI check below
-from whips.sources import foi_geo as f
+from datadash.demo import build_demo  # noqa: F401 - imported for the demo FOI check below
+from datadash.sources import foi_geo as f
 
 
 def square(code, x0, y0, x1, y1):
@@ -47,7 +47,7 @@ def test_assemble_links_areas_and_points_to_seats():
 
 
 def test_demo_reference_is_complete():
-    from whips.demo import _hex
+    from datadash.demo import _hex
     geo = {"type": "FeatureCollection", "features": [
         {"type": "Feature", "properties": {"code": f"D{i}", "name": f"D{i}"}, "geometry": {"type": "Polygon", "coordinates": [_hex(i % 10 * 0.3, i // 10 * 0.3, 0.09)]}}
         for i in range(60)]}

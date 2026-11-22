@@ -7,7 +7,7 @@ denominator separate lets the pipeline compute a true national figure
 
 Census metrics are defined against Nomis Census 2021 "TS" tables. Category
 labels are matched with regular expressions (case-insensitive) so the pipeline
-is robust to small wording differences; see ``whips.sources.nomis`` for the
+is robust to small wording differences; see ``datadash.sources.nomis`` for the
 matching rules (aggregate categories win over their children, so nothing is
 double counted).
 """
@@ -315,7 +315,7 @@ ELECTION_METRICS = [
 ]
 
 
-# Census figures that also have Scottish values (Scotland's Census 2022, see whips/sources/scotland.py).
+# Census figures that also have Scottish values (Scotland's Census 2022, see datadash/sources/scotland.py).
 SCOTLAND_NOTE = " Scottish seats: Scotland's Census 2022 (National Records of Scotland), March 2022."
 SCOTLAND_CENSUS = {
     "population", "age_0_14", "age_20_34", "age_35_49", "age_50_64", "age_65_plus", "age_80_plus", "female", "ethnic_minority",

@@ -1,7 +1,7 @@
 import pandas as pd
 import pytest
 
-from whips.sources import councils, housing
+from datadash.sources import councils, housing
 
 
 def weights():

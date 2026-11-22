@@ -2,7 +2,7 @@ import io
 
 import pandas as pd
 
-from whips.sources.rents import latest
+from datadash.sources.rents import latest
 
 
 def test_latest_month_per_area():

@@ -2,7 +2,7 @@ from datetime import date
 
 import pytest
 
-from whips.sources import questions
+from datadash.sources import questions
 
 
 class FakeSession:

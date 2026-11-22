@@ -1,6 +1,6 @@
 import pandas as pd
 
-from whips.sources import lsoa
+from datadash.sources import lsoa
 
 
 def test_service_discovery_prefers_detailed_clipped_boundaries_and_latest_wards():

@@ -1,7 +1,7 @@
 import pandas as pd
 import pytest
 
-from whips.sources.cqc import seat_frames
+from datadash.sources.cqc import seat_frames
 
 
 def test_poor_rating_shares_and_beds():

@@ -1,10 +1,10 @@
 import pandas as pd
 import pytest
 
-from whips import registry
-from whips.context import BuildContext
-from whips.metrics import CENSUS_METRICS, MetricMeta
-from whips.registry import SOURCES, Source
+from datadash import registry
+from datadash.context import BuildContext
+from datadash.metrics import CENSUS_METRICS, MetricMeta
+from datadash.registry import SOURCES, Source
 
 
 def test_ids_skips_and_metrics_are_consistent():
@@ -23,7 +23,7 @@ def test_ids_skips_and_metrics_are_consistent():
 
 
 def test_code_files_follow_direct_imports():
-    files = {p.name for p in registry.code_files("whips.sources.courts")}
+    files = {p.name for p in registry.code_files("datadash.sources.courts")}
     assert {"courts.py", "lsoa.py", "arcgis.py", "http.py", "metrics.py"} <= files
     assert "rail.py" not in files
 

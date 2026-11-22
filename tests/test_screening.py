@@ -1,7 +1,7 @@
 import pandas as pd
 import pytest
 
-from whips.sources import nhs
+from datadash.sources import nhs
 
 
 def test_screening_indicators_become_seat_rates():

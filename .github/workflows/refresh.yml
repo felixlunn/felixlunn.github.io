@@ -9,11 +9,11 @@ on:
     - cron: "17 3 * * *" # 03:17 UTC every day
   push:
     branches: [main]
-    paths: ["whips/**", "pyproject.toml", ".github/workflows/refresh.yml"]
+    paths: ["datadash/**", "pyproject.toml", ".github/workflows/refresh.yml"]
   workflow_dispatch:
     inputs:
       skip:
-        description: "Optional sources to skip, space-separated (python -m whips.build --help lists them)"
+        description: "Optional sources to skip, space-separated (python -m datadash.build --help lists them)"
         required: false
         default: ""
       fresh:
@@ -55,7 +55,7 @@ jobs:
           key: census-v1-${{ github.run_id }}
           restore-keys: census-v1-
 
-      # Slow sources that change rarely (police.uk, EPC, NHS, ...) are reused for a few days; see whips/cache.py.
+      # Slow sources that change rarely (police.uk, EPC, NHS, ...) are reused for a few days; see datadash/cache.py.
       - name: Restore saved sources
         uses: actions/cache@v6
         with:
@@ -78,26 +78,26 @@ jobs:
 
       - name: Fetch data and compute metrics
         env:
-          WHIPS_CENSUS_CACHE: .cache/census
-          WHIPS_PREVIOUS_DATA: previous.json
+          DATADASH_CENSUS_CACHE: .cache/census
+          DATADASH_PREVIOUS_DATA: previous.json
           FRESH_INPUT: ${{ github.event.inputs.fresh }}
           NOMIS_UID: ${{ secrets.NOMIS_UID }} # optional Nomis API key (higher limits)
           EPC_TOKEN: ${{ secrets.EPC_TOKEN }} # EPC API bearer token (get-energy-performance-data.communities.gov.uk)
           SKIP_INPUT: ${{ github.event.inputs.skip }}
         run: |
-          # Skip names come from whips/registry.py; unknown ones are ignored with a note.
-          KNOWN="$(python -m whips.build --list-sources)"
+          # Skip names come from datadash/registry.py; unknown ones are ignored with a note.
+          KNOWN="$(python -m datadash.build --list-sources)"
           SKIP=""
           for s in $SKIP_INPUT; do
             if printf '%s\n' "$KNOWN" | grep -qxF "$s"; then SKIP="$SKIP --skip $s"; else echo "ignoring '$s'"; fi
           done
-          # Saved copies of slow sources are reused for a few days (whips/cache.py), except on the weekly full refresh.
+          # Saved copies of slow sources are reused for a few days (datadash/cache.py), except on the weekly full refresh.
           if [ "$FRESH_INPUT" = "true" ] || { [ "$GITHUB_EVENT_NAME" = "schedule" ] && [ "$(date -u +%u)" = "1" ]; }; then
             echo "Full refresh: re-downloading every source"
           else
-            export WHIPS_SOURCE_CACHE=.cache/sources
+            export DATADASH_SOURCE_CACHE=.cache/sources
           fi
-          python -m whips.build --out frontend/public/data $SKIP
+          python -m datadash.build --out frontend/public/data $SKIP
 
       # One open issue lists the sources that failed to update; it is closed when they all work again.
       - name: Alert on failed sources
@@ -109,7 +109,7 @@ jobs:
         run: |
           TITLE="Data sources failing to update"
           # Compare with the data on the live site (fetched above), to catch a source that "worked" but returned little.
-          FAILED="$(python -m whips.report frontend/public/data/data.json previous.json)"
+          FAILED="$(python -m datadash.report frontend/public/data/data.json previous.json)"
           OPEN="$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --search "\"$TITLE\" in:title" --json number --jq '.[0].number')"
           if [ -n "$FAILED" ]; then
             BODY="$(printf 'Problems in the latest data refresh. The site is still published; the figures affected are missing or from an earlier run.\n\n%s\n\nRun: %s' "$FAILED" "$RUN_URL")"

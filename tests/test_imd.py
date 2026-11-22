@@ -1,7 +1,7 @@
 import pandas as pd
 import pytest
 
-from whips.sources import imd
+from datadash.sources import imd
 
 
 def file7():

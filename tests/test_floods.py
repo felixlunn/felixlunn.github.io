@@ -1,6 +1,6 @@
 import pandas as pd
 
-from whips.sources.floods import seat_frames
+from datadash.sources.floods import seat_frames
 
 
 def test_counts_with_zero_for_english_seats_without_areas():

@@ -3,7 +3,7 @@ import io
 import pandas as pd
 import pytest
 
-from whips.sources import fuel_poverty as fp
+from datadash.sources import fuel_poverty as fp
 
 
 def workbook() -> bytes:

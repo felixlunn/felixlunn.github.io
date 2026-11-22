@@ -1,6 +1,6 @@
 import pandas as pd
 
-from whips.sources.council_tax import latest
+from datadash.sources.council_tax import latest
 
 
 def test_latest_band_d_by_billing_authority():

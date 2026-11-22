@@ -46,5 +46,5 @@ load()
   })
   .catch((err: Error) => root.render(
     <div className="boot error"><h1>Couldn't load FOI research</h1><p>{err.message}</p>
-      <p>Run <code>python -m whips.build</code> (or <code>--demo</code>) to create <code>frontend/public/data/foi/</code>.</p></div>,
+      <p>Run <code>python -m datadash.build</code> (or <code>--demo</code>) to create <code>frontend/public/data/foi/</code>.</p></div>,
   ));

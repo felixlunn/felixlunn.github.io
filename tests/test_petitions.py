@@ -1,7 +1,7 @@
 import pandas as pd
 import pytest
 
-from whips.sources import petitions as P
+from datadash.sources import petitions as P
 
 
 def test_summarise_rates_top_and_over_represented():

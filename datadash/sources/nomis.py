@@ -283,7 +283,7 @@ def fetch_lsoa_table(s: requests.Session, ds: str, includes: list[tuple[str, ...
 
 
 def _cache_dir():
-    d = os.environ.get("WHIPS_CENSUS_CACHE")
+    d = os.environ.get("DATADASH_CENSUS_CACHE")
     return Path(d) if d else None
 
 

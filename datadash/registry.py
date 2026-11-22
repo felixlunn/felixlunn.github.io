@@ -2,7 +2,7 @@
 
 Each ``Source`` says what it is (name, link, description), what it provides (metrics), how to load it, how often its
 publisher updates it (for the freshness check), how long a downloaded copy may be reused (the cache), and the name
-used to skip it (``python -m whips.build --skip NAME``). ``build.py``, ``demo.py``, ``freshness.py``, the cache and
+used to skip it (``python -m datadash.build --skip NAME``). ``build.py``, ``demo.py``, ``freshness.py``, the cache and
 the refresh workflow's skip list all read from here, so adding a source means adding one entry.
 
 Sources run in the order listed (it is the order of figures and sources in data.json). Most are loaded generically

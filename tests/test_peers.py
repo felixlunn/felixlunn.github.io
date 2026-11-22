@@ -3,8 +3,8 @@ import json
 import numpy as np
 import pytest
 
-from whips import peers
-from whips.demo import build_demo
+from datadash import peers
+from datadash.demo import build_demo
 
 
 def test_groups_seats_on_their_census_profile():

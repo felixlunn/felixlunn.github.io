@@ -4,8 +4,8 @@ from datetime import time, timedelta
 import pandas as pd
 import pytest
 
-from whips.geo import SeatLocator, ngr_to_en
-from whips.sources import sewage
+from datadash.geo import SeatLocator, ngr_to_en
+from datadash.sources import sewage
 
 
 def test_grid_references():

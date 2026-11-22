@@ -1,7 +1,7 @@
 import pandas as pd
 import pytest
 
-from whips.sources.child_poverty import seat_table
+from datadash.sources.child_poverty import seat_table
 
 
 def test_seat_table_uses_latest_year():

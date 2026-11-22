@@ -1,5 +1,5 @@
-from whips.metrics import CENSUS_METRICS, census_meta, source_url
-from whips.registry import all_metrics
+from datadash.metrics import CENSUS_METRICS, census_meta, source_url
+from datadash.registry import all_metrics
 
 
 def all_metas():
