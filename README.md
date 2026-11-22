@@ -107,9 +107,8 @@ Publish site (every push, ~2 minutes)
   └─ deploy to GitHub Pages
 ```
 
-The site is fully static and the analytics run in the browser. For 650 seats × ~60 metrics, an exact
-similarity search or index recalculation takes well under a millisecond, so sliders respond instantly without
-a server, a cache or an approximate-nearest-neighbour index. The whole dataset is about 120 kB gzipped, and
+The site is fully static and the analytics run in the browser. For 650 seats × ~270 metrics, ranking and
+summarising takes well under a millisecond, so no server or cache is needed. The whole dataset is about 120 kB gzipped, and
 MapLibre loads in parallel as its own chunk.
 
 ```
@@ -118,12 +117,11 @@ whips/                Python package
   sources/            one adapter per data source
   registry.py         every source: name, link, metrics, loader, update cycle, cache period, --skip name
   context.py          what loaders can use during a build (session, boundaries, lookups), and how results are recorded
-  engine.py           analytics: ranks and k-means peer groups
+  peers.py            peer groups: seats clustered on their census profile
   build.py            pipeline entry point: required steps, then each source in registry order
-  api.py              optional FastAPI REST API over the same data
   demo.py             synthetic offline dataset for UI development
 frontend/             Vite + React + TypeScript + MapLibre GL
-  src/lib/analytics.ts  browser port of engine.py (same tests)
+  src/lib/analytics.ts  ranks, summaries and peer-group averages in the browser
 .github/workflows/    ci.yml (tests + build) · refresh.yml (rebuild the data daily, then publish) · publish.yml (publish the site)
 ```
 
@@ -242,19 +240,6 @@ figures in the others.
 - Several years are recognised either as year columns ("2023", "2023/24", "Q2 2024"…) or as one row per area per year with a Year column, which is reshaped. Each measure then gets two standard maps, made automatically: **average per year** and **% change** from the first year to the last, alongside each single year; clicking an area shows its figures by year as a small chart.
 - Count columns on force or NHS-area datasets can be shown per 100,000 residents. Residents are estimated from the
   seats each area covers.
-
-### Optional REST API
-
-```bash
-pip install -e ".[api]"
-```
-
-```bash
-WHIPS_DATA=frontend/public/data/data.json uvicorn whips.api:app
-```
-
-Endpoints: `GET /api/v1/constituencies`, `GET /api/v1/constituencies/{code}`, `GET /api/v1/metrics`. Interactive docs are at `/docs`. A `Dockerfile` is included for
-Render / Fly.io; point `WHIPS_DATA` at the deployed `data.json` URL.
 
 ## Method notes
 
