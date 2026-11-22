@@ -4,6 +4,7 @@
  * that keeps everything in this browser only.
  */
 
+import { normaliseDataset, normaliseDatasets } from "./contract";
 import type { Dataset, Department, NewDataset } from "./types";
 
 export interface User { id: string; email: string }
@@ -90,7 +91,7 @@ async function supabaseBackend(url: string, key: string): Promise<Backend> {
     async list(dept) {
       const { data, error } = await sb.from("foi_datasets").select("*").eq("department", dept).order("created_at", { ascending: false });
       fail(error);
-      return (data ?? []) as Dataset[];
+      return normaliseDatasets(data ?? []);
     },
     async create(d, file) {
       const u = (await sb.auth.getUser()).data.user;
@@ -102,12 +103,12 @@ async function supabaseBackend(url: string, key: string): Promise<Backend> {
       const { data, error } = await sb.from("foi_datasets").insert({ ...d, file_path }).select().single();
       if (error && file_path) await sb.storage.from("foi-files").remove([file_path]);
       fail(error);
-      return data as Dataset;
+      return normaliseDataset(data)!;
     },
     async update(id, patch) {
       const { data, error } = await sb.from("foi_datasets").update(patch).eq("id", id).select().single();
       fail(error);
-      return data as Dataset;
+      return normaliseDataset(data)!;
     },
     async remove(d) {
       fail((await sb.from("foi_datasets").delete().eq("id", d.id)).error);
@@ -142,7 +143,7 @@ function demoBackend(): Backend {
     async sendReset() { /* nothing to send in demo mode */ },
     async setPassword() { /* nothing to set in demo mode */ },
     async membership() { return { member: true, admin: true }; },
-    async list(dept) { return read().filter((d) => d.department === dept).sort((a, b) => b.created_at.localeCompare(a.created_at)); },
+    async list(dept) { return normaliseDatasets(read()).filter((d) => d.department === dept).sort((a, b) => b.created_at.localeCompare(a.created_at)); },
     async create(d) {
       const u = current();
       const now = new Date().toISOString();

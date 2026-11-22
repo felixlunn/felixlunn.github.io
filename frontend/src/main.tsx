@@ -1,6 +1,7 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import App from "./App";
+import { checkDashboardData } from "./lib/contract";
 import { dataUrl } from "./lib/dataUrl";
 import type { DashboardData } from "./types";
 import "./styles.css";
@@ -12,7 +13,14 @@ async function load() {
   const [data, geo] = await Promise.all([
     fetch(dataUrl("data.json")).then((r) => {
       if (!r.ok) throw new Error(`data.json: HTTP ${r.status}`);
-      return r.json() as Promise<DashboardData>;
+      return r.json().then((d: unknown) => {
+        // The pipeline (Python) and this site (TypeScript) share data.json's format: check it, and stop clearly if
+        // it's a format this code doesn't read (e.g. the site and its data from different versions).
+        const problems = checkDashboardData(d);
+        if (problems.some((p) => p.startsWith("data.version"))) throw new Error(problems.find((p) => p.startsWith("data.version")));
+        if (problems.length) console.warn("data.json doesn't match what the site expects:", problems);
+        return d as DashboardData;
+      });
     }),
     fetch(dataUrl("boundaries.geojson")).then((r) => {
       if (!r.ok) throw new Error(`boundaries.geojson: HTTP ${r.status}`);
