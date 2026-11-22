@@ -4,6 +4,7 @@ import { type GeoJSONSource, type Map as MLMap } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { osmStyle, UK_BOUNDS } from "../lib/basemap";
 import { classify, quantileBreaks, ramp } from "../lib/colors";
+import { bandCounts, bands, cleanBreaks } from "./key";
 
 export interface MapItem { code: string; name: string; value: number | null; label: string; sub?: string; lat?: number; lon?: number }
 
@@ -24,6 +25,13 @@ interface Props {
   title?: string;
   format?: (v: number) => string;
   onSelect: (code: string) => void;
+  /** The key's own boundaries, set by the user (null: automatic, equal-sized bands). Given with onCustomBreaks,
+   * the key offers "Set my own key". */
+  customBreaks?: number[] | null;
+  onCustomBreaks?: (b: number[] | null) => void;
+  /** With custom boundaries: the band shown alone (others faded), and picking one from the key. */
+  band?: number | null;
+  onBand?: (k: number | null) => void;
 }
 
 const EMPTY: GeoJSON.FeatureCollection = { type: "FeatureCollection", features: [] };
@@ -32,7 +40,8 @@ function css(name: string) { return getComputedStyle(document.documentElement).g
 
 const NONE = new Set<string>();
 
-export default function FoiMap({ shapes, items, reverse, selected, highlight, flagged = NONE, dimmed = NONE, title, format = (v) => v.toLocaleString("en-GB"), onSelect }: Props) {
+export default function FoiMap({ shapes, items, reverse, selected, highlight, flagged = NONE, dimmed = NONE, title, format = (v) => v.toLocaleString("en-GB"), onSelect,
+  customBreaks = null, onCustomBreaks, band = null, onBand }: Props) {
   const el = useRef<HTMLDivElement>(null);
   const map = useRef<MLMap | null>(null);
   const [ready, setReady] = useState(false);
@@ -43,10 +52,17 @@ export default function FoiMap({ shapes, items, reverse, selected, highlight, fl
   const byCode = useMemo(() => new Map(items.map((i) => [i.code, i])), [items]);
   const { breaks, colours } = useMemo(() => {
     const c = ramp();
-    return { breaks: quantileBreaks(items.map((i) => i.value), c.length), colours: reverse ? [...c].reverse() : c };
-  }, [items, reverse]);
+    return { breaks: customBreaks ?? quantileBreaks(items.map((i) => i.value), c.length), colours: reverse ? [...c].reverse() : c };
+  }, [items, reverse, customBreaks]);
+  const [editing, setEditing] = useState(false);
   // The key: one line per colour, with the range of values it covers (highest first).
   const legend = useMemo(() => {
+    if (customBreaks) {
+      const used = breaks.length + 1;
+      const step = (colours.length - 1) / Math.max(used - 1, 1);
+      const counts = bandCounts(items.map((i) => i.value), breaks);
+      return bands(breaks, format).map((b) => ({ colour: colours[Math.round(b.k * step)], text: b.label, k: b.k, n: counts[b.k] }));
+    }
     const vals = items.map((i) => i.value).filter((v): v is number => v !== null).sort((a, b) => a - b);
     if (!vals.length) return [];
     const used = breaks.length + 1;
@@ -54,10 +70,13 @@ export default function FoiMap({ shapes, items, reverse, selected, highlight, fl
     const out = [];
     for (let k = 0; k < used; k++) {
       const inClass = vals.filter((v) => classify(v, breaks) === k);
-      if (inClass.length) out.push({ colour: colours[Math.round(k * step)], lo: inClass[0], hi: inClass[inClass.length - 1] });
+      if (inClass.length) {
+        const lo = inClass[0], hi = inClass[inClass.length - 1];
+        out.push({ colour: colours[Math.round(k * step)], text: lo === hi ? format(lo) : `${format(lo)} – ${format(hi)}`, k, n: inClass.length });
+      }
     }
     return out.reverse();
-  }, [items, breaks, colours]);
+  }, [items, breaks, colours, customBreaks, format]);
   const colour = (v: number | null) => {
     if (v === null) return css("--map-nodata");
     const used = breaks.length + 1;
@@ -159,15 +178,59 @@ export default function FoiMap({ shapes, items, reverse, selected, highlight, fl
       {legend.length > 0 && (
         <div className="foi-legend">
           {title && <div className="lg-title">{title}</div>}
-          <ul>
-            {legend.map((b, i) => (
-              <li key={i}><span className="sw" style={{ background: b.colour }} />{b.lo === b.hi ? format(b.lo) : `${format(b.lo)} – ${format(b.hi)}`}</li>
-            ))}
-            <li className="muted"><span className="sw" style={{ background: css("--map-nodata") }} />No figure</li>
-            {dimmed.size > 0 && <li className="muted"><span className="sw faded" />Filtered out (faded)</li>}
-          </ul>
+          {editing && onCustomBreaks ? (
+            <KeyEditor initial={customBreaks} onCancel={() => setEditing(false)}
+              onApply={(b) => { onCustomBreaks(b); setEditing(false); }} />
+          ) : (
+            <>
+              <ul>
+                {legend.map((b) => (
+                  <li key={b.k}>
+                    {customBreaks && onBand ? (
+                      <button className={`lg-band ${band === b.k ? "on" : ""}`} aria-pressed={band === b.k} disabled={!b.n}
+                        title={band === b.k ? "Show every band again" : "Show only this band"} onClick={() => onBand(band === b.k ? null : b.k)}>
+                        <span className="sw" style={{ background: b.colour }} />{b.text}<span className="lg-n">{b.n}</span>
+                      </button>
+                    ) : <><span className="sw" style={{ background: b.colour }} />{b.text}</>}
+                  </li>
+                ))}
+                <li className="muted"><span className="sw" style={{ background: css("--map-nodata") }} />No figure</li>
+                {dimmed.size > 0 && <li className="muted"><span className="sw faded" />Filtered out (faded)</li>}
+              </ul>
+              {onCustomBreaks && (
+                <div className="lg-actions">
+                  <button className="link-btn" onClick={() => setEditing(true)}>{customBreaks ? "Change my key" : "Set my own key"}</button>
+                  {customBreaks && <button className="link-btn" onClick={() => onCustomBreaks(null)}>Automatic</button>}
+                </div>
+              )}
+              {customBreaks && onBand && band === null && <div className="tiny muted lg-hint">Click a band to show only those.</div>}
+            </>
+          )}
         </div>
       )}
     </div>
+  );
+}
+
+/** Typing the key's own boundaries: one number splits the map in two (e.g. 50: "50 or more" and "under 50"). */
+function KeyEditor({ initial, onApply, onCancel }: { initial: number[] | null; onApply: (b: number[] | null) => void; onCancel: () => void }) {
+  const [draft, setDraft] = useState<string[]>(() => (initial?.length ? initial.map(String) : [""]));
+  const clean = cleanBreaks(draft);
+  const set = (i: number, v: string) => setDraft((d) => d.map((x, j) => (j === i ? v : x)));
+  return (
+    <form className="lg-editor" onSubmit={(e) => { e.preventDefault(); if (clean.length) onApply(clean); }}>
+      <div className="tiny muted">Boundaries between colours. One number splits the map in two: e.g. 50 shows 50 or more against the rest.</div>
+      {draft.map((v, i) => (
+        <div key={i} className="lg-row">
+          <input inputMode="decimal" value={v} autoFocus={i === draft.length - 1} placeholder="e.g. 50" aria-label={`Boundary ${i + 1}`} onChange={(e) => set(i, e.target.value)} />
+          {draft.length > 1 && <button type="button" className="icon-btn" aria-label="Remove" onClick={() => setDraft((d) => d.filter((_, j) => j !== i))}>✕</button>}
+        </div>
+      ))}
+      {draft.length < 6 && <button type="button" className="link-btn tiny" onClick={() => setDraft((d) => [...d, ""])}>+ Add a boundary</button>}
+      <div className="lg-actions">
+        <button type="submit" className="btn primary small" disabled={!clean.length}>Apply</button>
+        <button type="button" className="link-btn" onClick={onCancel}>Cancel</button>
+      </div>
+    </form>
   );
 }

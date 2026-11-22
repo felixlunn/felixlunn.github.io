@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { usePersistentState } from "../lib/usePersistentState";
 import { canPerHead, fmtValue, forSeat, libDemServed, overallRate, points, ranked, summary, type LdScope } from "./analysis";
 import { outlier, vsMedian } from "./stats";
@@ -13,6 +13,7 @@ import { type Dataset, type Reference } from "./types";
 import { ViewPicker, YearBars } from "./YearViews";
 import { LibDemPanel } from "./LibDemPanel";
 import { useMapFilter } from "./useMapFilter";
+import { bands, loadKeys, saveKeys } from "./key";
 /** Dataset view: one FOI response on the map, with its Lib Dem seats, ranking and details. */
 
 export function DatasetView({ d: saved, ref_, shapes, seat, backend, canEdit, onDeleted, onPickSeat, scope, setScope }: {
@@ -36,10 +37,31 @@ export function DatasetView({ d: saved, ref_, shapes, seat, backend, canEdit, on
   const flagged = useMemo(() => rows.map((r) => ({ r, o: outlier(r.value, stats) })).filter((x) => x.o !== null), [rows, stats]);
   const flaggedSet = useMemo(() => new Set(flagged.map((x) => x.r.target.code)), [flagged]);
 
+  // The key's own boundaries, if the user set some for this figure (remembered per dataset and figure).
+  const [keys, setKeys] = useState(loadKeys);
+  const keyId = `${saved.id}|${colKey}${ph ? "|per100k" : ""}`;
+  const customBreaks = keys[keyId] ?? null;
+  const setCustomBreaks = (b: number[] | null) => setKeys((k) => {
+    const next = { ...k };
+    if (b) next[keyId] = b; else delete next[keyId];
+    saveKeys(next);
+    return next;
+  });
+
   const [tab, setTab] = usePersistentState("foi.tab", "ld", ["ld", "all", "about"] as const);
   const ld = useMemo(() => libDemServed(ref_, d.geography, new Set(d.rows.map((r) => r.code)), scope), [ref_, d.geography, d.rows, scope]);
   // Map filters (up / down, Lib Dem seats): one rule for the map, ranking, outliers and counts.
-  const { dir, setDir, ldOnly, setLdOnly, directional: filtering, isChange, pass, visible, active: activeFilter, clear: clearFilters } = useMapFilter(rows, col, stats.mean, ld);
+  const { dir, setDir, ldOnly, setLdOnly, band, setBand, directional: filtering, isChange, pass, visible, active: activeFilter, clear: clearFilters } = useMapFilter(rows, col, stats.mean, ld, customBreaks);
+  const bandLabel = band !== null && customBreaks ? bands(customBreaks, (v) => fmtValue(v, col, ph)).find((b) => b.k === band)?.label : null;
+  // The full ranking folds away (it's long for trusts and courts); it opens by itself when the map is filtered.
+  const [rankOpen, setRankOpen] = usePersistentState("foi.rankOpen", "closed", ["open", "closed"] as const);
+  useEffect(() => { if (activeFilter) setRankOpen("open"); }, [activeFilter, setRankOpen]);
+  // Unusual figures: name the three furthest from the median; the rest are marked in the ranking.
+  const unusual = useMemo(() => {
+    const all = flagged.filter(({ r }) => pass(r));
+    const far = (v: number | null) => (v === null || stats.median === null ? 0 : Math.abs(v - stats.median));
+    return { top: [...all].sort((a, b) => far(b.r.value) - far(a.r.value)).slice(0, 3), all };
+  }, [flagged, pass, stats.median]);
   const overall = ph ? overallRate(rows) : null;
   // How far from the middle: a ratio for levels ("2.3× the median"), a difference for changes ("+12 points above").
   const vsMid = (v: number): string | null => {
@@ -107,7 +129,8 @@ export function DatasetView({ d: saved, ref_, shapes, seat, backend, canEdit, on
       <div className="foi-map-wrap">
         {mapNote && <div className="foi-map-note tiny">{mapNote}</div>}
         <FoiMap shapes={layerShapes} items={items} reverse={col?.direction === "higher_better"} selected={selected} highlight={highlight} flagged={flaggedSet} dimmed={dimmed} onSelect={setSelected}
-          title={`${col?.label ?? ""}${unit}`} format={(v) => fmtValue(v, col, ph)} />
+          title={`${col?.label ?? ""}${unit}`} format={(v) => fmtValue(v, col, ph)}
+          customBreaks={customBreaks} onCustomBreaks={setCustomBreaks} band={band} onBand={setBand} />
       </div>
       <section className="foi-detail">
         <header className="foi-dh">
@@ -145,6 +168,7 @@ export function DatasetView({ d: saved, ref_, shapes, seat, backend, canEdit, on
           <p className="foi-showing">
             Showing <strong>{visible.size}</strong> of {rows.length}
             {filtering && dir !== "all" && <> · {isChange ? (dir === "up" ? "increased" : "decreased") : `${dir === "up" ? "above" : "below"} the average (${fmtValue(stats.mean, col, ph)})`}</>}
+            {bandLabel && <> · {bandLabel}</>}
             {ldOnly && <> · serving {scope === "held" ? "a Lib Dem seat" : scope === "target" ? "a Lib Dem target" : "a Lib Dem seat or target"}</>}
             {" "}<button className="link-btn" onClick={clearFilters}>clear</button>
           </p>
@@ -241,22 +265,29 @@ export function DatasetView({ d: saved, ref_, shapes, seat, backend, canEdit, on
               {" "}· range <strong>{fmtValue(stats.min, col, ph)}</strong> to <strong>{fmtValue(stats.max, col, ph)}</strong>
               {stats.withheld > 0 && <> · {stats.withheld} withheld</>}
             </p>
-            {flagged.some(({ r }) => pass(r)) && (
-              <p className="foi-unusual small">
-                <span className="muted">Unusual:</span>{" "}
-                {flagged.filter(({ r }) => pass(r)).map(({ r, o }, i) => (
-                  <span key={r.target.code}>{i > 0 && ", "}
-                    <button className="link-btn" title={vsMid(r.value!) ?? ""} onClick={() => setSelected(r.target.code)}>{r.target.name}</button>{" "}
-                    <span className={`tag ${o}`}>{o === "high" ? "▲" : "▼"} {fmtValue(r.value, col, ph)}</span>
-                  </span>
-                ))}
-              </p>
+            {unusual.top.length > 0 && (
+              <div className="foi-unusual small">
+                <span className="muted">Most unusual</span>
+                <ul>
+                  {unusual.top.map(({ r, o }) => (
+                    <li key={r.target.code}>
+                      <button className="link-btn" title={vsMid(r.value!) ?? ""} onClick={() => setSelected(r.target.code)}>{r.target.name}</button>
+                      <span className={`tag ${o}`}>{o === "high" ? "▲" : "▼"} {fmtValue(r.value, col, ph)}</span>
+                    </li>
+                  ))}
+                </ul>
+                {unusual.all.length > 3 && <span className="tiny muted">and {unusual.all.length - 3} more, marked ▲ ▼ in the ranking</span>}
+              </div>
             )}
             <div className="foi-table-head">
-              <span className="tiny muted">{col?.label}{unit}</span>
-              <input type="search" placeholder="Find" value={filter} onChange={(e) => setFilter(e.target.value)} aria-label="Find in the ranking" />
+              <button className="foi-fold" aria-expanded={rankOpen === "open"} onClick={() => setRankOpen(rankOpen === "open" ? "closed" : "open")}>
+                <span className="foi-fold-arrow" aria-hidden="true">{rankOpen === "open" ? "▾" : "▸"}</span>
+                Ranking of {activeFilter ? `${shown.length} of ${rows.length}` : `all ${rows.length}`} {GEO[d.geography].plural}
+                <span className="tiny muted"> · {col?.label}{unit}</span>
+              </button>
+              {rankOpen === "open" && <input type="search" placeholder="Find" value={filter} onChange={(e) => setFilter(e.target.value)} aria-label="Find in the ranking" />}
             </div>
-            <table className="foi-rank">
+            {rankOpen === "open" && <table className="foi-rank">
               <thead><tr><th className="rk">#</th><th>{GEO[d.geography].label}</th><th className="num">{ph ? "Per 100,000" : "Figure"}</th></tr></thead>
               <tbody>
                 {shown.map((r) => (
@@ -267,7 +298,7 @@ export function DatasetView({ d: saved, ref_, shapes, seat, backend, canEdit, on
                   </tr>
                 ))}
               </tbody>
-            </table>
+            </table>}
           </>
         )}
 
