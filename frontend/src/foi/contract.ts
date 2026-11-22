@@ -6,7 +6,7 @@
 
 import { each, field, type Problems } from "../lib/check";
 import { DEPARTMENT, GEO } from "./geographies";
-import type { Cell, Column, DataRow, Dataset } from "./types";
+import type { Cell, Column, DataRow, Dataset, DatasetSummary } from "./types";
 
 /** The reference.json format this code reads (the pipeline writes "version"; bump both together). */
 export const REFERENCE_VERSION = 1;
@@ -85,9 +85,20 @@ export function normaliseDataset(raw: unknown, problems: Problems = []): Dataset
     foi_reference: opt("foi_reference"), authority: opt("authority"), period: opt("period"), requested_on: opt("requested_on"),
     received_on: opt("received_on"), notes: opt("notes"), columns, rows,
     unmatched: Array.isArray(o.unmatched) ? (o.unmatched as Dataset["unmatched"]) : [],
+    summary: normaliseSummary(o.summary),
     file_path: opt("file_path"), created_by: opt("created_by"), created_by_email: opt("created_by_email") ?? "",
     created_at: opt("created_at") ?? "", updated_at: opt("updated_at") ?? "",
   };
+}
+
+/** A saved summary, or null when it's missing or malformed (the list then shows less, nothing breaks). */
+function normaliseSummary(raw: unknown): DatasetSummary | null {
+  const s = (raw ?? {}) as Record<string, unknown>;
+  if (typeof s.rows !== "number" || typeof s.unmatched !== "number") return null;
+  const h = (s.headline ?? null) as Record<string, unknown> | null;
+  const col = (h?.col ?? {}) as Record<string, unknown>;
+  const ok = h && typeof col.key === "string" && typeof col.label === "string" && (typeof h.median === "number" || h.median === null);
+  return { rows: s.rows, unmatched: s.unmatched, headline: ok ? (h as unknown as DatasetSummary["headline"]) : null };
 }
 
 /** Clean up a list of datasets, dropping unusable ones; problems are reported in the console. */

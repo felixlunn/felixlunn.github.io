@@ -3,6 +3,7 @@ import { Matcher, targets, type Match } from "./match";
 import { numericShare, parseCsv, parseValue, readFile, toTable, type Table } from "./parse";
 import { parsePeriod, seriesName } from "./periods";
 import { DEPARTMENTS, GEO } from "./geographies";
+import { summarise } from "./orgs";
 import { type Cell, type Column, type DataRow, type Department, type Direction, type Geography, type NewDataset, type Reference } from "./types";
 
 interface Props {
@@ -200,11 +201,13 @@ export default function Upload({ ref_, department, onCancel, onSave }: Props) {
     setBusy(true);
     setError(null);
     try {
-      await onSave({
+      const draft: NewDataset = {
         department, geography, title: meta.title.trim(), foi_reference: nul(meta.foi_reference), authority: nul(meta.authority),
         period: nul(meta.period), requested_on: nul(meta.requested_on), received_on: nul(meta.received_on), notes: nul(meta.notes),
-        columns, rows, unmatched, file_path: null,
-      }, file);
+        columns, rows, unmatched, summary: null, file_path: null,
+      };
+      // The size and headline figure, saved alongside so the dataset list never has to load the rows.
+      await onSave({ ...draft, summary: summarise(ref_, draft) }, file);
     } catch (e) {
       setError((e as Error).message);
       setBusy(false);

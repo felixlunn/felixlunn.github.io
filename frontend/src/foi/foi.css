@@ -40,11 +40,14 @@
 .foi-list button:hover { border-color: var(--accent); }
 .foi-list button.on { border-color: var(--accent); box-shadow: inset 3px 0 0 var(--accent); background: color-mix(in srgb, var(--accent) 7%, var(--surface-1)); }
 .foi-list-title { font-weight: 600; font-size: 13.5px; }
+.foi-list-head { display: block; margin-top: 2px; }
 
 /* Main: map above, details below; side by side on wide screens */
 .foi-main { display: grid; grid-template-columns: 1fr minmax(380px, 460px); min-height: 0; min-width: 0; }
 .foi-main.foi-empty { grid-template-columns: 1fr; }
 .foi-map-wrap, .foi-empty { position: relative; min-height: 0; }
+.foi-loading { position: absolute; top: 14px; left: 50%; transform: translateX(-50%); z-index: 3; margin: 0; padding: 6px 12px; border-radius: 8px;
+  background: var(--surface-1); border: 1px solid var(--border); box-shadow: 0 2px 8px rgb(0 0 0 / 12%); }
 .foi-map { position: absolute; inset: 0; }
 .foi-map-canvas { position: absolute; inset: 0; background: var(--map-sea); }
 .foi-legend { position: absolute; left: 12px; bottom: 34px; max-width: 260px; background: var(--surface-1); border: 1px solid var(--border);
