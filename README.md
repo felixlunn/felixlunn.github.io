@@ -120,7 +120,7 @@ whips/                Python package
   demo.py             synthetic offline dataset for UI development
 frontend/             Vite + React + TypeScript + MapLibre GL
   src/lib/analytics.ts  browser port of engine.py (same tests)
-.github/workflows/    ci.yml (tests + build) · deploy.yml (refresh data every 2 days + publish)
+.github/workflows/    ci.yml (tests + build) · refresh.yml (rebuild the data daily, then publish) · publish.yml (publish the site)
 ```
 
 ## Map style
@@ -161,11 +161,18 @@ cd frontend && npm test
 ### Deploying to GitHub Pages
 
 1. In the repository go to **Settings → Pages** and set **Source** to **GitHub Actions**.
-2. Merge to `main` (or run **Actions → Refresh data & deploy → Run workflow**).
+2. Run **Actions → Refresh data → Run workflow** once to build the first data.
 3. Optional: add a `NOMIS_UID` repository secret ([free Nomis account](https://www.nomisweb.co.uk/myaccount/userjoin.asp)) for higher API limits.
 
-The site will be at `https://<owner>.github.io/<repo>/`. Generated data are published with the site and kept
-as a 30-day workflow artifact; they are not committed, so the git history stays small.
+Two workflows keep the site up to date:
+
+- **Refresh data** (`refresh.yml`) rebuilds every dataset daily at 03:17 UTC, on demand, and whenever the pipeline
+  code (`whips/`) changes. It saves the result as the `dashboard-data` artifact (kept 30 days), raises an issue for
+  sources that failed or stopped updating, then publishes.
+- **Publish site** (`publish.yml`) runs on every push to `main`: it builds the latest code with the most recent
+  refreshed data and publishes it in about two minutes. Site-only changes never wait for a data refresh.
+
+The site will be at `https://<owner>.github.io/<repo>/`. Generated data are not committed, so the git history stays small.
 
 ### FOI research section
 

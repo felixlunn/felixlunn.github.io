@@ -1,0 +1,99 @@
+name: Publish site
+
+# Builds the dashboard from the latest main and the most recent refreshed data, and publishes it to GitHub Pages.
+# Runs on every push to main (about two minutes: no data is re-downloaded), on demand, and at the end of each data
+# refresh (see refresh.yml), which passes in the data it has just built.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+  workflow_call:
+    inputs:
+      same_run:
+        description: "Use the data artifact uploaded earlier in the calling run"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+  actions: read # to find and download the latest data artifact
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # A newer publish supersedes an older one: it always uses the latest code and the latest data.
+    concurrency:
+      group: publish
+      cancel-in-progress: true
+    steps:
+      # Always the latest main, even when called by a refresh that started before newer commits landed.
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Get the data built in this run
+        if: inputs.same_run
+        uses: actions/download-artifact@v4
+        with:
+          name: dashboard-data
+          path: frontend/public/data
+
+      - name: Get the most recent refreshed data
+        if: ${{ !inputs.same_run }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Newest unexpired data artifact ("dashboard-data", or "dashboard-data-N" from the older single workflow).
+          ID="$(gh api "repos/$GITHUB_REPOSITORY/actions/artifacts?per_page=100" \
+            --jq '[.artifacts[] | select(.expired | not) | select(.name == "dashboard-data" or (.name | startswith("dashboard-data-")))][0].id')"
+          if [ -z "$ID" ] || [ "$ID" = "null" ]; then
+            echo "::error::No refreshed data found. Run the 'Refresh data' workflow first."
+            exit 1
+          fi
+          echo "Using data artifact $ID"
+          curl -sfL -H "Authorization: Bearer $GH_TOKEN" "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/artifacts/$ID/zip" -o data.zip
+          mkdir -p frontend/public/data
+          unzip -q -o data.zip -d frontend/public/data
+          test -s frontend/public/data/data.json
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - working-directory: frontend
+        env:
+          # FOI research section (foi.html): the Supabase project URL and its public "anon" key, set as repository
+          # variables (Settings > Secrets and variables > Actions > Variables). The anon key is designed to be public:
+          # the database's row-level security decides who can read what. Without them the page says it isn't set up.
+          # Read from repository variables, or from repository secrets of the same name if saved there instead.
+          VITE_SUPABASE_URL: ${{ vars.SUPABASE_URL || secrets.SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ vars.SUPABASE_ANON_KEY || secrets.SUPABASE_ANON_KEY }}
+        run: |
+          if [ -z "$VITE_SUPABASE_URL" ] || [ -z "$VITE_SUPABASE_ANON_KEY" ]; then
+            echo "::warning title=FOI research not connected::SUPABASE_URL and/or SUPABASE_ANON_KEY is missing (Settings > Secrets and variables > Actions, repository level, exact names). foi.html will say it isn't set up."
+          fi
+          case "$VITE_SUPABASE_URL" in ""|https://*.supabase.co|https://*.supabase.co/) ;; *) echo "::warning title=FOI research::SUPABASE_URL should be just https://<project>.supabase.co (any path such as /rest/v1/ is ignored)" ;; esac
+          npm ci
+          npm run build
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: frontend/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    concurrency:
+      group: pages-deploy
+      cancel-in-progress: true
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

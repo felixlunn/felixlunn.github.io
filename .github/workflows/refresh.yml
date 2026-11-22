@@ -1,17 +1,19 @@
-name: Refresh data & deploy
+name: Refresh data
 
-# Rebuilds every dataset from the live APIs and publishes the dashboard to
-# GitHub Pages. Runs daily, on every push to main, and on demand. Monday's run (and a manual run with
-# "fresh" ticked) ignores saved copies and re-downloads every source.
+# Rebuilds every dataset from the live APIs, saves it as the "dashboard-data" artifact, then publishes the site with
+# it (publish.yml). Runs daily, on demand, and when the pipeline code changes. Monday's run (and a manual run with
+# "fresh" ticked) ignores saved copies and re-downloads every source. Site-only changes don't wait for this: they are
+# published by publish.yml with the most recent data.
 on:
   schedule:
     - cron: "17 3 * * *" # 03:17 UTC every day
   push:
     branches: [main]
+    paths: ["whips/**", "pyproject.toml", ".github/workflows/refresh.yml"]
   workflow_dispatch:
     inputs:
       skip:
-        description: "Optional sources to skip, space-separated (foi council_control scotland fire police_workforce heat_pumps green_space floods business_demography council_tax insolvency university ofsted pupils pharmacies public_health income asylum road_condition rents energy travel renewables air_pollution children vehicles buses cqc roads housing_stock child_poverty dental life_expectancy affordability homelessness ev sewage petitions questions rail courts fuel_poverty nhs schools epc imd neighbourhoods debates claimants aps ashe bres business popest police elections members lsoa)"
+        description: "Optional sources to skip, space-separated (python -m whips.build --help lists them)"
         required: false
         default: ""
       fresh:
@@ -24,14 +26,16 @@ permissions:
   contents: read
   pages: write
   id-token: write
+  actions: read
   issues: write # to raise an alert when the refresh or a data source fails
 
+# One refresh at a time; a newer one waits rather than cancelling a refresh part-way through.
 concurrency:
-  group: pages
+  group: refresh
   cancel-in-progress: false
 
 jobs:
-  build:
+  data:
     runs-on: ubuntu-latest
     timeout-minutes: 90
     steps:
@@ -116,49 +120,20 @@ jobs:
       - name: Keep a copy of the data
         uses: actions/upload-artifact@v4
         with:
-          name: dashboard-data-${{ github.run_number }}
+          name: dashboard-data
           path: frontend/public/data
           retention-days: 30
 
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-          cache-dependency-path: frontend/package-lock.json
-      - working-directory: frontend
-        env:
-          # FOI research section (foi.html): the Supabase project URL and its public "anon" key, set as repository
-          # variables (Settings > Secrets and variables > Actions > Variables). The anon key is designed to be public:
-          # the database's row-level security decides who can read what. Without them the page says it isn't set up.
-          # Read from repository variables, or from repository secrets of the same name if saved there instead.
-          VITE_SUPABASE_URL: ${{ vars.SUPABASE_URL || secrets.SUPABASE_URL }}
-          VITE_SUPABASE_ANON_KEY: ${{ vars.SUPABASE_ANON_KEY || secrets.SUPABASE_ANON_KEY }}
-        run: |
-          if [ -z "$VITE_SUPABASE_URL" ] || [ -z "$VITE_SUPABASE_ANON_KEY" ]; then
-            echo "::warning title=FOI research not connected::SUPABASE_URL and/or SUPABASE_ANON_KEY is missing (Settings > Secrets and variables > Actions, repository level, exact names). foi.html will say it isn't set up."
-          fi
-          case "$VITE_SUPABASE_URL" in ""|https://*.supabase.co|https://*.supabase.co/) ;; *) echo "::warning title=FOI research::SUPABASE_URL should be just https://<project>.supabase.co (any path such as /rest/v1/ is ignored)" ;; esac
-          npm ci
-          npm run build
+  publish:
+    needs: data
+    uses: ./.github/workflows/publish.yml
+    with:
+      same_run: true
+    secrets: inherit
 
-      - uses: actions/configure-pages@v5
-      - uses: actions/upload-pages-artifact@v3
-        with:
-          path: frontend/dist
-
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - id: deployment
-        uses: actions/deploy-pages@v4
-
-  # If the refresh or the deploy fails outright, the site keeps its old data: raise an issue so it is noticed.
+  # If the refresh or the publish fails outright, the site keeps its old data: raise an issue so it is noticed.
   alert:
-    needs: [build, deploy]
+    needs: [data, publish]
     if: failure() && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
@@ -167,7 +142,7 @@ jobs:
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           TITLE="Data refresh failed"
-          BODY="The data refresh and deploy failed, so the live site is still showing older data. Run: $RUN_URL"
+          BODY="The data refresh or publish failed, so the live site is still showing older data. Run: $RUN_URL"
           OPEN="$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --search "\"$TITLE\" in:title" --json number --jq '.[0].number')"
           if [ -n "$OPEN" ]; then gh issue comment "$OPEN" --repo "$GITHUB_REPOSITORY" --body "$BODY"
           else gh issue create --repo "$GITHUB_REPOSITORY" --title "$TITLE" --body "$BODY"; fi
