@@ -2,25 +2,19 @@ import { useMemo, useState } from "react";
 import { campaignLine, displayName, fmtValue, ldOf, libDemServed, seatsServed, type LdScope } from "./analysis";
 import FoiMap, { type MapItem } from "./FoiMap";
 import { targets } from "./match";
-import { CHILD, KIND_LABEL, ORG_KINDS, PARENT, orgList, parentOf, scores, worseHalf, type Headline } from "./orgs";
-import { MAP_NOTE, mapShapes } from "./shapes";
+import { ordinal } from "../lib/format";
+import { DEPARTMENT, GEO } from "./geographies";
+import { orgList, parentOf, scores, worseHalf, type Headline } from "./orgs";
+import { mapShapes } from "./shapes";
 import { outlier } from "./stats";
-import { GEOGRAPHY_LABEL, IS_AREA, type Department, type Geography, type Reference } from "./types";
+import type { Department, Geography, Reference } from "./types";
 
-const PLURAL: Record<Geography, string> = { police_force: "police force areas", court: "courts and tribunals", nhs_trust: "NHS trusts", health_area: "NHS areas" };
-const ORD = (n: number) => `${n}${n % 100 >= 11 && n % 100 <= 13 ? "th" : ["th", "st", "nd", "rd"][n % 10] ?? "th"}`;
-
-function readScope(): LdScope {
-  try { return (localStorage.getItem("foi.ldScope") as LdScope) || "held"; } catch { return "held"; }
-}
-
-/** Sidebar in "By organisation" mode: the kind (e.g. trusts or ICBs), a search, and the list, worst first. */
-export function OrgSidebar({ ref_, heads, dept, kind, setKind, code, setCode }: {
-  ref_: Reference; heads: Headline[]; dept: Department; kind: Geography; setKind: (g: Geography) => void; code: string | null; setCode: (c: string | null) => void;
+/** Sidebar in Area view: the kind (e.g. trusts or ICBs), a search, and the list, worst first. */
+export function OrgSidebar({ ref_, heads, dept, scope, kind, setKind, code, setCode }: {
+  ref_: Reference; heads: Headline[]; dept: Department; scope: LdScope; kind: Geography; setKind: (g: Geography) => void; code: string | null; setCode: (c: string | null) => void;
 }) {
   const [q, setQ] = useState("");
   const [ldOnly, setLdOnly] = useState(false);
-  const scope = readScope();
   const list = useMemo(() => orgList(ref_, heads, kind), [ref_, heads, kind]);
   const sc = useMemo(() => scores(heads, kind), [heads, kind]);
   const ld = useMemo(() => libDemServed(ref_, kind, new Set(list.map((t) => t.code)), scope), [ref_, kind, list, scope]);
@@ -31,19 +25,19 @@ export function OrgSidebar({ ref_, heads, dept, kind, setKind, code, setCode }: 
       const ra = sa?.of ? sa.worse / sa.of : -1, rb = sb?.of ? sb.worse / sb.of : -1;
       return rb - ra || (sb?.worse ?? 0) - (sa?.worse ?? 0) || a.name.localeCompare(b.name);
     });
-  const kinds = ORG_KINDS[dept];
+  const kinds = DEPARTMENT[dept].geographies;
   return (
     <div className="foi-orgside">
       {kinds.length > 1 && (
         <div className="seg mini foi-kind" role="tablist">
-          {kinds.map((k) => <button key={k} className={k === kind ? "on" : ""} onClick={() => { setKind(k); setCode(null); }}>{KIND_LABEL[k].many}</button>)}
+          {kinds.map((k) => <button key={k} className={k === kind ? "on" : ""} onClick={() => { setKind(k); setCode(null); }}>{GEO[k].many}</button>)}
         </div>
       )}
       <div className="foi-orgside-tools">
-        <input type="search" placeholder={KIND_LABEL[kind].find} value={q} onChange={(e) => setQ(e.target.value)} aria-label="Find" />
+        <input type="search" placeholder={GEO[kind].find} value={q} onChange={(e) => setQ(e.target.value)} aria-label="Find" />
         <button className={`chip ld ${ldOnly ? "on" : ""}`} aria-pressed={ldOnly} onClick={() => setLdOnly(!ldOnly)} title="Only those serving Lib Dem seats">LD</button>
       </div>
-      {!heads.some((h) => h.d.geography === kind) && <p className="small muted">No datasets by {GEOGRAPHY_LABEL[kind].toLowerCase()} yet.</p>}
+      {!heads.some((h) => h.d.geography === kind) && <p className="small muted">No datasets by {GEO[kind].label.toLowerCase()} yet.</p>}
       <ul className="foi-orglist">
         {shown.map((t) => {
           const s = sc.get(t.code);
@@ -64,19 +58,18 @@ export function OrgSidebar({ ref_, heads, dept, kind, setKind, code, setCode }: 
   );
 }
 
-/** Map and profile in "By organisation" mode. */
-export default function OrgView({ ref_, shapes, heads, kind, code, setCode, setKindAndCode, onOpenDataset }: {
-  ref_: Reference; shapes: GeoJSON.FeatureCollection; heads: Headline[]; kind: Geography; code: string | null;
+/** Map and profile in Area view. */
+export default function OrgView({ ref_, shapes, heads, scope, kind, code, setCode, setKindAndCode, onOpenDataset }: {
+  ref_: Reference; shapes: GeoJSON.FeatureCollection; heads: Headline[]; scope: LdScope; kind: Geography; code: string | null;
   setCode: (c: string | null) => void; setKindAndCode: (g: Geography, c: string) => void; onOpenDataset: (id: string) => void;
 }) {
-  const scope = readScope();
   const list = useMemo(() => orgList(ref_, heads, kind), [ref_, heads, kind]);
   const sc = useMemo(() => scores(heads, kind), [heads, kind]);
   const present = useMemo(() => new Set(heads.filter((h) => h.d.geography === kind).flatMap((h) => [...h.byCode.keys()])), [heads, kind]);
   const layer = useMemo(() => mapShapes(ref_, shapes, kind, present), [ref_, shapes, kind, present]);
   const ld = useMemo(() => libDemServed(ref_, kind, new Set(list.map((t) => t.code)), scope), [ref_, kind, list, scope]);
   const byCode = useMemo(() => new Map(targets(ref_, kind).map((t) => [t.code, t])), [ref_, kind]);
-  const pts = useMemo(() => (IS_AREA[kind] ? null : new Map((kind === "court" ? ref_.points.courts ?? [] : ref_.points.trusts ?? []).map((p) => [("id" in p ? p.id : p.code), p]))), [ref_, kind]);
+  const pts = useMemo(() => (GEO[kind].isArea ? null : new Map((kind === "court" ? ref_.points.courts ?? [] : ref_.points.trusts ?? []).map((p) => [("id" in p ? p.id : p.code), p]))), [ref_, kind]);
 
   const items: MapItem[] = list.map((t) => {
     const s = sc.get(t.code);
@@ -91,7 +84,7 @@ export default function OrgView({ ref_, shapes, heads, kind, code, setCode, setK
   return (
     <div className="foi-main">
       <div className="foi-map-wrap">
-        {MAP_NOTE[kind] && <div className="foi-map-note tiny">{MAP_NOTE[kind]}</div>}
+        {GEO[kind].mapNote && <div className="foi-map-note tiny">{GEO[kind].mapNote}</div>}
         <FoiMap shapes={layer} items={items} reverse={false} selected={code} highlight={new Set(ld.keys())} onSelect={setCode}
           title="Datasets where it's in the worse half" format={(v) => `${Math.round(v)}%`} />
       </div>
@@ -114,8 +107,8 @@ function Overview({ heads, kind, list, sc, ld, setCode }: {
     .slice(0, 12);
   return (
     <>
-      <h2>{KIND_LABEL[kind].many}: across all datasets</h2>
-      <p className="small muted">{n} {n === 1 ? "dataset" : "datasets"} by {GEOGRAPHY_LABEL[kind].toLowerCase()}. Choose one on the map or in the list for everything known about it.</p>
+      <h2>{GEO[kind].many}: across all datasets</h2>
+      <p className="small muted">{n} {n === 1 ? "dataset" : "datasets"} by {GEO[kind].label.toLowerCase()}. Choose one on the map or in the list for everything known about it.</p>
       {worst.length > 0 && (
         <>
           <h3 className="foi-h">Most often in the worse half</h3>
@@ -158,7 +151,7 @@ function Card({ h, code, name, via, onOpen }: { h: Headline; code: string; name:
   const o = r ? outlier(v, h.stats) : null;
   const measure = h.view?.series || h.d.title;
   const line = campaignLine({ server: displayName(h.d.geography, name), measure: h.col.change ? measure : h.col.period ? `${measure} in ${h.col.period}` : h.col.label,
-    col: h.col, value: v, suppressed: r?.suppressed, values: h.values, median: h.stats.median, plural: PLURAL[h.d.geography] });
+    col: h.col, value: v, suppressed: r?.suppressed, values: h.values, median: h.stats.median, plural: GEO[h.d.geography].plural });
   return (
     <article className={`foi-card ${w ? "worse" : ""}`}>
       <div className="foi-card-top">
@@ -173,7 +166,7 @@ function Card({ h, code, name, via, onOpen }: { h: Headline; code: string; name:
         <Spark h={h} code={code} />
       </div>
       <div className="foi-card-meta tiny">
-        {r?.rank ? <span>{ORD(r.rank)} highest of {h.stats.n}</span> : <span className="muted">no figure</span>}
+        {r?.rank ? <span>{ordinal(r.rank)} highest of {h.stats.n}</span> : <span className="muted">no figure</span>}
         {h.stats.median !== null && v !== null && <span className="muted"> · median {fmtValue(h.stats.median, h.col)}</span>}
         {w === true && <span className="tag high">worse half</span>}
         {w === false && <span className="tag low">better half</span>}
@@ -189,11 +182,11 @@ function Profile({ ref_, heads, kind, code, present, name, sub, score, setKindAn
 }) {
   const direct = heads.filter((h) => h.d.geography === kind && h.byCode.has(code));
   const missing = heads.filter((h) => h.d.geography === kind && !h.byCode.has(code));
-  const parentKind = PARENT[kind];
+  const parentKind = GEO[kind].parent;
   const parentCode = parentKind ? parentOf(ref_, kind, code) : null;
   const parentName = parentKind && parentCode ? targets(ref_, parentKind).find((t) => t.code === parentCode)?.name : null;
   const viaParent = parentKind && parentCode ? heads.filter((h) => h.d.geography === parentKind && h.byCode.has(parentCode)) : [];
-  const childKind = CHILD[kind];
+  const childKind = GEO[kind].child;
   const childHeads = childKind ? heads.filter((h) => h.d.geography === childKind) : [];
   const children = childKind ? targets(ref_, childKind).filter((t) => parentOf(ref_, childKind, t.code) === code) : [];
 
@@ -212,7 +205,7 @@ function Profile({ ref_, heads, kind, code, present, name, sub, score, setKindAn
         <div className="foi-dh-text">
           <h2>{name}</h2>
           <div className="tiny muted">
-            {[KIND_LABEL[kind].one, sub].filter(Boolean).join(" · ")}
+            {[GEO[kind].one, sub].filter(Boolean).join(" · ")}
             {parentKind && parentCode && parentName && <> · in <button className="link-btn" onClick={() => setKindAndCode(parentKind, parentCode)}>{parentName}</button></>}
           </div>
         </div>
@@ -231,7 +224,7 @@ function Profile({ ref_, heads, kind, code, present, name, sub, score, setKindAn
             <Card key={h.d.id} h={h} code={code} name={name} onOpen={() => onOpenDataset(h.d.id)} />
           ))}
         </div>
-      ) : <p className="small muted">Not in any {KIND_LABEL[kind].one.toLowerCase()} dataset yet.</p>}
+      ) : <p className="small muted">Not in any {GEO[kind].one.toLowerCase()} dataset yet.</p>}
 
       {viaParent.length > 0 && parentName && parentCode && (
         <>
@@ -244,7 +237,7 @@ function Profile({ ref_, heads, kind, code, present, name, sub, score, setKindAn
 
       {childKind && childHeads.length > 0 && children.length > 0 && (
         <>
-          <h3 className="foi-h">Its {KIND_LABEL[childKind].many.toLowerCase()}</h3>
+          <h3 className="foi-h">Its {GEO[childKind].many.toLowerCase()}</h3>
           {childHeads.map((h) => {
             const kids = children.filter((c) => h.byCode.has(c.code)).map((c) => ({ c, r: h.byCode.get(c.code)! }))
               .sort((a, b) => (b.r.value ?? -Infinity) - (a.r.value ?? -Infinity));
@@ -257,7 +250,7 @@ function Profile({ ref_, heads, kind, code, present, name, sub, score, setKindAn
                     <li key={c.code}>
                       <button className="link-btn" onClick={() => setKindAndCode(childKind, c.code)}>{c.name}</button>{" "}
                       <strong>{r.suppressed ? "withheld" : fmtValue(r.value, h.col)}</strong>
-                      {r.rank && <span className="tiny muted"> · {ORD(r.rank)} of {h.stats.n}</span>}
+                      {r.rank && <span className="tiny muted"> · {ordinal(r.rank)} of {h.stats.n}</span>}
                       {worseHalf(h, r.value) && <span className="tag high">worse half</span>}
                     </li>
                   ))}

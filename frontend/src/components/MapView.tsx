@@ -3,6 +3,8 @@ import maplibregl, { type GeoJSONSource, type Map as MLMap } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import type { Choropleth, Seat } from "../types";
 import { classify, isDark, quantileBreaks, ramp } from "../lib/colors";
+import { usePersistentState } from "../lib/usePersistentState";
+import { osmStyle, UK_BOUNDS } from "../lib/basemap";
 
 /** A finer layer drawn over the constituencies, e.g. the LSOAs of one seat. */
 export interface Overlay {
@@ -27,29 +29,6 @@ interface Props {
   onSelect: (code: string) => void;
 }
 
-/**
- * Base map: the standard OpenStreetMap tiles (no API key). Use follows the OSM tile usage policy:
- * attribution is shown and the browser sends its normal Referer. Dimmed in dark mode.
- * If tiles can't load, the plain background underneath simply shows through.
- */
-function baseStyle(): maplibregl.StyleSpecification {
-  const dark = isDark();
-  return {
-    version: 8,
-    sources: {
-      osm: {
-        type: "raster", tileSize: 256, maxzoom: 19,
-        tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],
-        attribution: '© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">OpenStreetMap</a> contributors',
-      },
-    },
-    layers: [{
-      id: "osm", type: "raster", source: "osm",
-      paint: dark ? { "raster-brightness-max": 0.55, "raster-saturation": -0.4 } : { "raster-saturation": -0.15 },
-    }],
-  };
-}
-
 /** Fill opacity: lets the base map show through as you zoom in; solid without one. */
 function fillOpacity(hover: number, solid: number, zoomed: number, baseMap: boolean): maplibregl.DataDrivenPropertyValueSpecification<number> {
   const h = ["boolean", ["feature-state", "hover"], false];
@@ -57,7 +36,6 @@ function fillOpacity(hover: number, solid: number, zoomed: number, baseMap: bool
   return ["interpolate", ["linear"], ["zoom"], 7, ["case", h, hover, solid], 11, ["case", h, zoomed - 0.2, zoomed]] as never;
 }
 
-const UK_BOUNDS: [number, number, number, number] = [-8.6, 49.85, 1.8, 60.9];
 
 function cssVar(name: string): string {
   return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || "#ccc";
@@ -94,11 +72,10 @@ export default function MapView({ geo, seats, choropleth, selected, mine = null,
   const map = useRef<MLMap | null>(null);
   const [ready, setReady] = useState(false);
   // Base map on/off, remembered per browser.
-  const [baseMap, setBaseMap] = useState(() => {
-    try { return localStorage.getItem("whips.baseMap") !== "off"; } catch { return true; }
-  });
+  const [baseMapSetting, setBaseMapSetting] = usePersistentState("whips.baseMap", "on", ["on", "off"] as const);
+  const baseMap = baseMapSetting === "on";
+  const setBaseMap = (f: (b: boolean) => boolean) => setBaseMapSetting(f(baseMap) ? "on" : "off");
   useEffect(() => {
-    try { localStorage.setItem("whips.baseMap", baseMap ? "on" : "off"); } catch { /* keep for this visit */ }
     const m = map.current;
     if (!m || !ready) return;
     const visibility = baseMap ? "visible" : "none";
@@ -122,7 +99,7 @@ export default function MapView({ geo, seats, choropleth, selected, mine = null,
     if (!el.current) return;
     const m = new maplibregl.Map({
       container: el.current,
-      style: baseStyle(),
+      style: osmStyle(),
       bounds: UK_BOUNDS,
       fitBoundsOptions: { padding: 20 },
       attributionControl: false,

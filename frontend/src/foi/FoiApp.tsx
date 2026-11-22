@@ -1,18 +1,19 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { usePersistentState } from "../lib/usePersistentState";
 import { campaignLine, canPerHead, displayName, fmtValue, forSeat, inScope, ldOf, libDemServed, mainServer, overallRate, points, ranked, summary, type LdScope, type Ranked } from "./analysis";
 import { outlier, vsMedian } from "./stats";
-import { MAP_NOTE, mapShapes } from "./shapes";
+import { mapShapes } from "./shapes";
 import OrgView, { OrgSidebar } from "./OrgView";
-import { headline, MODE_LABEL, ORG_KINDS, type Headline } from "./orgs";
+import { headline, type Headline } from "./orgs";
 import { withYearViews, type YearView } from "./periods";
 import type { Backend, User } from "./backend";
 import FoiMap, { type MapItem } from "./FoiMap";
 import { targets } from "./match";
 import Upload from "./Upload";
 import { csv, download, slug } from "../lib/format";
-import { DEPARTMENTS, GEOGRAPHY_LABEL, IS_AREA, type Column, type Dataset, type Department, type Geography, type NewDataset, type Reference, type Target } from "./types";
+import { DEPARTMENT, DEPARTMENTS, GEO } from "./geographies";
+import { type Column, type Dataset, type Department, type Geography, type NewDataset, type Reference, type Target } from "./types";
 
-const PLURAL: Record<Dataset["geography"], string> = { police_force: "police force areas", court: "courts and tribunals", nhs_trust: "NHS trusts", health_area: "NHS areas" };
 
 export default function FoiApp({ backend, ref_, shapes }: { backend: Backend; ref_: Reference; shapes: GeoJSON.FeatureCollection }) {
   const [user, setUser] = useState<User | null | undefined>(undefined);
@@ -114,13 +115,14 @@ function Workspace({ backend, user, admin, ref_, shapes }: { backend: Backend; u
   const [error, setError] = useState<string | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
-  const [seat, setSeat] = useState<string>(() => { try { return localStorage.getItem("foi.seat") ?? ""; } catch { return ""; } });
+  const [seat, setSeat] = usePersistentState<string>("foi.seat", "");
   // Two ways in: one dataset at a time, or one organisation (trust / ICB / force / court) across every dataset.
-  const [mode, setMode] = useState<"datasets" | "orgs">(() => { try { return localStorage.getItem("foi.mode") === "orgs" ? "orgs" : "datasets"; } catch { return "datasets"; } });
-  useEffect(() => { try { localStorage.setItem("foi.mode", mode); } catch { /* per visit */ } }, [mode]);
-  const [orgKind, setOrgKind] = useState<Geography>(ORG_KINDS[dept][0]);
+  const [mode, setMode] = usePersistentState("foi.mode", "datasets", ["datasets", "orgs"] as const);
+  // Which Lib Dem seats to focus on (held, targets or both): shared by both views and remembered.
+  const [scope, setScope] = usePersistentState<LdScope>("foi.ldScope", "held", ["held", "target", "both"]);
+  const [orgKind, setOrgKind] = useState<Geography>(DEPARTMENT[dept].geographies[0]);
   const [orgCode, setOrgCode] = useState<string | null>(null);
-  useEffect(() => { setOrgKind(ORG_KINDS[dept][0]); setOrgCode(null); }, [dept]);
+  useEffect(() => { setOrgKind(DEPARTMENT[dept].geographies[0]); setOrgCode(null); }, [dept]);
   const heads = useMemo(() => (datasets ?? []).map((d) => headline(ref_, d)).filter((h): h is Headline => h !== null), [datasets, ref_]);
 
   const reload = useCallback(() => {
@@ -130,7 +132,6 @@ function Workspace({ backend, user, admin, ref_, shapes }: { backend: Backend; u
   }, [backend, dept]);
   useEffect(reload, [reload]);
   useEffect(() => { history.replaceState(null, "", `#${dept}`); }, [dept]);
-  useEffect(() => { try { localStorage.setItem("foi.seat", seat); } catch { /* per visit only */ } }, [seat]);
 
   const active = datasets?.find((d) => d.id === activeId) ?? null;
   const info = DEPARTMENTS.find((d) => d.id === dept)!;
@@ -171,13 +172,13 @@ function Workspace({ backend, user, admin, ref_, shapes }: { backend: Backend; u
             <button className="btn primary block" onClick={() => setUploading(true)}>Upload an FOI response</button>
             {error && <p className="small bad">Couldn't load datasets: {error}</p>}
             <div className="seg foi-mode" role="tablist" aria-label="View by">
-              <button role="tab" aria-selected={mode === "datasets"} className={mode === "datasets" ? "on" : ""} onClick={() => setMode("datasets")}><strong>By dataset</strong></button>
-              <button role="tab" aria-selected={mode === "orgs"} className={mode === "orgs" ? "on" : ""} onClick={() => setMode("orgs")}>
-                <strong>{MODE_LABEL[dept]}</strong>
+              <button role="tab" aria-selected={mode === "datasets"} className={mode === "datasets" ? "on" : ""} onClick={() => setMode("datasets")} title="One FOI response at a time"><strong>Dataset view</strong></button>
+              <button role="tab" aria-selected={mode === "orgs"} className={mode === "orgs" ? "on" : ""} onClick={() => setMode("orgs")} title={DEPARTMENT[dept].areaViewHint}>
+                <strong>Area view</strong>
               </button>
             </div>
             {mode === "orgs" ? (
-              <OrgSidebar ref_={ref_} heads={heads} dept={dept} kind={orgKind} setKind={setOrgKind} code={orgCode} setCode={setOrgCode} />
+              <OrgSidebar ref_={ref_} heads={heads} dept={dept} scope={scope} kind={orgKind} setKind={setOrgKind} code={orgCode} setCode={setOrgCode} />
             ) : datasets === null ? <p className="small muted">Loading…</p> : !datasets.length ? (
               <p className="small muted">None yet. Upload the first FOI response for {info.label.toLowerCase()}.</p>
             ) : (
@@ -186,7 +187,7 @@ function Workspace({ backend, user, admin, ref_, shapes }: { backend: Backend; u
                   <li key={d.id}>
                     <button className={d.id === activeId ? "on" : ""} onClick={() => setActiveId(d.id)}>
                       <span className="foi-list-title">{d.title}</span>
-                      <span className="tiny muted">{GEOGRAPHY_LABEL[d.geography]} · {d.rows.length} rows · {d.period || d.received_on || d.created_at.slice(0, 10)}</span>
+                      <span className="tiny muted">{GEO[d.geography].label} · {d.rows.length} rows · {d.period || d.received_on || d.created_at.slice(0, 10)}</span>
                     </button>
                   </li>
                 ))}
@@ -195,10 +196,11 @@ function Workspace({ backend, user, admin, ref_, shapes }: { backend: Backend; u
           </div>
         </aside>
         {mode === "orgs" ? (
-          <OrgView ref_={ref_} shapes={shapes} heads={heads} kind={orgKind} code={orgCode} setCode={setOrgCode}
+          <OrgView ref_={ref_} shapes={shapes} heads={heads} scope={scope} kind={orgKind} code={orgCode} setCode={setOrgCode}
             setKindAndCode={(g, c) => { setOrgKind(g); setOrgCode(c); }} onOpenDataset={(id) => { setActiveId(id); setMode("datasets"); }} />
         ) : active ? (
           <DatasetView key={active.id} d={active} ref_={ref_} shapes={shapes} seat={seat || null} backend={backend} onPickSeat={setSeat}
+            scope={scope} setScope={setScope}
             canEdit={admin || active.created_by === user.id} onDeleted={reload} />
         ) : (
           <div className="foi-main foi-empty">
@@ -242,9 +244,11 @@ function SeatPicker({ ref_, seat, setSeat }: { ref_: Reference; seat: string; se
   );
 }
 
-function DatasetView({ d: saved, ref_, shapes, seat, backend, canEdit, onDeleted, onPickSeat }: {
+function DatasetView({ d: saved, ref_, shapes, seat, backend, canEdit, onDeleted, onPickSeat, scope, setScope }: {
   d: Dataset; ref_: Reference; shapes: GeoJSON.FeatureCollection; seat: string | null; backend: Backend; canEdit: boolean; onDeleted: () => void;
   onPickSeat: (code: string) => void;
+  scope: LdScope;
+  setScope: (s: LdScope) => void;
 }) {
   // Several years: an average per year and a % change are worked out and offered as the standard maps.
   const { d, views } = useMemo(() => withYearViews(saved), [saved]);
@@ -264,10 +268,7 @@ function DatasetView({ d: saved, ref_, shapes, seat, backend, canEdit, onDeleted
   // Filters on the average and % change maps: above / below average (or increase / decrease), and Lib Dem seats.
   const [dir, setDir] = useState<"all" | "up" | "down">("all");
   const [ldOnly, setLdOnly] = useState(false);
-  const [tab, setTab] = useState<"ld" | "all" | "about">(() => { try { return (localStorage.getItem("foi.tab") as "ld" | "all" | "about") || "ld"; } catch { return "ld"; } });
-  useEffect(() => { try { localStorage.setItem("foi.tab", tab); } catch { /* per visit */ } }, [tab]);
-  const [scope, setScope] = useState<LdScope>(() => { try { return (localStorage.getItem("foi.ldScope") as LdScope) || "held"; } catch { return "held"; } });
-  useEffect(() => { try { localStorage.setItem("foi.ldScope", scope); } catch { /* per visit */ } }, [scope]);
+  const [tab, setTab] = usePersistentState("foi.tab", "ld", ["ld", "all", "about"] as const);
   const filtering = !!col?.derived;
   const ld = useMemo(() => libDemServed(ref_, d.geography, new Set(d.rows.map((r) => r.code)), scope), [ref_, d.geography, d.rows, scope]);
   const isChange = col?.derived === "change";
@@ -297,12 +298,12 @@ function DatasetView({ d: saved, ref_, shapes, seat, backend, canEdit, onDeleted
   const layer = d.geography === "police_force" || d.geography === "court" ? "police" : "health";
   // What to shade: official boundaries (forces, NHS areas), official trust catchments, or approximate court areas.
   const layerShapes = useMemo(() => mapShapes(ref_, shapes, d.geography, new Set(rowByCode.keys())), [ref_, shapes, d.geography, rowByCode]);
-  const mapNote = MAP_NOTE[d.geography] ?? null;
+  const mapNote = GEO[d.geography].mapNote ?? null;
 
   const unit = ph ? " per 100,000 residents" : "";
   const items: MapItem[] = useMemo(() => {
     const val = new Map(rows.map((r) => [r.target.code, r]));
-    const base = IS_AREA[d.geography] ? [...tByCode.values()].map((t) => ({ code: t.code, name: t.name, sub: undefined as string | undefined, lat: undefined as number | undefined, lon: undefined as number | undefined }))
+    const base = GEO[d.geography].isArea ? [...tByCode.values()].map((t) => ({ code: t.code, name: t.name, sub: undefined as string | undefined, lat: undefined as number | undefined, lon: undefined as number | undefined }))
       // Courts and trusts: only those in the response (others would clutter the shaded areas as empty dots).
       : points(ref_, d.geography).filter((p) => rowByCode.has(p.code) || d.geography === "nhs_trust" && !!ref_.points.trusts?.find((t) => t.code === p.code)?.catchment)
         .map((p) => ({ code: p.code, name: p.name, sub: p.sub, lat: p.lat, lon: p.lon }));
@@ -320,7 +321,7 @@ function DatasetView({ d: saved, ref_, shapes, seat, backend, canEdit, onDeleted
   const sel = selected ? tByCode.get(selected) : null;
   const selRow = selected ? rowByCode.get(selected) : null;
   const linkedSeats = (code: string) => {
-    if (IS_AREA[d.geography]) {
+    if (GEO[d.geography].isArea) {
       const a = (layer === "police" ? ref_.layers.police.areas : ref_.layers.health.areas).find((x) => x.code === code);
       return a?.seats.length ?? 0;
     }
@@ -328,7 +329,7 @@ function DatasetView({ d: saved, ref_, shapes, seat, backend, canEdit, onDeleted
   };
 
   const exportCsv = () => {
-    const head = [GEOGRAPHY_LABEL[d.geography], "Code", "Name in response", ...d.columns.map((c) => c.label)];
+    const head = [GEO[d.geography].label, "Code", "Name in response", ...d.columns.map((c) => c.label)];
     const body = d.rows.map((r) => [tByCode.get(r.code)?.name ?? r.code, r.code, r.source_name, ...d.columns.map((c) => r.suppressed?.[c.key] ?? r.values[c.key])]);
     download(`${slug(d.title)}.csv`, csv([head, ...body]));
   };
@@ -351,7 +352,7 @@ function DatasetView({ d: saved, ref_, shapes, seat, backend, canEdit, onDeleted
         <header className="foi-dh">
           <div className="foi-dh-text">
             <h2>{d.title}</h2>
-            <div className="tiny muted">{[GEOGRAPHY_LABEL[d.geography], d.authority, d.period || d.received_on].filter(Boolean).join(" · ")}</div>
+            <div className="tiny muted">{[GEO[d.geography].label, d.authority, d.period || d.received_on].filter(Boolean).join(" · ")}</div>
           </div>
           <details className="foi-menu">
             <summary aria-label="More actions" title="Download, original file, delete">⋯</summary>
@@ -419,7 +420,7 @@ function DatasetView({ d: saved, ref_, shapes, seat, backend, canEdit, onDeleted
 
 
         <div className="foi-tabs" role="tablist">
-          {([["ld", "Lib Dem seats"], ["all", `All ${PLURAL[d.geography]}`], ["about", "About"]] as const).map(([k, label]) => (
+          {([["ld", "Lib Dem seats"], ["all", `All ${GEO[d.geography].plural}`], ["about", "About"]] as const).map(([k, label]) => (
             <button key={k} role="tab" aria-selected={tab === k} className={tab === k ? "on" : ""} onClick={() => setTab(k)}>{label}</button>
           ))}
         </div>
@@ -464,7 +465,7 @@ function DatasetView({ d: saved, ref_, shapes, seat, backend, canEdit, onDeleted
             )}
 
             <LibDemPanel ref_={ref_} d={d} col={col} rows={rows} stats={stats} ph={ph} view={view} scope={scope} setScope={setScope}
-              plural={PLURAL[d.geography]} names={tByCode} onPick={(seatCode, server) => { onPickSeat(seatCode); setSelected(server); }} />
+              plural={GEO[d.geography].plural} names={tByCode} onPick={(seatCode, server) => { onPickSeat(seatCode); setSelected(server); }} />
           </>
         )}
 
@@ -495,7 +496,7 @@ function DatasetView({ d: saved, ref_, shapes, seat, backend, canEdit, onDeleted
               <input type="search" placeholder="Find" value={filter} onChange={(e) => setFilter(e.target.value)} aria-label="Find in the ranking" />
             </div>
             <table className="foi-rank">
-              <thead><tr><th className="rk">#</th><th>{GEOGRAPHY_LABEL[d.geography]}</th><th className="num">{ph ? "Per 100,000" : "Figure"}</th></tr></thead>
+              <thead><tr><th className="rk">#</th><th>{GEO[d.geography].label}</th><th className="num">{ph ? "Per 100,000" : "Figure"}</th></tr></thead>
               <tbody>
                 {shown.map((r) => (
                   <tr key={r.target.code} className={`${highlight.has(r.target.code) ? "mine" : ""} ${selected === r.target.code ? "sel" : ""}`} onClick={() => setSelected(r.target.code)}>
@@ -512,7 +513,7 @@ function DatasetView({ d: saved, ref_, shapes, seat, backend, canEdit, onDeleted
         {tab === "about" && (
           <div className="foi-about">
             <table className="foi-kv"><tbody>
-              <tr><th>Each row is a</th><td>{GEOGRAPHY_LABEL[d.geography]}</td></tr>
+              <tr><th>Each row is a</th><td>{GEO[d.geography].label}</td></tr>
               {d.authority && <tr><th>Answered by</th><td>{d.authority}</td></tr>}
               {d.foi_reference && <tr><th>FOI reference</th><td>{d.foi_reference}</td></tr>}
               {d.period && <tr><th>Period covered</th><td>{d.period}</td></tr>}
@@ -523,7 +524,7 @@ function DatasetView({ d: saved, ref_, shapes, seat, backend, canEdit, onDeleted
             {d.notes && <p className="small foi-notes">{d.notes}</p>}
             {notIn.length > 0 && notIn.length < tByCode.size && (
               <details className="small foi-missing">
-                <summary>{notIn.length} {notIn.length === 1 ? PLURAL[d.geography].replace(/s$/, "") : PLURAL[d.geography]} not in this response</summary>
+                <summary>{notIn.length} {notIn.length === 1 ? GEO[d.geography].plural.replace(/s$/, "") : GEO[d.geography].plural} not in this response</summary>
                 <p className="tiny">{notIn.slice(0, 60).map((t) => t.name).join(", ")}{notIn.length > 60 ? ` and ${notIn.length - 60} more` : ""}</p>
               </details>
             )}

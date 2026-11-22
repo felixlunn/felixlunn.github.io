@@ -5,11 +5,9 @@
 
 import { Delaunay } from "d3-delaunay";
 import polygonClipping, { type MultiPolygon, type Polygon } from "polygon-clipping";
+import { LON_SCALE } from "./nearest";
 
 export interface Place { code: string; lon: number; lat: number; jurisdiction: string }
-
-// Longitude degrees are shorter than latitude degrees in Britain: scale them so "nearest" means nearest on the ground.
-const K = Math.cos((54 * Math.PI) / 180);
 
 function asMulti(g: GeoJSON.Geometry): MultiPolygon {
   if (g.type === "Polygon") return [g.coordinates as Polygon];
@@ -42,13 +40,13 @@ export function nearestAreas(places: Place[], lands: Record<string, GeoJSON.Geom
       const k = `${p.lon},${p.lat}`;
       const n = seen.get(k) ?? 0;
       seen.set(k, n + 1);
-      return [(p.lon + n * 1e-4) * K, p.lat + n * 1e-4] as [number, number];
+      return [(p.lon + n * 1e-4) * LON_SCALE, p.lat + n * 1e-4] as [number, number];
     });
-    const vor = Delaunay.from(xy).voronoi([x0 * K - 1, y0 - 1, x1 * K + 1, y1 + 1]);
+    const vor = Delaunay.from(xy).voronoi([x0 * LON_SCALE - 1, y0 - 1, x1 * LON_SCALE + 1, y1 + 1]);
     pts.forEach((p, i) => {
       const cell = vor.cellPolygon(i);
       if (!cell) return;
-      const ring = cell.map(([x, y]) => [x / K, y] as [number, number]);
+      const ring = cell.map(([x, y]) => [x / LON_SCALE, y] as [number, number]);
       const cb = bbox([[ring]]);
       const near = parts.filter(({ box }) => box[0] <= cb[2] && box[2] >= cb[0] && box[1] <= cb[3] && box[3] >= cb[1]).map((x) => x.poly);
       if (!near.length) return;
@@ -59,7 +57,3 @@ export function nearestAreas(places: Place[], lands: Record<string, GeoJSON.Geom
   return { type: "FeatureCollection", features };
 }
 
-/** The jurisdiction of a police force area code: England & Wales, Scotland or Northern Ireland. */
-export function jurisdictionOf(areaCode: string | null): string {
-  return areaCode?.startsWith("S") ? "S" : areaCode?.startsWith("N") ? "N" : "EW";
-}

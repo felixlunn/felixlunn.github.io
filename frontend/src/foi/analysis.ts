@@ -2,7 +2,10 @@
 
 import { targets } from "./match";
 import { describe } from "./stats";
-import { IS_AREA, type Column, type Dataset, type Geography, type Reference, type Target } from "./types";
+import { ordinal } from "../lib/format";
+import { GEO } from "./geographies";
+import { nearestCourtBySeat } from "./nearest";
+import { type Column, type Dataset, type Geography, type Reference, type Target } from "./types";
 
 export interface Point { code: string; name: string; lat: number; lon: number; area: string | null; seat: string | null; sub: string }
 
@@ -13,7 +16,7 @@ export function points(ref: Reference, g: Geography): Point[] {
 }
 
 export function canPerHead(d: Dataset, col: Column | undefined): boolean {
-  return IS_AREA[d.geography] && col?.unit === "count";
+  return GEO[d.geography].isArea && col?.unit === "count";
 }
 
 export interface Ranked { target: Target; value: number | null; raw: number | null; suppressed?: string; rank: number | null }
@@ -85,7 +88,6 @@ export function fmtValue(v: number | null, col: Column | undefined, perHead = fa
 const LIB_DEM = /^(liberal democrats?|lib ?dems?|ld)$/i;
 export const isLibDem = (party: string | null | undefined) => LIB_DEM.test((party ?? "").trim());
 
-const jurisdiction = (code: string | null | undefined) => (code?.startsWith("S") ? "S" : code?.startsWith("N") ? "N" : "EW");
 
 /**
  * The seats each force, NHS area, trust or court in a response serves:
@@ -109,19 +111,8 @@ export function seatsServed(ref: Reference, g: Geography, inResponse: Set<string
       else add(t.code, t.seat);
     }
   } else {
-    const courts = (ref.points.courts ?? []).filter((c) => inResponse.has(c.id));
-    for (const c of courts) add(c.id, c.seat);
-    const K = Math.cos((54 * Math.PI) / 180);
-    for (const s of ref.seats) {
-      if (s.lon === undefined || s.lat === undefined) continue;
-      let best: string | null = null, bestD = Infinity;
-      for (const c of courts) {
-        if (jurisdiction(c.area) !== jurisdiction(s.code)) continue;
-        const dd = ((c.lon - s.lon) * K) ** 2 + (c.lat - s.lat) ** 2;
-        if (dd < bestD) { bestD = dd; best = c.id; }
-      }
-      if (best) add(best, s.code);
-    }
+    for (const c of ref.points.courts ?? []) if (inResponse.has(c.id)) add(c.id, c.seat);
+    for (const [seat, court] of nearestCourtBySeat(ref, inResponse)) add(court, seat);
   }
   return out;
 }
@@ -168,27 +159,14 @@ export function mainServer(ref: Reference, g: Geography, inResponse: Set<string>
     for (const t of trusts) for (const [s, share] of t.catchment ?? []) offer(s, t.code, share);
     for (const t of trusts) if (t.seat && !out.has(t.seat)) out.set(t.seat, { code: t.code });
   } else {
-    // Courts: nearest in the response, the same rule as the shaded areas and seatsServed.
-    for (const [code, seats] of seatsServed(ref, g, inResponse)) {
-      for (const s of seats) if (!out.has(s)) out.set(s, { code });
-    }
-    const K = Math.cos((54 * Math.PI) / 180);
-    const courts = (ref.points.courts ?? []).filter((c) => inResponse.has(c.id));
-    for (const s of ref.seats) {
-      if (s.lon === undefined || s.lat === undefined) continue;
-      let best: string | null = null, bestD = Infinity;
-      for (const c of courts) {
-        if (jurisdiction(c.area) !== jurisdiction(s.code)) continue;
-        const dd = ((c.lon - s.lon) * K) ** 2 + (c.lat - s.lat) ** 2;
-        if (dd < bestD) { bestD = dd; best = c.id; }
-      }
-      if (best) out.set(s.code, { code: best });
-    }
+    // Courts: the nearest in the response (the same rule as the shaded areas); seats without a location fall back to
+    // the court that sits in them.
+    for (const c of ref.points.courts ?? []) if (inResponse.has(c.id) && c.seat && !out.has(c.seat)) out.set(c.seat, { code: c.id });
+    for (const [seat, court] of nearestCourtBySeat(ref, inResponse)) out.set(seat, { code: court });
   }
   return out;
 }
 
-const ORD = (n: number) => `${n}${n % 100 >= 11 && n % 100 <= 13 ? "th" : ["th", "st", "nd", "rd"][n % 10] ?? "th"}`;
 
 /** A sentence a campaign can use, e.g. "In Bath, Avon and Somerset's stop and search rose 12% from 2021/22 to 2024/25: a bigger rise than 30 of 43 police force areas (median +4%)." */
 export function campaignLine(o: {
@@ -208,7 +186,7 @@ export function campaignLine(o: {
     return `${lead}'s ${measure} ${moved} from ${col.change.from} to ${col.change.to}: ${cmp}${o.median !== null && value !== 0 ? ` (median ${f(o.median)})` : ""}.`;
   }
   const rank = values.filter((v) => v > value).length + 1;
-  const pos = rank <= Math.ceil(values.length / 2) ? `the ${ORD(rank)} highest of ${values.length} ${plural}` : `the ${ORD(values.length - rank + 1)} lowest of ${values.length} ${plural}`;
+  const pos = rank <= Math.ceil(values.length / 2) ? `the ${ordinal(rank)} highest of ${values.length} ${plural}` : `the ${ordinal(values.length - rank + 1)} lowest of ${values.length} ${plural}`;
   const unit = o.perHead ? " per 100,000 residents" : "";
   return `${lead}'s ${measure} was ${f(value)}${unit}: ${pos}${o.median !== null ? ` (median ${f(o.median)}${unit})` : ""}.`;
 }
