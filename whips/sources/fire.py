@@ -15,12 +15,11 @@ import re
 import pandas as pd
 import requests
 
-from ..http import get_json
+from .. import arcgis
+from .. import govuk
 from ..history import council_periods
 from ..metrics import MetricMeta
-from .boundaries import ARCGIS_ROOT
-from .councils import arcgis_rows, averaged, column, regrouped_weights
-from .lsoa import _services
+from .councils import averaged, regrouped_weights
 
 log = logging.getLogger(__name__)
 
@@ -48,7 +47,7 @@ def key(name: str) -> str:
 
 
 def find_file(s: requests.Session) -> str:
-    for a in get_json(s, DATASET).get("details", {}).get("attachments", []):
+    for a in govuk.attachments(s, DATASET):
         if str(a.get("title", "")).upper().startswith("FIRE1001") and str(a.get("url", "")).endswith(".xlsx"):
             return a["url"]
     raise LookupError("No FIRE1001 table found")
@@ -79,9 +78,9 @@ def response_times(d: pd.DataFrame, fire_type: str) -> tuple[pd.Series, float | 
 
 
 def lad_to_fra(s: requests.Session) -> dict[str, str]:
-    names = [n for n in _services(s, FRA_PATTERN) if FRA_PATTERN.match(n)]
+    names = arcgis.matching(s, FRA_PATTERN)
     latest = max(names, key=lambda n: (int(FRA_PATTERN.match(n).group(1)), n))
-    return {column(r, r"LAD\d{2}CD"): key(column(r, r"FRA\d{2}NM")) for r in arcgis_rows(s, f"{ARCGIS_ROOT}/{latest}/FeatureServer/0")}
+    return {arcgis.field(r, r"LAD\d{2}CD"): key(arcgis.field(r, r"FRA\d{2}NM")) for r in arcgis.rows(s, arcgis.layer(latest))}
 
 
 def load_fire(s: requests.Session, weights: pd.DataFrame) -> tuple[dict[str, pd.DataFrame], str]:

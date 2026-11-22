@@ -24,7 +24,7 @@ def test_ids_skips_and_metrics_are_consistent():
 
 def test_code_files_follow_direct_imports():
     files = {p.name for p in registry.code_files("whips.sources.courts")}
-    assert {"courts.py", "councils.py", "lsoa.py", "boundaries.py", "http.py", "metrics.py"} <= files
+    assert {"courts.py", "lsoa.py", "arcgis.py", "http.py", "metrics.py"} <= files
     assert "rail.py" not in files
 
 

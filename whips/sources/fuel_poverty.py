@@ -14,13 +14,12 @@ import re
 import pandas as pd
 import requests
 
-from ..http import get_json
+from .. import govuk
 from ..metrics import MetricMeta
 
 log = logging.getLogger(__name__)
 
 COLLECTION = "https://www.gov.uk/api/content/government/collections/fuel-poverty-statistics"
-CONTENT = "https://www.gov.uk/api/content"
 SOURCE_URL = "https://www.gov.uk/government/collections/fuel-poverty-sub-regional-statistics"
 
 FUEL_POVERTY_METRICS = [
@@ -33,7 +32,7 @@ FUEL_POVERTY_METRICS = [
 
 def find_file(s: requests.Session) -> tuple[str, str]:
     """(xlsx URL, data year) of the latest sub-regional fuel poverty data tables."""
-    docs = get_json(s, COLLECTION).get("links", {}).get("documents", [])
+    docs = govuk.documents(s, COLLECTION)
     editions = []
     for d in docs:
         m = re.search(r"sub-regional-fuel-poverty-data-(\d{4})-(\d{4})-data", d.get("base_path", ""))
@@ -42,7 +41,7 @@ def find_file(s: requests.Session) -> tuple[str, str]:
     if not editions:
         raise LookupError("No sub-regional fuel poverty data publication found")
     _, data_year, path = max(editions)
-    for a in get_json(s, CONTENT + path).get("details", {}).get("attachments", []):
+    for a in govuk.attachments(s, path):
         if str(a.get("url", "")).lower().endswith(".xlsx"):
             return a["url"], str(data_year)
     raise LookupError(f"No Excel file in {path}")

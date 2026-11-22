@@ -22,12 +22,12 @@ import requests
 from shapely.geometry import mapping, shape
 from shapely.ops import unary_union
 
+from .. import arcgis
 from ..geo import SeatLocator
+from .. import govuk
 from ..http import get_json
-from .boundaries import ARCGIS_ROOT, _round_coords
 from ..ods import read_ods
 from ..parties import is_lib_dem
-from .lsoa import _services, layer_url
 
 log = logging.getLogger(__name__)
 
@@ -37,8 +37,6 @@ COURTS_PAGE = "https://www.find-court-tribunal.service.gov.uk/"
 ODS_URL = "https://directory.spineservices.nhs.uk/ORD/2-0-0/organisations"
 ODS_PAGE = "https://digital.nhs.uk/services/organisation-data-service"
 POSTCODES = "https://api.postcodes.io/postcodes"
-GOVUK_SEARCH = "https://www.gov.uk/api/search.json"
-GOVUK_CONTENT = "https://www.gov.uk/api/content"
 CATCHMENT_PREFIX = "/government/statistics/nhs-acute-hospital-trust-catchment-populations"
 CATCHMENT_PAGE = "https://www.gov.uk/government/collections/nhs-acute-hospital-trust-catchment-populations"
 MSOA_PATTERN = re.compile(r"^(?:MSOA_2021_EW|Middle_layer_Super_Output_Areas_\(December_2021\)_Boundaries_EW)_(BSC|BGC|BFC|BFE)", re.I)
@@ -63,18 +61,13 @@ def pick_service(names: list[str], pattern: re.Pattern) -> str:
     return max(hits)[2]
 
 
-def _field(props: dict, pattern: str):
-    return next((v for k, v in props.items() if re.fullmatch(pattern, k, re.IGNORECASE)), None)
-
-
 def load_layer(s: requests.Session, names: list[str], kind: str) -> list[dict]:
     pattern, code_f, name_f = LAYERS[kind]
-    layer = f"{ARCGIS_ROOT}/{pick_service(names, pattern)}/FeatureServer/0"
-    data = get_json(s, f"{layer}/query", params={"where": "1=1", "outFields": "*", "outSR": "4326", "f": "geojson"})
+    layer = arcgis.layer(pick_service(names, pattern))
     out = []
-    for f in data.get("features", []):
+    for f in arcgis.features(s, layer, geojson=True):
         p = f.get("properties") or {}
-        code, name = _field(p, code_f), _field(p, name_f)
+        code, name = arcgis.field(p, code_f), arcgis.field(p, name_f)
         if code and name and f.get("geometry"):
             out.append({"code": code, "name": name, "geometry": shape(f["geometry"])})
     if not out:
@@ -183,11 +176,11 @@ def load_trusts(s: requests.Session) -> list[dict]:
 
 def find_catchment_file(s: requests.Session) -> tuple[str, str]:
     """(data tables .ods URL, title) of OHID's latest NHS acute trust catchment populations release."""
-    res = get_json(s, GOVUK_SEARCH, params={"q": "NHS acute hospital trust catchment populations", "count": 20}).get("results", [])
+    res = govuk.search(s, "NHS acute hospital trust catchment populations")
     pages = sorted((r for r in res if str(r.get("link", "")).startswith(CATCHMENT_PREFIX)),
                    key=lambda r: r.get("public_timestamp", ""), reverse=True)
     for r in pages[:3]:
-        for a in get_json(s, GOVUK_CONTENT + r["link"]).get("details", {}).get("attachments", []):
+        for a in govuk.attachments(s, r["link"]):
             if str(a.get("url", "")).endswith(".ods") and "data table" in str(a.get("title", "")).lower():
                 return a["url"], r.get("title", "")
     raise LookupError("No NHS acute trust catchment data tables found on GOV.UK")
@@ -210,19 +203,13 @@ def load_msoa_shapes(s: requests.Session, names: list[str]) -> dict:
     hits = sorted((MSOA_PREFERENCE[m.group(1).upper()], n) for n in names if (m := MSOA_PATTERN.match(n)))
     if not hits:
         raise LookupError("No MSOA 2021 boundary service found on the ONS portal")
-    layer = layer_url(s, hits[0][1])
-    out, offset = {}, 0
-    while True:
-        data = get_json(s, f"{layer}/query", params={"where": "MSOA21CD LIKE 'E%'", "outFields": "MSOA21CD", "outSR": "4326",
-                                                     "f": "geojson", "resultOffset": offset, "resultRecordCount": 2000}, timeout=180)
-        batch = data.get("features", [])
-        for f in batch:
-            code = (f.get("properties") or {}).get("MSOA21CD")
-            if code and f.get("geometry"):
-                out[code] = shape(f["geometry"]).buffer(0)
-        if not batch or not (data.get("exceededTransferLimit") or data.get("properties", {}).get("exceededTransferLimit")):
-            return out
-        offset += len(batch)
+    layer = arcgis.first_layer(s, hits[0][1])
+    out = {}
+    for f in arcgis.features(s, layer, where="MSOA21CD LIKE 'E%'", fields="MSOA21CD", geojson=True, timeout=180):
+        code = (f.get("properties") or {}).get("MSOA21CD")
+        if code and f.get("geometry"):
+            out[code] = shape(f["geometry"]).buffer(0)
+    return out
 
 
 def catchment_areas(fptp: pd.DataFrame, msoas: dict) -> list[dict]:
@@ -262,7 +249,7 @@ def area_of_points(points: list[dict], areas: list[dict]) -> None:
 def to_feature(a: dict, layer: str) -> dict:
     g = mapping(a["geometry"].simplify(SIMPLIFY, preserve_topology=True))
     return {"type": "Feature", "properties": {"layer": layer, "code": a["code"], "name": a["name"]},
-            "geometry": {"type": g["type"], "coordinates": _round_coords(g["coordinates"], 4)}}
+            "geometry": {"type": g["type"], "coordinates": arcgis.round_coords(g["coordinates"], 4)}}
 
 
 def ld_status(seat: dict) -> dict:
@@ -323,7 +310,7 @@ def assemble(geo: dict, seats: list[dict], population: dict[str, float], police:
 
 def load_foi_reference(s: requests.Session, geo: dict, seats: list[dict], population: dict[str, float], as_of: str) -> tuple[dict, dict, list[str]]:
     """Fetch every layer. Courts and trusts are each optional: a failure leaves them out and is reported."""
-    names = _services(s, *(p for p, _, _ in LAYERS.values()))
+    names = arcgis.services(s, *(p for p, _, _ in LAYERS.values()))
     police = load_layer(s, names, "police")
     police += [nation_area(geo, "S", "S23000009", "Police Scotland"), nation_area(geo, "N", "N23000001", "Police Service of Northern Ireland")]
     health = load_layer(s, names, "icb") + load_layer(s, names, "lhb")
@@ -341,7 +328,7 @@ def load_foi_reference(s: requests.Session, geo: dict, seats: list[dict], popula
         problems.append(f"NHS trusts: {exc}"[:200])
     catchments = None
     try:
-        catchments, _ = load_catchments(s, _services(s, MSOA_PATTERN))
+        catchments, _ = load_catchments(s, arcgis.services(s, MSOA_PATTERN))
     except Exception as exc:  # noqa: BLE001
         log.exception("Trust catchments failed")
         problems.append(f"trust catchments: {exc}"[:200])

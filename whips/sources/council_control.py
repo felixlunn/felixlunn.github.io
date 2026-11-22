@@ -19,9 +19,8 @@ from datetime import date
 import pandas as pd
 import requests
 
-from .boundaries import ARCGIS_ROOT
-from .councils import COUNTY_PATTERN, arcgis_rows, column, lad_to_county
-from .lsoa import _services
+from .. import arcgis
+from .councils import COUNTY_PATTERN, lad_to_county
 
 log = logging.getLogger(__name__)
 
@@ -82,11 +81,11 @@ def load_councillors(s: requests.Session) -> tuple[pd.DataFrame, int]:
 
 def council_names(s: requests.Session) -> dict[str, str]:
     """Council code -> name, for UK local authorities and English counties."""
-    names = _services(s, UK_NAMES, COUNTY_PATTERN)
+    names = arcgis.services(s, UK_NAMES, COUNTY_PATTERN)
     uk = max((n for n in names if UK_NAMES.match(n)), key=lambda n: (int(UK_NAMES.match(n).group(1)), n))
-    out = {column(r, r"LAD\d{2}CD"): column(r, r"LAD\d{2}NM") for r in arcgis_rows(s, f"{ARCGIS_ROOT}/{uk}/FeatureServer/0")}
+    out = {arcgis.field(r, r"LAD\d{2}CD"): arcgis.field(r, r"LAD\d{2}NM") for r in arcgis.rows(s, arcgis.layer(uk))}
     cty = max(n for n in names if COUNTY_PATTERN.match(n))
-    out.update({column(r, r"CTY\d{2}CD"): column(r, r"CTY\d{2}NM") for r in arcgis_rows(s, f"{ARCGIS_ROOT}/{cty}/FeatureServer/0")})
+    out.update({arcgis.field(r, r"CTY\d{2}CD"): arcgis.field(r, r"CTY\d{2}NM") for r in arcgis.rows(s, arcgis.layer(cty))})
     return out
 
 

@@ -18,7 +18,7 @@ import re
 import pandas as pd
 import requests
 
-from ..http import get_json
+from .. import govuk
 from ..history import council_periods
 from ..metrics import MetricMeta
 from ..ods import find_table, read_ods
@@ -124,7 +124,7 @@ def homelessness_url(s: requests.Session) -> tuple[str, str]:
     """(URL, quarter) of the latest quarterly detailed local authority tables."""
     pat = re.compile(r"^Detailed local authority level tables: ((January|April|July|October) to \w+ \d{4})", re.I)
     found = []
-    for a in get_json(s, HOMELESS).get("details", {}).get("attachments", []):
+    for a in govuk.attachments(s, HOMELESS):
         m = pat.match(a.get("title", ""))
         if m and "accessible" not in a["title"].lower() and str(a.get("url", "")).endswith(".ods"):
             found.append((pd.to_datetime("1 " + m.group(1).split(" to ")[1]), m.group(1), a["url"]))

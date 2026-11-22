@@ -14,7 +14,7 @@ import re
 import pandas as pd
 import requests
 
-from ..http import get_json
+from .. import govuk
 from ..history import council_periods, year_columns
 from ..metrics import MetricMeta
 from ..ods import find_table, read_ods
@@ -41,7 +41,7 @@ ROAD_CONDITION_METRICS = [
 
 def find_files(s: requests.Session) -> dict[str, str]:
     out = {}
-    for a in get_json(s, DATASET).get("details", {}).get("attachments", []):
+    for a in govuk.attachments(s, DATASET):
         url = str(a.get("url", ""))
         for table in {t for t, _, _ in TABLES.values()}:
             if url.endswith(f"/{table}.ods"):

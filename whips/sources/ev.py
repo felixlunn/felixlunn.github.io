@@ -13,7 +13,7 @@ import re
 import pandas as pd
 import requests
 
-from ..http import get_json
+from .. import govuk
 from ..history import with_history
 from ..metrics import MetricMeta
 from ..ods import find_table, read_ods
@@ -37,7 +37,7 @@ EV_METRICS = [
 
 
 def find_file(s: requests.Session) -> str:
-    for a in get_json(s, DATASET).get("details", {}).get("attachments", []):
+    for a in govuk.attachments(s, DATASET):
         if "parliamentary constituency" in str(a.get("title", "")).lower() and str(a.get("url", "")).endswith(".ods"):
             return a["url"]
     raise LookupError("No EV chargers by parliamentary constituency table found")

@@ -16,7 +16,7 @@ import re
 import pandas as pd
 import requests
 
-from ..http import get_json
+from .. import govuk
 from ..metrics import MetricMeta
 
 log = logging.getLogger(__name__)
@@ -75,8 +75,7 @@ RATES = {
 
 def find_file_url(s: requests.Session) -> str:
     try:
-        data = get_json(s, CONTENT_API)
-        for a in data.get("details", {}).get("attachments", []):
+        for a in govuk.attachments(s, CONTENT_API):
             if str(a.get("title", "")).startswith("File 7") and str(a.get("url", "")).lower().endswith(".csv"):
                 return a["url"]
     except (requests.RequestException, ValueError) as exc:

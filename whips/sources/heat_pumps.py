@@ -14,13 +14,12 @@ import re
 import pandas as pd
 import requests
 
-from ..http import get_json
+from .. import govuk
 from ..metrics import MetricMeta
 
 log = logging.getLogger(__name__)
 
 COLLECTION = "https://www.gov.uk/api/content/government/collections/boiler-upgrade-scheme-statistics"
-CONTENT = "https://www.gov.uk/api/content"
 SOURCE_URL = "https://www.gov.uk/government/collections/boiler-upgrade-scheme-statistics"
 
 HEAT_PUMP_METRICS = [
@@ -31,10 +30,10 @@ HEAT_PUMP_METRICS = [
 
 
 def find_file(s: requests.Session) -> tuple[str, str]:
-    docs = [d for d in get_json(s, COLLECTION).get("links", {}).get("documents", [])
+    docs = [d for d in govuk.documents(s, COLLECTION)
             if re.search(r"boiler-upgrade-scheme-statistics-\w+-\d{4}$", d.get("base_path", ""))]
     for d in sorted(docs, key=lambda d: d.get("public_updated_at", ""), reverse=True)[:3]:
-        for a in get_json(s, CONTENT + d["base_path"]).get("details", {}).get("attachments", []):
+        for a in govuk.attachments(s, d["base_path"]):
             if str(a.get("url", "")).endswith(".xlsx"):
                 return a["url"], d.get("title", "").split(": ")[-1]
     raise LookupError("No Boiler Upgrade Scheme statistics workbook found")

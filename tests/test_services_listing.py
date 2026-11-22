@@ -1,6 +1,6 @@
 import re
 
-from whips.sources import boundaries, lsoa
+from whips import arcgis
 
 
 def fake(monkeypatch, listings):
@@ -10,26 +10,26 @@ def fake(monkeypatch, listings):
         calls.append(url)
         return {"services": [{"name": n, "type": "FeatureServer"} for n in next(it, [])] + [{"name": "M", "type": "MapServer"}]}
 
-    monkeypatch.setattr(boundaries, "get_json", get_json)
-    monkeypatch.setattr(boundaries, "_SERVICES", set())
-    monkeypatch.setattr(boundaries.time, "sleep", lambda _: None)
+    monkeypatch.setattr(arcgis, "get_json", get_json)
+    monkeypatch.setattr(arcgis, "_SERVICES", set())
+    monkeypatch.setattr(arcgis.time, "sleep", lambda _: None)
     return calls
 
 
 def test_service_listing_combines_incomplete_responses(monkeypatch):
     calls = fake(monkeypatch, [["A", "B"], ["A", "C"], ["B"]])
-    assert lsoa._services(None) == ["A", "B", "C"]
-    assert lsoa._services(None) == ["A", "B", "C"] and len(calls) == 3  # cached after the first call
+    assert arcgis.services(None) == ["A", "B", "C"]
+    assert arcgis.services(None) == ["A", "B", "C"] and len(calls) == 3  # cached after the first call
 
 
 def test_listing_again_until_a_wanted_service_appears(monkeypatch):
     # The 20 Nov 2026 failure: several listings in a row left out the police force areas.
     calls = fake(monkeypatch, [["A"], ["A"], ["A"], ["A"], ["Police_Force_Areas_Dec_2024_EW_BUC"]])
-    names = lsoa._services(None, re.compile(r"^Police_Force_Areas_"))
+    names = arcgis.services(None, re.compile(r"^Police_Force_Areas_"))
     assert "Police_Force_Areas_Dec_2024_EW_BUC" in names and len(calls) == 5
 
 
 def test_gives_up_after_the_limit(monkeypatch):
     calls = fake(monkeypatch, [["A"]] * 20)
-    assert lsoa._services(None, re.compile("never")) == ["A"]
-    assert len(calls) == boundaries.MAX_LISTINGS
+    assert arcgis.services(None, re.compile("never")) == ["A"]
+    assert len(calls) == arcgis.MAX_LISTINGS

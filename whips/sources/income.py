@@ -14,7 +14,7 @@ import re
 import pandas as pd
 import requests
 
-from ..http import get_json
+from .. import govuk
 from ..metrics import MetricMeta
 from ..ods import find_table, read_ods
 
@@ -36,7 +36,7 @@ INCOME_METRICS = [
 
 def find_file(s: requests.Session) -> tuple[str, str]:
     best = None
-    for a in get_json(s, PAGE).get("details", {}).get("attachments", []):
+    for a in govuk.attachments(s, PAGE):
         m = re.search(r"(\d{4}) to (\d{4})", str(a.get("title", "")))
         url = str(a.get("url", ""))
         if m and url.endswith((".ods", ".xlsx")) and (best is None or m.group(2) > best[0]):

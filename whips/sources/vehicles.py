@@ -15,7 +15,7 @@ import logging
 import pandas as pd
 import requests
 
-from ..http import get_json
+from .. import govuk
 from ..history import MAX_PERIODS, with_history
 
 MAX_SUPPRESSED = 0.10
@@ -38,7 +38,7 @@ VEHICLE_METRICS = [
 
 def find_files(s: requests.Session) -> dict[str, str]:
     found = {}
-    for a in get_json(s, DATASET).get("details", {}).get("attachments", []):
+    for a in govuk.attachments(s, DATASET):
         url = str(a.get("url", ""))
         for key in ("VEH0125", "VEH0145"):
             if url.endswith(f"df_{key}.csv"):

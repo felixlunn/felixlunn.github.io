@@ -14,7 +14,7 @@ import re
 import pandas as pd
 import requests
 
-from ..http import get_json
+from .. import govuk
 from ..history import council_periods, year_columns as history_years
 from ..metrics import MetricMeta
 from ..ods import find_table, read_ods
@@ -45,7 +45,7 @@ BUS_METRICS = [
 def find_files(s: requests.Session) -> dict[str, str]:
     """{"bus01": url, "bus02": url} for the journeys and vehicle miles workbooks."""
     found = {}
-    for a in get_json(s, DATASET).get("details", {}).get("attachments", []):
+    for a in govuk.attachments(s, DATASET):
         url = str(a.get("url", ""))
         for key, name in [("bus01", "/bus01.ods"), ("bus02", "/bus02_mi.ods")]:
             if url.endswith(name):

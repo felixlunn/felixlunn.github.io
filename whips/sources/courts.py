@@ -24,16 +24,14 @@ from xml.etree.ElementTree import iterparse
 import pandas as pd
 import requests
 
-from ..http import get_json
+from .. import arcgis
+from .. import govuk
 from ..metrics import MetricMeta
-from .boundaries import ARCGIS_ROOT
-from .councils import arcgis_rows, column
-from .lsoa import WARD_PATTERN, _services, find_ward_service
+from .lsoa import WARD_PATTERN, find_ward_service
 
 log = logging.getLogger(__name__)
 
 COLLECTION = "https://www.gov.uk/api/content/government/collections/criminal-court-statistics"
-CONTENT = "https://www.gov.uk/api/content"
 SOURCE_URL = "https://www.gov.uk/government/collections/criminal-court-statistics"
 TOOL_TITLE = "crown court receipts, disposals and open cases"
 PFA_PATTERN = re.compile(r"^LAD(\d{2})_CSP\d{2}_PFA\d{2}_EW_LU", re.I)
@@ -63,11 +61,11 @@ def area_key(name: str) -> str:
 
 def find_tool(s: requests.Session) -> tuple[str, str]:
     """(xlsx URL, edition title) of the Crown Court receipts/disposals/open cases tool in the latest quarterly release."""
-    docs = get_json(s, COLLECTION).get("links", {}).get("documents", [])
+    docs = govuk.documents(s, COLLECTION)
     quarterly = sorted((d for d in docs if "criminal-court-statistics-quarterly" in d.get("base_path", "")),
                        key=lambda d: d.get("public_updated_at", ""), reverse=True)
     for d in quarterly[:3]:
-        for a in get_json(s, CONTENT + d["base_path"]).get("details", {}).get("attachments", []):
+        for a in govuk.attachments(s, d["base_path"]):
             if TOOL_TITLE in str(a.get("title", "")).lower() and str(a.get("url", "")).endswith(".xlsx"):
                 return a["url"], d.get("title", "")
     raise LookupError("No Crown Court receipts/disposals/open cases tool found")
@@ -109,15 +107,15 @@ def open_by_area(df: pd.DataFrame) -> tuple[pd.DataFrame, str]:
 
 def seat_areas(s: requests.Session, lsoa_to_pcon: dict[str, str]) -> dict[str, str]:
     """Seat code -> police force area key: the area most of its LSOAs fall in (LSOA -> council -> police force area)."""
-    names = _services(s, WARD_PATTERN, PFA_PATTERN)
+    names = arcgis.services(s, WARD_PATTERN, PFA_PATTERN)
     ward = find_ward_service(names)
     pfa_svc = sorted(((int(PFA_PATTERN.match(n).group(1)), n) for n in names if PFA_PATTERN.match(n)), reverse=True)
     if not pfa_svc:
         raise LookupError("No council to police force area lookup found on the ONS portal")
-    pfa_layer = f"{ARCGIS_ROOT}/{pfa_svc[0][1]}/FeatureServer/0"
+    pfa_layer = arcgis.layer(pfa_svc[0][1])
 
-    lad_pfa = {column(r, r"LAD\d{2}CD"): area_key(column(r, r"PFA\d{2}NM") or "") for r in arcgis_rows(s, pfa_layer)}
-    lsoa_lad = {r["LSOA21CD"]: column(r, r"LAD\d{2}CD") for r in arcgis_rows(s, ward) if r.get("LSOA21CD")}
+    lad_pfa = {arcgis.field(r, r"LAD\d{2}CD"): area_key(arcgis.field(r, r"PFA\d{2}NM") or "") for r in arcgis.rows(s, pfa_layer)}
+    lsoa_lad = {r["LSOA21CD"]: arcgis.field(r, r"LAD\d{2}CD") for r in arcgis.rows(s, ward) if r.get("LSOA21CD")}
     votes: dict[str, Counter] = {}
     for lsoa, pcon in lsoa_to_pcon.items():
         area = lad_pfa.get(lsoa_lad.get(lsoa))

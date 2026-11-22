@@ -16,7 +16,7 @@ import re
 import pandas as pd
 import requests
 
-from ..http import get_json
+from .. import govuk
 from ..metrics import MetricMeta
 from ..ods import find_table, read_ods
 from .councils import apportion
@@ -45,7 +45,7 @@ ASYLUM_METRICS = [
 def find_file(s: requests.Session) -> tuple[str, str]:
     """(URL, "as at" label) of the latest quarterly local authority dataset."""
     best = None
-    for a in get_json(s, DATASET).get("details", {}).get("attachments", []):
+    for a in govuk.attachments(s, DATASET):
         m = re.search(r"year ending (\w+) (\d{4})", str(a.get("title", "")))
         url = str(a.get("url", ""))
         if m and url.endswith((".ods", ".xlsx")):

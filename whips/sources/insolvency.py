@@ -14,14 +14,12 @@ import re
 import pandas as pd
 import requests
 
-from ..http import get_json
+from .. import govuk
 from ..history import with_history
 from ..metrics import MetricMeta
 
 log = logging.getLogger(__name__)
 
-SEARCH = "https://www.gov.uk/api/search.json"
-CONTENT = "https://www.gov.uk/api/content"
 SOURCE_URL = "https://www.gov.uk/government/collections/individual-insolvency-statistics-releases"
 
 INSOLVENCY_METRICS = [
@@ -37,12 +35,12 @@ INSOLVENCY_METRICS = [
 
 def find_file(s: requests.Session) -> str:
     """Latest edition's constituency workbook, via GOV.UK search (each year is its own publication)."""
-    hits = get_json(s, SEARCH, params={"q": "individual insolvencies by location age and gender england and wales",
-                                       "count": 10, "fields": "link,title,public_timestamp"}).get("results", [])
+    hits = govuk.search(s, "individual insolvencies by location age and gender england and wales", count=10,
+                        fields="link,title,public_timestamp")
     editions = sorted((h for h in hits if re.search(r"by location, age and gender.*\d{4}$", h["title"], re.I)),
                       key=lambda h: re.search(r"(\d{4})$", h["title"]).group(1), reverse=True)
     for h in editions[:5]:  # the newest may be announced but not yet published
-        for a in get_json(s, CONTENT + h["link"]).get("details", {}).get("attachments", []):
+        for a in govuk.attachments(s, h["link"]):
             t = str(a.get("title", "")).lower()
             if "parliamentary constituency" in t and str(a.get("url", "")).endswith(".xlsx"):
                 return a["url"]

@@ -18,7 +18,7 @@ import re
 import pandas as pd
 import requests
 
-from ..http import get_json
+from .. import govuk
 from ..metrics import MetricMeta
 from ..ods import find_table, read_ods
 from .councils import apportion
@@ -47,10 +47,10 @@ HOUSING_STOCK_METRICS = [
 
 def taxbase_url(s: requests.Session) -> tuple[str, str]:
     """(URL, title) of the latest local authority Council Taxbase workbook."""
-    docs = sorted(get_json(s, TAXBASE).get("links", {}).get("documents", []),
+    docs = sorted(govuk.documents(s, TAXBASE),
                   key=lambda d: d.get("public_updated_at", ""), reverse=True)
     for d in docs[:3]:
-        for a in get_json(s, CONTENT + d["base_path"]).get("details", {}).get("attachments", []):
+        for a in govuk.attachments(s, d["base_path"]):
             if "local authority level data" in str(a.get("title", "")).lower() and str(a.get("url", "")).endswith(".xlsx"):
                 return a["url"], d.get("title", "")
     raise LookupError("No local authority Council Taxbase workbook found")
@@ -75,7 +75,7 @@ def taxbase_counts(book: bytes) -> pd.DataFrame:
 
 
 def supply_url(s: requests.Session) -> str:
-    for a in get_json(s, SUPPLY).get("details", {}).get("attachments", []):
+    for a in govuk.attachments(s, SUPPLY):
         if str(a.get("title", "")).lower().startswith("table 122") and str(a.get("url", "")).endswith(".ods"):
             return a["url"]
     raise LookupError("No Live Table 122 found")
