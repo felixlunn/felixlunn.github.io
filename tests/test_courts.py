@@ -4,7 +4,7 @@ import zipfile
 import pandas as pd
 import pytest
 
-from whips.sources import courts
+from datadash.sources import courts
 
 
 def test_area_keys_group_like_the_court_data():

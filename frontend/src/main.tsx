@@ -5,6 +5,9 @@ import { checkDashboardData } from "./lib/contract";
 import { dataUrl } from "./lib/dataUrl";
 import type { DashboardData } from "./types";
 import "./styles.css";
+import { migrateStoredSettings } from "./lib/usePersistentState";
+
+migrateStoredSettings();
 
 const root = createRoot(document.getElementById("root")!);
 
@@ -46,7 +49,7 @@ load()
         <h1>Couldn't load the data</h1>
         <p>{err.message}</p>
         <p>
-          Run <code>python -m whips.build</code> (real data) or <code>python -m whips.build --demo</code> (synthetic, offline) to create{" "}
+          Run <code>python -m datadash.build</code> (real data) or <code>python -m datadash.build --demo</code> (synthetic, offline) to create{" "}
           <code>frontend/public/data/</code>.
         </p>
       </div>,

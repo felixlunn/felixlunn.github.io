@@ -3,8 +3,8 @@ import struct
 import pandas as pd
 import pytest
 
-from whips.metrics import CENSUS_METRICS, SCOTLAND_CENSUS
-from whips.sources import scotland as sc
+from datadash.metrics import CENSUS_METRICS, SCOTLAND_CENSUS
+from datadash.sources import scotland as sc
 
 TABLE = '''"Scotland's Census 2022 - National Records of Scotland"
 "Table UV404 - Household tenure - Households"

@@ -2,7 +2,7 @@
 
 import pytest
 
-from whips import arcgis, govuk
+from datadash import arcgis, govuk
 
 
 def test_features_follows_pagination(monkeypatch):

@@ -8,7 +8,7 @@ import ast
 import importlib
 from pathlib import Path
 
-import whips
+import datadash
 
 
 import pytest
@@ -17,7 +17,7 @@ import pytest
 @pytest.mark.parametrize("module", ["build.py", "registry.py"])
 def test_build_only_uses_attributes_that_exist(module):
     # Attributes used inside loader lambdas are only looked up when the source runs: check them statically.
-    tree = ast.parse((Path(whips.__file__).parent / module).read_text())
+    tree = ast.parse((Path(datadash.__file__).parent / module).read_text())
     aliases = {}
     for node in ast.walk(tree):
         if isinstance(node, ast.ImportFrom) and node.module in ("sources", ".sources") or (
@@ -28,6 +28,6 @@ def test_build_only_uses_attributes_that_exist(module):
         f"{node.value.id}.{node.attr}"
         for node in ast.walk(tree)
         if isinstance(node, ast.Attribute) and isinstance(node.value, ast.Name) and node.value.id in aliases
-        and not hasattr(importlib.import_module(f"whips.sources.{aliases[node.value.id]}"), node.attr)
+        and not hasattr(importlib.import_module(f"datadash.sources.{aliases[node.value.id]}"), node.attr)
     })
     assert missing == []

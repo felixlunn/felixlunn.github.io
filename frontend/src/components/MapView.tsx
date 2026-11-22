@@ -61,7 +61,7 @@ export default function MapView({ geo, seats, choropleth, selected, mine = null,
   const map = useRef<MLMap | null>(null);
   const [ready, setReady] = useState(false);
   // Base map on/off, remembered per browser.
-  const [baseMapSetting, setBaseMapSetting] = usePersistentState("whips.baseMap", "on", ["on", "off"] as const);
+  const [baseMapSetting, setBaseMapSetting] = usePersistentState("dash.baseMap", "on", ["on", "off"] as const);
   const baseMap = baseMapSetting === "on";
   const setBaseMap = (f: (b: boolean) => boolean) => setBaseMapSetting(f(baseMap) ? "on" : "off");
   useEffect(() => {

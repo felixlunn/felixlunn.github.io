@@ -1,7 +1,7 @@
 import pandas as pd
 import pytest
 
-from whips.history import MAX_PERIODS, assemble_history, with_history
+from datadash.history import MAX_PERIODS, assemble_history, with_history
 
 
 def frame(vals):
@@ -25,7 +25,7 @@ def test_single_period_is_not_history_and_long_series_are_trimmed():
 
 
 def test_new_councils_get_predecessor_figures():
-    from whips.history import fill_successors
+    from datadash.history import fill_successors
     v = pd.Series({"E07000027": 10.0, "E07000030": 20.0, "E07000031": 30.0, "E10000006": 99.0, "E06000001": 5.0})
     filled = fill_successors(v)
     assert filled["E06000064"] == pytest.approx((10 + 20 + 30 + 99) / 4) and filled["E06000001"] == 5.0

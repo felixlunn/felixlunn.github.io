@@ -3,7 +3,7 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "whips"
+name = "datadash"
 version = "0.1.0"
 description = "Constituency analytics for MPs' offices: census, local services and election data by seat, plus FOI research maps."
 requires-python = ">=3.10"
@@ -20,7 +20,7 @@ dependencies = [
 dev = ["pytest>=8"]
 
 [tool.setuptools.packages.find]
-include = ["whips*"]
+include = ["datadash*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

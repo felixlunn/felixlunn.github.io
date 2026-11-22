@@ -1,6 +1,6 @@
 import pandas as pd
 
-from whips.sources.road_condition import latest_by_authority
+from datadash.sources.road_condition import latest_by_authority
 
 
 def test_latest_year_by_highway_authority():

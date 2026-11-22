@@ -1,7 +1,7 @@
 import pandas as pd
 import pytest
 
-from whips.sources.pharmacies import quarter_key, seat_frames
+from datadash.sources.pharmacies import quarter_key, seat_frames
 
 
 def test_quarter_key_handles_both_name_styles():

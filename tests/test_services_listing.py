@@ -1,6 +1,6 @@
 import re
 
-from whips import arcgis
+from datadash import arcgis
 
 
 def fake(monkeypatch, listings):

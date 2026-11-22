@@ -1,7 +1,7 @@
 import pandas as pd
 import pytest
 
-from whips.sources.vehicles import latest_counts, seat_frames
+from datadash.sources.vehicles import latest_counts, seat_frames
 
 CSV = b"""LSOA21CD,LSOA21NM,BodyType,Keepership,LicenceStatus,2026 Q2,2026 Q1
 E01,a,Cars,Private,Licensed,100,90

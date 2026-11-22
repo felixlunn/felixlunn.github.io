@@ -1,6 +1,6 @@
 """Data pipeline: fetch every source, compute metrics, write the dashboard's static data files.
 
-    python -m whips.build --out frontend/public/data
+    python -m datadash.build --out frontend/public/data
 
 Outputs
     data.json           metrics catalogue, seats, columnar values, peer groups, source status
@@ -40,7 +40,7 @@ from .sources import lsoa as lsoa_src
 from .sources import nomis
 from .sources import scotland as scotland_src
 
-log = logging.getLogger("whips.build")
+log = logging.getLogger("datadash.build")
 
 
 SKIPPABLE = skip_names()  # every --skip name, from the registry

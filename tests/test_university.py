@@ -1,6 +1,6 @@
 import pytest
 
-from whips.sources.university import parse, seat_frame
+from datadash.sources.university import parse, seat_frame
 
 
 def test_cohort_weighted_progression():

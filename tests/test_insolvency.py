@@ -2,7 +2,7 @@ import io
 
 import pandas as pd
 
-from whips.sources.insolvency import table
+from datadash.sources.insolvency import table
 
 
 def test_latest_year_and_england_wales_rate():

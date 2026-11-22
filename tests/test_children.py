@@ -1,7 +1,7 @@
 import pandas as pd
 import pytest
 
-from whips.sources.children import councils_frame, education_weights
+from datadash.sources.children import councils_frame, education_weights
 
 
 def test_councils_frame_drops_tiny_returns_and_sets_national():

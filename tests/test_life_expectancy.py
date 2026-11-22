@@ -1,4 +1,4 @@
-from whips.sources import life_expectancy as L
+from datadash.sources import life_expectancy as L
 
 CSV = """Indicator ID,Area Code,Area Type,Sex,Age,Category Type,Category,Time period,Value,Time period Sortable
 90366,E92000001,England,Male,All ages,,,2022 - 24,79.5,20220000

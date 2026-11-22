@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 
-from whips.sources.parliament import only_where_standing
+from datadash.sources.parliament import only_where_standing
 
 
 def test_nation_parties_blank_elsewhere():

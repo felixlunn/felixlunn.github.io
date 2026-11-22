@@ -1,6 +1,6 @@
 /**
  * The pipeline (Python) writes data.json and foi/reference.json; the site (TypeScript) reads them. CI builds the demo
- * data first (python -m whips.build --demo), so these check that the two sides still agree.
+ * data first (python -m datadash.build --demo), so these check that the two sides still agree.
  */
 import { describe, expect, it } from "vitest";
 import { normaliseDataset, checkReference } from "./foi/contract";

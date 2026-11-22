@@ -2,7 +2,7 @@ import io
 
 import pandas as pd
 
-from whips.sources.business_demography import counts, latest_sheet
+from datadash.sources.business_demography import counts, latest_sheet
 
 
 def test_counts_latest_year():

@@ -1,7 +1,7 @@
 import pandas as pd
 import pytest
 
-from whips.sources.fire import key, response_times
+from datadash.sources.fire import key, response_times
 
 
 def test_fire_authority_names_match_lookup():

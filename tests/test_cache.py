@@ -1,6 +1,6 @@
 import pytest
 
-from whips import cache
+from datadash import cache
 
 
 def test_reuses_recent_copy_then_refetches(tmp_path):
@@ -42,7 +42,7 @@ def test_only_its_own_code_matters(tmp_path):
 
 
 def test_off_without_folder_or_keep_period(tmp_path, monkeypatch):
-    monkeypatch.delenv("WHIPS_SOURCE_CACHE", raising=False)
+    monkeypatch.delenv("DATADASH_SOURCE_CACHE", raising=False)
     n = iter(range(10))
     assert [cache.cached("x", lambda: next(n), max_age_days=5), cache.cached("x", lambda: next(n), max_age_days=5)] == [0, 1]
     assert [cache.cached("y", lambda: next(n), str(tmp_path)), cache.cached("y", lambda: next(n), str(tmp_path))] == [2, 3]

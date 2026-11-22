@@ -2,7 +2,7 @@ import io
 
 import pandas as pd
 
-from whips.sources.heat_pumps import by_constituency
+from datadash.sources.heat_pumps import by_constituency
 
 
 def test_heat_pump_grants_by_constituency():

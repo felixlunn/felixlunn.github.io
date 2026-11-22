@@ -22,7 +22,7 @@ from .sources import councils as councils_src
 if TYPE_CHECKING:
     from .registry import Source
 
-log = logging.getLogger("whips.build")
+log = logging.getLogger("datadash.build")
 
 
 @dataclass

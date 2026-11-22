@@ -1,7 +1,7 @@
 import pandas as pd
 import pytest
 
-from whips.sources import schools
+from datadash.sources import schools
 
 
 def gias():

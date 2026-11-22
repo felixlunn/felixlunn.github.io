@@ -1,7 +1,7 @@
 import pandas as pd
 import pytest
 
-from whips.sources.buses import authority_weights, miles_change
+from datadash.sources.buses import authority_weights, miles_change
 
 
 def test_miles_change_uses_totals_since_2010():

@@ -4,8 +4,8 @@ import zipfile
 import pandas as pd
 import pytest
 
-from whips.ods import find_table, read_ods
-from whips.sources import ev
+from datadash.ods import find_table, read_ods
+from datadash.sources import ev
 
 NS = ('xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" '
       'xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" '

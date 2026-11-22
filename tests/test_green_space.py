@@ -1,7 +1,7 @@
 import pandas as pd
 import pytest
 
-from whips.sources.green_space import seat_frames
+from datadash.sources.green_space import seat_frames
 
 
 def test_msoa_gardens_shared_across_lsoas_and_park_access():

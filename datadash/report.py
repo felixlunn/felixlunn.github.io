@@ -1,6 +1,6 @@
 """Summarise a built data.json for the deploy workflow: which sources failed to update.
 
-``python -m whips.report new/data.json [previous/data.json]`` prints a Markdown list of failed sources, and of
+``python -m datadash.report new/data.json [previous/data.json]`` prints a Markdown list of failed sources, and of
 figures that vanished or lost many seats since the previous data (nothing when all is well) and exits 0 either way; the workflow turns the output into an alert.
 """
 

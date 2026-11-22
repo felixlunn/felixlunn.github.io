@@ -1,6 +1,6 @@
 import pytest
 
-from whips.sources.public_health import parse
+from datadash.sources.public_health import parse
 
 CSV = """Area Code,Area Type,Sex,Category Type,Time period,Time period Sortable,Value
 E92000001,England,Persons,,2025/26,20250000,84.0
@@ -18,7 +18,7 @@ def test_parse_latest_persons():
 
 
 def test_national_uses_the_councils_age_group():
-    from whips.sources.public_health import parse_periods
+    from datadash.sources.public_health import parse_periods
     csv = """Area Code,Area Type,Sex,Age,Category Type,Time period,Time period Sortable,Value
 E92000001,England,Persons,25-29 yrs,,2025,20250000,27.0
 E92000001,England,Persons,18+ yrs,,2025,20250000,10.0

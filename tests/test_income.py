@@ -1,7 +1,7 @@
 import pandas as pd
 import pytest
 
-from whips.sources.income import parse
+from datadash.sources.income import parse
 
 
 def test_parse_income_table():

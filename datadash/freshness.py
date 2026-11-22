@@ -38,8 +38,8 @@ def stamp(sources: list[dict], previous: dict | None, today: date | None = None,
 
 
 def load_previous() -> dict | None:
-    """The previously published data.json, if the workflow fetched it (``WHIPS_PREVIOUS_DATA``)."""
-    path = os.environ.get("WHIPS_PREVIOUS_DATA")
+    """The previously published data.json, if the workflow fetched it (``DATADASH_PREVIOUS_DATA``)."""
+    path = os.environ.get("DATADASH_PREVIOUS_DATA")
     if not path or not Path(path).exists():
         return None
     try:

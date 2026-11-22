@@ -1,6 +1,6 @@
 from datetime import date
 
-from whips import freshness, report
+from datadash import freshness, report
 
 
 def src(sid, as_of, status="ok", **kw):

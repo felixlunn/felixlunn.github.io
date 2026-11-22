@@ -1,7 +1,7 @@
 import pandas as pd
 import pytest
 
-from whips.sources.travel import seat_frame, times
+from datadash.sources.travel import seat_frame, times
 
 
 def test_times_weighted_by_service_population():

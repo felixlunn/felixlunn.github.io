@@ -3,7 +3,7 @@ from datetime import date
 import pandas as pd
 import pytest
 
-from whips.sources import epc
+from datadash.sources import epc
 
 
 class Resp:

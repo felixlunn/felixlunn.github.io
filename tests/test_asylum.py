@@ -1,7 +1,7 @@
 import pandas as pd
 import pytest
 
-from whips.sources.asylum import counts, seat_frames
+from datadash.sources.asylum import counts, seat_frames
 
 
 def test_asylum_rates_per_10k():

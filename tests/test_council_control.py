@@ -1,6 +1,6 @@
 import pandas as pd
 
-from whips.sources import council_control as cc
+from datadash.sources import council_control as cc
 
 
 def members(parties):

@@ -1,7 +1,7 @@
 import pandas as pd
 import pytest
 
-from whips.sources import rail
+from datadash.sources import rail
 
 ORR = (
     '"Table 1410: Passenger entries, exits and interchanges by station, Great Britain, annual data, April 2024 to March 2025",,\n'

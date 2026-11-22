@@ -1,7 +1,7 @@
 import pandas as pd
 import pytest
 
-from whips.sources.energy import seat_frames
+from datadash.sources.energy import seat_frames
 
 
 def test_off_gas_grid_from_meter_counts():

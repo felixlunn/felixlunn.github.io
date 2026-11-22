@@ -1,6 +1,6 @@
 """Keep slow, slowly-changing sources between runs so each refresh only re-downloads what may have changed.
 
-Set ``WHIPS_SOURCE_CACHE`` to a folder to turn this on (the refresh workflow does, except on its weekly full
+Set ``DATADASH_SOURCE_CACHE`` to a folder to turn this on (the refresh workflow does, except on its weekly full
 refresh, which re-downloads everything). A source with a ``keep`` period in the registry (``max_age_days`` here) is
 reused until its saved copy is that old. A change to the source's own code (its module and the pipeline modules it
 imports) discards its saved copy, so a new figure or a fix is never hidden by old data. If a source fails to update
@@ -36,7 +36,7 @@ def cached(sid: str, load, folder: str | None = None, now: float | None = None,
            max_age_days: float | None = None, code_files: Iterable[Path] | None = None):
     """``load()``, or its saved result when it is less than ``max_age_days`` old (see the module docstring).
     Without ``max_age_days`` (or a cache folder) it always loads."""
-    folder = folder if folder is not None else os.environ.get("WHIPS_SOURCE_CACHE")
+    folder = folder if folder is not None else os.environ.get("DATADASH_SOURCE_CACHE")
     if not folder or not max_age_days:
         return load()
     now = time.time() if now is None else now
