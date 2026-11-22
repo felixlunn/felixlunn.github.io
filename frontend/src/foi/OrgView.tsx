@@ -71,7 +71,8 @@ export default function OrgView({ ref_, shapes, heads, scope, kind, code, setCod
   const byCode = useMemo(() => new Map(targets(ref_, kind).map((t) => [t.code, t])), [ref_, kind]);
   const pts = useMemo(() => (GEO[kind].isArea ? null : new Map((kind === "court" ? ref_.points.courts ?? [] : ref_.points.trusts ?? []).map((p) => [("id" in p ? p.id : p.code), p]))), [ref_, kind]);
 
-  const items: MapItem[] = list.map((t) => {
+  // Memoised: the map redraws whenever these change identity.
+  const items: MapItem[] = useMemo(() => list.map((t) => {
     const s = sc.get(t.code);
     const p = pts?.get(t.code);
     return {
@@ -79,13 +80,14 @@ export default function OrgView({ ref_, shapes, heads, scope, kind, code, setCod
       value: s?.of ? (s.worse / s.of) * 100 : null,
       label: s?.of ? `In the worse half in ${s.worse} of ${s.of} datasets` : "No comparable figures",
     };
-  });
+  }), [list, sc, pts]);
+  const highlight = useMemo(() => new Set(ld.keys()), [ld]);
 
   return (
     <div className="foi-main">
       <div className="foi-map-wrap">
         {GEO[kind].mapNote && <div className="foi-map-note tiny">{GEO[kind].mapNote}</div>}
-        <FoiMap shapes={layer} items={items} reverse={false} selected={code} highlight={new Set(ld.keys())} onSelect={setCode}
+        <FoiMap shapes={layer} items={items} reverse={false} selected={code} highlight={highlight} onSelect={setCode}
           title="Datasets where it's in the worse half" format={(v) => `${Math.round(v)}%`} />
       </div>
       <section className="foi-detail">
@@ -128,7 +130,7 @@ function Overview({ heads, kind, list, sc, ld, setCode }: {
 
 function Spark({ h, code }: { h: Headline; code: string }) {
   if (!h.view) return null;
-  const rows = h.d.rows.find((r) => r.code === code);
+  const rows = h.rowsByCode.get(code);
   const vals = h.view.years.map((y) => rows?.values[y.key] ?? null);
   const known = vals.filter((v): v is number => v !== null);
   if (known.length < 2) return null;

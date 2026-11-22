@@ -16,6 +16,8 @@ export interface Headline {
   view: YearView | null;
   stats: ReturnType<typeof summary>;
   byCode: Map<string, Ranked>;
+  /** The dataset's rows by code (for year values). */
+  rowsByCode: Map<string, Dataset["rows"][number]>;
   values: number[];
 }
 
@@ -26,7 +28,9 @@ export function headline(ref: Reference, saved: Dataset): Headline | null {
   for (const col of candidates) {
     const rows = ranked(ref, d, col.key, false);
     const values = rows.map((r) => r.value).filter((v): v is number => v !== null);
-    if (values.length) return { d, col, view, stats: summary(rows), byCode: new Map(rows.map((r) => [r.target.code, r])), values };
+    if (values.length) {
+      return { d, col, view, stats: summary(rows), byCode: new Map(rows.map((r) => [r.target.code, r])), rowsByCode: new Map(d.rows.map((r) => [r.code, r])), values };
+    }
   }
   return null;
 }
@@ -38,10 +42,20 @@ export function worseHalf(h: Headline, v: number | null): boolean | null {
 }
 
 /** The parent organisation's code: a trust's NHS area, a court's criminal justice (police force) area. */
+const parents = new WeakMap<Reference, Map<string, string | null>>();
+
 export function parentOf(ref: Reference, g: Geography, code: string): string | null {
-  if (g === "nhs_trust") return ref.points.trusts?.find((t) => t.code === code)?.area ?? null;
-  if (g === "court") return ref.points.courts?.find((c) => c.id === code)?.area ?? null;
-  return null;
+  if (g !== "nhs_trust" && g !== "court") return null;
+  // Built once per reference file: trust and court codes are distinct, so one map serves both.
+  let m = parents.get(ref);
+  if (!m) {
+    m = new Map<string, string | null>([
+      ...(ref.points.trusts ?? []).map((t) => [t.code, t.area] as [string, string | null]),
+      ...(ref.points.courts ?? []).map((c) => [c.id, c.area] as [string, string | null]),
+    ]);
+    parents.set(ref, m);
+  }
+  return m.get(code) ?? null;
 }
 
 export interface Score { worse: number; of: number }
