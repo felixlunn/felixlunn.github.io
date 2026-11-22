@@ -98,10 +98,12 @@ the header shows which source failed.
 ## Architecture
 
 ```
-GitHub Actions (every 2 days)
-  └─ python -m whips.build      fetch APIs → compute metrics + peer groups
-       └─ frontend/public/data/  data.json · boundaries.geojson · constituencies.csv
-  └─ npm run build               React + MapLibre static site
+Refresh data (daily)
+  └─ python -m whips.build      fetch every source in whips/registry.py → metrics, peer groups
+       └─ frontend/public/data/  data.json · boundaries.geojson · constituencies.csv · lsoa/ · foi/
+  └─ Publish site
+Publish site (every push, ~2 minutes)
+  └─ npm run build               React + MapLibre static site, with the latest refreshed data
   └─ deploy to GitHub Pages
 ```
 
@@ -113,15 +115,27 @@ MapLibre loads in parallel as its own chunk.
 ```
 whips/                Python package
   metrics.py          catalogue of themes and metrics (add new census metrics here)
-  sources/            one adapter per API: nomis, boundaries, police, parliament
+  sources/            one adapter per data source
+  registry.py         every source: name, link, metrics, loader, update cycle, cache period, --skip name
+  context.py          what loaders can use during a build (session, boundaries, lookups), and how results are recorded
   engine.py           analytics: ranks and k-means peer groups
-  build.py            pipeline entry point
+  build.py            pipeline entry point: required steps, then each source in registry order
   api.py              optional FastAPI REST API over the same data
   demo.py             synthetic offline dataset for UI development
 frontend/             Vite + React + TypeScript + MapLibre GL
   src/lib/analytics.ts  browser port of engine.py (same tests)
 .github/workflows/    ci.yml (tests + build) · refresh.yml (rebuild the data daily, then publish) · publish.yml (publish the site)
 ```
+
+### Adding a data source
+
+1. Write `whips/sources/<name>.py` with its `MetricMeta` list and a loader returning `({metric id: num/den frame}, period)`.
+2. Add one `Source(...)` entry to `SOURCES` in `whips/registry.py`: name, link, detail, metrics, loader (it can use
+   the build context: `c.s`, `c.geo`, `c.population`, `c.lsoa_lookup()`, `c.council_weights()`…), and optionally
+   `every` (publisher's update cycle, for the overdue check) and `keep` (days a download may be reused).
+
+That's all: the build, the demo data, `--skip` (and the refresh workflow's skip list), the freshness check and the
+cache all pick it up. `tests/test_registry.py` and `tests/test_build_wiring.py` check the entry.
 
 ## Map style
 

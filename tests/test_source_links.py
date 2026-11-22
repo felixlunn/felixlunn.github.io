@@ -1,16 +1,9 @@
-import inspect
-import re
-
-import whips.demo as demo
-from whips.metrics import CENSUS_METRICS, CLAIMANT_METRICS, ELECTION_METRICS, POLICE_METRICS, census_meta, source_url
+from whips.metrics import CENSUS_METRICS, census_meta, source_url
+from whips.registry import all_metrics
 
 
 def all_metas():
-    names = re.search(r"extra = (.+)", inspect.getsource(demo)).group(1).split(" + ")
-    metas = [census_meta(m) for m in CENSUS_METRICS] + list(CLAIMANT_METRICS) + list(ELECTION_METRICS) + list(POLICE_METRICS)
-    for n in names:
-        metas += list(getattr(demo, n.strip()))
-    return metas
+    return [census_meta(m) for m in CENSUS_METRICS] + all_metrics()
 
 
 def test_every_metric_links_to_its_source():
