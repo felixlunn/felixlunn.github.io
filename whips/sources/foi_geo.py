@@ -26,6 +26,7 @@ from ..geo import SeatLocator
 from ..http import get_json
 from .boundaries import ARCGIS_ROOT, _round_coords
 from ..ods import read_ods
+from ..parties import is_lib_dem
 from .lsoa import _services, layer_url
 
 log = logging.getLogger(__name__)
@@ -264,14 +265,11 @@ def to_feature(a: dict, layer: str) -> dict:
             "geometry": {"type": g["type"], "coordinates": _round_coords(g["coordinates"], 4)}}
 
 
-LIB_DEM = re.compile(r"^(liberal democrats?|lib ?dems?|ld)$", re.I)
-
-
 def ld_status(seat: dict) -> dict:
     """{"ld": "held"} for Lib Dem seats, {"ld": "target"} where the Lib Dems came second in 2024, else {}."""
-    if LIB_DEM.match((seat.get("party") or "").strip()):
+    if is_lib_dem(seat.get("party")):
         return {"ld": "held"}
-    if LIB_DEM.match((seat.get("second_party_2024") or "").strip()):
+    if is_lib_dem(seat.get("second_party_2024")):
         return {"ld": "target"}
     return {}
 

@@ -16,7 +16,6 @@ from __future__ import annotations
 
 import logging
 import re
-from collections.abc import Callable
 
 import pandas as pd
 import requests
@@ -216,40 +215,4 @@ def load_popest(s: requests.Session) -> tuple[dict[str, pd.DataFrame], str]:
     return {"pop_change": pd.DataFrame({"num": (by[latest] - by["2021"]) * 100, "den": by["2021"]})}, f"mid-2021 to mid-{latest}"
 
 
-def load_all(s: requests.Session, skip: set[str], record: Callable[..., None]) -> tuple[dict[str, pd.DataFrame], list[MetricMeta]]:
-    """Load every dataset not in ``skip``; record each one's status via ``record(id, name, url, status, detail, as_of)``."""
-    frames: dict[str, pd.DataFrame] = {}
-    metas: list[MetricMeta] = []
-    pop_16_64 = pd.Series(dtype=float)
-
-    def attempt(sid: str, name: str, url: str, detail: str, fn, meta_list: list[MetricMeta]):
-        if sid in skip:
-            return
-        try:
-            got, period = fn()
-            got = {k: v for k, v in got.items() if not v.empty}
-            if not got:
-                raise ValueError("no data returned")
-            frames.update(got)
-            metas.extend(m for m in meta_list if m.id in got)
-            record(sid, name, url, "ok", detail, period)
-        except Exception as exc:  # noqa: BLE001 - optional source
-            log.exception("%s failed", name)
-            record(sid, name, url, "failed", str(exc)[:300])
-
-    def aps():
-        nonlocal pop_16_64
-        got, pop_16_64, period = load_aps(s)
-        return got, period
-
-    attempt("aps", "Annual Population Survey (ONS via Nomis)", APS_URL, "Great Britain; 12-month survey estimates", aps, APS_METRICS)
-    attempt("ashe", "Annual Survey of Hours and Earnings (ONS via Nomis)", ASHE_URL, "Great Britain; medians", lambda: load_ashe(s), ASHE_METRICS)
-    attempt("bres", "Business Register and Employment Survey (ONS via Nomis)", BRES_URL, "Great Britain; jobs by workplace",
-            lambda: load_bres(s, pop_16_64), BRES_METRICS)
-    attempt("business", "UK Business Counts (ONS via Nomis)", BUSINESS_URL, "Local units; per-resident rate GB only",
-            lambda: load_business(s, pop_16_64), BUSINESS_METRICS)
-    attempt("popest", "Small-area population estimates (ONS via Nomis)", POPEST_URL, "England & Wales", lambda: load_popest(s), POPEST_METRICS)
-    return frames, metas
-
-
-__all__ = ["load_all", "ASHE_METRICS", "APS_METRICS", "BRES_METRICS", "BUSINESS_METRICS", "POPEST_METRICS", "bres_frames"]
+__all__ = ["load_aps", "load_ashe", "load_bres", "load_business", "load_popest", "ASHE_METRICS", "APS_METRICS", "BRES_METRICS", "BUSINESS_METRICS", "POPEST_METRICS", "bres_frames"]

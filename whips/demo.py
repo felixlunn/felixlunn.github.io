@@ -15,48 +15,7 @@ import pandas as pd
 
 from .build import assemble, finish
 from .metrics import CENSUS_METRICS, CLAIMANT_METRICS, ELECTION_METRICS, POLICE_METRICS, census_meta
-from .sources.courts import COURT_METRICS
-from .sources.epc import EPC_METRICS
-from .sources.ev import EV_METRICS
-from .sources.fuel_poverty import FUEL_POVERTY_METRICS
-from .sources.housing import AFFORDABILITY_METRICS, HOMELESS_METRICS
-from .sources.nhs import NHS_METRICS
-from .sources.nhsbsa import DENTAL_METRICS
-from .sources.petitions import PETITION_METRICS
-from .sources.questions import QUESTION_METRICS
-from .sources.rail import RAIL_METRICS
-from .sources.schools import KS4_METRICS, SCHOOL_METRICS
-from .sources.sewage import SEWAGE_METRICS
-from .sources.imd import IMD_METRICS
-from .sources.life_expectancy import LIFE_METRICS
-from .sources.fire import FIRE_METRICS
-from .sources.police_workforce import POLICE_WORKFORCE_METRICS
-from .sources.heat_pumps import HEAT_PUMP_METRICS
-from .sources.green_space import GREEN_METRICS
-from .sources.floods import FLOOD_METRICS
-from .sources.business_demography import BUSINESS_DEMOGRAPHY_METRICS
-from .sources.council_tax import COUNCIL_TAX_METRICS
-from .sources.insolvency import INSOLVENCY_METRICS
-from .sources.university import UNIVERSITY_METRICS
-from .sources.ofsted import OFSTED_METRICS
-from .sources.pupils import PUPIL_METRICS
-from .sources.pharmacies import PHARMACY_METRICS
-from .sources.public_health import PUBLIC_HEALTH_METRICS
-from .sources.income import INCOME_METRICS
-from .sources.asylum import ASYLUM_METRICS
-from .sources.road_condition import ROAD_CONDITION_METRICS
-from .sources.rents import RENT_METRICS
-from .sources.energy import ENERGY_METRICS
-from .sources.travel import TRAVEL_METRICS
-from .sources.air_energy import AIR_METRICS, RENEWABLE_METRICS
-from .sources.children import CHILDREN_METRICS
-from .sources.vehicles import VEHICLE_METRICS
-from .sources.buses import BUS_METRICS
-from .sources.cqc import CQC_METRICS
-from .sources.roads import ROAD_METRICS
-from .sources.housing_stock import HOUSING_STOCK_METRICS
-from .sources.child_poverty import CHILD_POVERTY_METRICS
-from .sources.nomis_extra import APS_METRICS, ASHE_METRICS, BRES_METRICS, BUSINESS_METRICS, POPEST_METRICS
+from .registry import all_metrics
 
 
 def _hex(cx: float, cy: float, r: float) -> list[list[float]]:
@@ -112,7 +71,9 @@ def build_demo(out_dir: Path, n: int = 650, seed: int = 42) -> dict:
         base = 40 if m.unit == "per 1,000" else 20
         val = np.clip(base * np.exp(0.3 * (depriv + 0.5 * urban) + rng.normal(scale=0.4, size=n)), 0.1, 99)
         frames[m.id] = pd.DataFrame({"num": val, "den": 1.0}, index=codes)
-    extra = APS_METRICS + ASHE_METRICS + BRES_METRICS + BUSINESS_METRICS + POPEST_METRICS + IMD_METRICS + EPC_METRICS + SCHOOL_METRICS + KS4_METRICS + NHS_METRICS + FUEL_POVERTY_METRICS + COURT_METRICS + RAIL_METRICS + QUESTION_METRICS + PETITION_METRICS + SEWAGE_METRICS + EV_METRICS + AFFORDABILITY_METRICS + HOMELESS_METRICS + LIFE_METRICS + DENTAL_METRICS + FIRE_METRICS + POLICE_WORKFORCE_METRICS + HEAT_PUMP_METRICS + GREEN_METRICS + FLOOD_METRICS + BUSINESS_DEMOGRAPHY_METRICS + COUNCIL_TAX_METRICS + INSOLVENCY_METRICS + UNIVERSITY_METRICS + OFSTED_METRICS + PUPIL_METRICS + PHARMACY_METRICS + PUBLIC_HEALTH_METRICS + INCOME_METRICS + ASYLUM_METRICS + ROAD_CONDITION_METRICS + RENT_METRICS + ENERGY_METRICS + TRAVEL_METRICS + AIR_METRICS + RENEWABLE_METRICS + CHILDREN_METRICS + VEHICLE_METRICS + BUS_METRICS + CQC_METRICS + ROAD_METRICS + HOUSING_STOCK_METRICS + CHILD_POVERTY_METRICS
+    # Every other metric any source provides (from the registry, so new sources appear in the demo automatically).
+    special = {m.id for m in CLAIMANT_METRICS + POLICE_METRICS + ELECTION_METRICS}
+    extra = [m for m in all_metrics() if m.id not in special]
     for m in extra:
         base = {"£": 30000 if "annual" in m.id else 750, "ratio": 0.8, "per 1,000": 75}.get(m.unit, 3 if m.id == "pop_change" else 15)
         val = base * np.exp(0.15 * (urban - depriv) + rng.normal(scale=0.15, size=n))

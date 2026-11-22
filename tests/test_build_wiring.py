@@ -11,11 +11,17 @@ from pathlib import Path
 import whips
 
 
-def test_build_only_uses_attributes_that_exist():
-    tree = ast.parse((Path(whips.__file__).parent / "build.py").read_text())
+import pytest
+
+
+@pytest.mark.parametrize("module", ["build.py", "registry.py"])
+def test_build_only_uses_attributes_that_exist(module):
+    # Attributes used inside loader lambdas are only looked up when the source runs: check them statically.
+    tree = ast.parse((Path(whips.__file__).parent / module).read_text())
     aliases = {}
     for node in ast.walk(tree):
-        if isinstance(node, ast.ImportFrom) and node.module == "sources":
+        if isinstance(node, ast.ImportFrom) and node.module in ("sources", ".sources") or (
+                isinstance(node, ast.ImportFrom) and node.level == 1 and node.module == "sources"):
             for a in node.names:
                 aliases[a.asname or a.name] = a.name
     missing = sorted({
