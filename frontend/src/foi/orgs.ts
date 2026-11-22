@@ -1,31 +1,13 @@
 /**
- * "By organisation": every dataset's headline figure for one trust, ICB, force, court or criminal justice area,
+ * Area view: every dataset's headline figure for one trust, ICB, force, court or criminal justice area,
  * and an overview of which organisations most often fall in the worse half.
  */
 
 import { ranked, summary, type Ranked } from "./analysis";
 import { targets } from "./match";
 import { withYearViews, type YearView } from "./periods";
-import type { Column, Dataset, Department, Geography, Reference, Target } from "./types";
-
-/** The organisation types each department can be viewed by, and how they nest (trust within ICB, court within area). */
-export const ORG_KINDS: Record<Department, Geography[]> = {
-  policing: ["police_force"],
-  justice: ["court", "police_force"],
-  health: ["nhs_trust", "health_area"],
-};
-export const PARENT: Partial<Record<Geography, Geography>> = { nhs_trust: "health_area", court: "police_force" };
-export const CHILD: Partial<Record<Geography, Geography>> = { health_area: "nhs_trust", police_force: "court" };
-
-export const KIND_LABEL: Record<Geography, { one: string; many: string; find: string }> = {
-  police_force: { one: "Force", many: "Forces", find: "Find a force" },
-  court: { one: "Court", many: "Courts", find: "Find a court" },
-  nhs_trust: { one: "Trust", many: "Trusts", find: "Find a trust" },
-  health_area: { one: "ICB / health board", many: "ICBs", find: "Find an ICB or health board" },
-};
-
-/** The second viewing mode's name in each department. */
-export const MODE_LABEL: Record<Department, string> = { policing: "By force", justice: "By court / area", health: "By trust / ICB" };
+import { GEO } from "./geographies";
+import type { Column, Dataset, Geography, Reference, Target } from "./types";
 
 /** A dataset's headline: the % change when it covers several years, otherwise its first figure. */
 export interface Headline {
@@ -84,7 +66,7 @@ export function scores(heads: Headline[], g: Geography): Map<string, Score> {
 /** The organisations to list for a kind: every area, or the trusts / courts that appear in any dataset. */
 export function orgList(ref: Reference, heads: Headline[], g: Geography): Target[] {
   const all = targets(ref, g);
-  if (g === "police_force" || g === "health_area") return all;
+  if (GEO[g].isArea) return all;
   const seen = new Set(heads.filter((h) => h.d.geography === g).flatMap((h) => [...h.byCode.keys()]));
   return all.filter((t) => seen.has(t.code));
 }

@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import maplibregl, { type GeoJSONSource, type Map as MLMap } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
-import { classify, isDark, quantileBreaks, ramp } from "../lib/colors";
+import { osmStyle, UK_BOUNDS } from "../lib/basemap";
+import { classify, quantileBreaks, ramp } from "../lib/colors";
 
 export interface MapItem { code: string; name: string; value: number | null; label: string; sub?: string; lat?: number; lon?: number }
 
@@ -24,7 +25,6 @@ interface Props {
   onSelect: (code: string) => void;
 }
 
-const UK_BOUNDS: [number, number, number, number] = [-8.6, 49.85, 1.8, 60.9];
 const EMPTY: GeoJSON.FeatureCollection = { type: "FeatureCollection", features: [] };
 
 function css(name: string) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || "#ccc"; }
@@ -66,16 +66,10 @@ export default function FoiMap({ shapes, items, reverse, selected, highlight, fl
 
   useEffect(() => {
     if (!el.current) return;
-    const dark = isDark();
     const m = new maplibregl.Map({
       container: el.current, bounds: UK_BOUNDS, fitBoundsOptions: { padding: 20 }, attributionControl: false,
       dragRotate: false, pitchWithRotate: false, maxZoom: 13, minZoom: 3,
-      style: {
-        version: 8,
-        sources: { osm: { type: "raster", tileSize: 256, maxzoom: 19, tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],
-          attribution: '© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">OpenStreetMap</a> contributors' } },
-        layers: [{ id: "osm", type: "raster", source: "osm", paint: dark ? { "raster-brightness-max": 0.55, "raster-saturation": -0.4 } : { "raster-saturation": -0.15 } }],
-      },
+      style: osmStyle(),
     });
     m.touchZoomRotate.disableRotation();
     m.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");

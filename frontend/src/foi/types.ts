@@ -87,21 +87,3 @@ export interface Dataset {
 }
 
 export type NewDataset = Omit<Dataset, "id" | "created_by" | "created_by_email" | "created_at" | "updated_at">;
-
-export const DEPARTMENTS: { id: Department; label: string; geographies: Geography[]; blurb: string }[] = [
-  { id: "policing", label: "Policing", geographies: ["police_force"], blurb: "FOI responses from police forces, mapped by police force area." },
-  { id: "justice", label: "Justice", geographies: ["court", "police_force"],
-    blurb: "FOI responses from HMCTS, the MoJ, the CPS and others, by court or by criminal justice area (these follow police force areas)." },
-  { id: "health", label: "Health", geographies: ["nhs_trust", "health_area"],
-    blurb: "FOI responses from NHS trusts and boards, by trust or by NHS area (integrated care boards in England, health boards in Wales)." },
-];
-
-export const GEOGRAPHY_LABEL: Record<Geography, string> = {
-  police_force: "Police force area",
-  court: "Court or tribunal",
-  nhs_trust: "NHS trust",
-  health_area: "NHS area (ICB / health board)",
-};
-
-/** Area geographies are drawn as shapes and can be shown per head; the others are points. */
-export const IS_AREA: Record<Geography, boolean> = { police_force: true, court: false, nhs_trust: false, health_area: true };

@@ -2,7 +2,8 @@ import { useMemo, useState } from "react";
 import { Matcher, targets, type Match } from "./match";
 import { numericShare, parseCsv, parseValue, readFile, toTable, type Table } from "./parse";
 import { parsePeriod, seriesName } from "./periods";
-import { DEPARTMENTS, GEOGRAPHY_LABEL, type Cell, type Column, type DataRow, type Department, type Direction, type Geography, type NewDataset, type Reference } from "./types";
+import { DEPARTMENTS, GEO } from "./geographies";
+import { type Cell, type Column, type DataRow, type Department, type Direction, type Geography, type NewDataset, type Reference } from "./types";
 
 interface Props {
   ref_: Reference;
@@ -257,7 +258,7 @@ export default function Upload({ ref_, department, onCancel, onSave }: Props) {
                 <span>Each row is a…</span>
                 <div className="chips">
                   {dept.geographies.map((g) => (
-                    <button key={g} className={`chip ${g === geography ? "on" : ""}`} onClick={() => { setGeography(g); setOverrides({}); }}>{GEOGRAPHY_LABEL[g]}</button>
+                    <button key={g} className={`chip ${g === geography ? "on" : ""}`} onClick={() => { setGeography(g); setOverrides({}); }}>{GEO[g].label}</button>
                   ))}
                 </div>
               </fieldset>
@@ -275,7 +276,7 @@ export default function Upload({ ref_, department, onCancel, onSave }: Props) {
               <textarea rows={3} value={meta.notes} onChange={(e) => setMeta({ ...meta, notes: e.target.value })} />
             </label>
             <p className="tiny muted">
-              One row per {GEOGRAPHY_LABEL[geography].toLowerCase()}, with its name or code in one column and figures in the others. Title rows above
+              One row per {GEO[geography].label.toLowerCase()}, with its name or code in one column and figures in the others. Title rows above
               the header are skipped. Withheld figures (such as "&lt;5" or "*") are kept as withheld, not zero.
             </p>
           </div>
@@ -284,7 +285,7 @@ export default function Upload({ ref_, department, onCancel, onSave }: Props) {
         {step === "columns" && table && (
           <div className="foi-step">
             <label className="foi-field">
-              <span>Which column names the {GEOGRAPHY_LABEL[geography].toLowerCase()}?</span>
+              <span>Which column names the {GEO[geography].label.toLowerCase()}?</span>
               <select value={areaCol} onChange={(e) => { const k = Number(e.target.value); setAreaCol(k); const c = { ...cols }; delete c[k]; setCols(c); setOverrides({}); }}>
                 {table.headers.map((h, k) => <option key={k} value={k}>{h} (e.g. {table.rows[0]?.[k] || "blank"})</option>)}
               </select>
@@ -292,7 +293,7 @@ export default function Upload({ ref_, department, onCancel, onSave }: Props) {
             <label className="foi-field">
               <span>Does each row cover one year (or period)?</span>
               <select value={periodCol ?? ""} onChange={(e) => { const k = e.target.value === "" ? null : Number(e.target.value); setPeriodCol(k); if (k !== null) { const c = { ...cols }; delete c[k]; setCols(c); } }}>
-                <option value="">No: one row per {GEOGRAPHY_LABEL[geography].toLowerCase()}</option>
+                <option value="">No: one row per {GEO[geography].label.toLowerCase()}</option>
                 {table.headers.map((h, k) => k === areaCol ? null : <option key={k} value={k}>Yes: the year is in “{h}”</option>)}
               </select>
             </label>
