@@ -408,6 +408,7 @@ SOURCE_LINKS: dict[str, str] = {
     "UK Parliament petitions": "https://petition.parliament.uk/",
     "UK Parliament written questions API": "https://questions-statements.parliament.uk/",
     "police.uk": "https://data.police.uk/",
+    "police.uk stop and search": "https://data.police.uk/docs/method/stops-street/",
 }
 
 

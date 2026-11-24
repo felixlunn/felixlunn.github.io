@@ -29,6 +29,7 @@ All data are open, refreshed automatically **every day** by GitHub Actions (a fu
 | [ONS small-area population estimates via Nomis](https://www.nomisweb.co.uk/sources/pest) | Population change since 2021 | England & Wales | Annual |
 | [ONS Claimant Count via Nomis](https://www.nomisweb.co.uk/sources/cc) | Claimant rate (16-64) | UK | Monthly |
 | [police.uk API](https://data.police.uk/docs/) | Crime rates by type, share of crimes closed with no suspect identified, share charged or sent to court | England, Wales, NI | Monthly |
+| [police.uk stop and search](https://data.police.uk/docs/method/stops-street/) | Stop and searches per 1,000 residents; share ending with no further action, or in arrest | England & Wales forces that publish it | Monthly (last 6 months) |
 | [House of Commons Library CBP-10009](https://commonslibrary.parliament.uk/research-briefings/cbp-10009/) | 2024 result, majority, turnout, party vote shares | UK | Static |
 | [ONS electoral statistics](https://www.ons.gov.uk/peoplepopulationandcommunity/elections/electoralregistration/datasets/electoralstatisticsforuk) | Registered electors, change since the 2024 election, young people registered early | UK | Annual (1 December register) |
 | [ONS Open Geography Portal](https://geoportal.statistics.gov.uk/) | LSOA 2021 boundaries and LSOA to ward lookup for the Neighbourhoods view | England & Wales | Static |

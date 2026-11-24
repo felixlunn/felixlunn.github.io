@@ -107,11 +107,13 @@ def split(p: Polygon) -> list[Polygon]:
     return [g for g in out if not g.is_empty]
 
 
-def fetch_polygon(s: requests.Session, rl: _RateLimiter, p: Polygon, month: str, depth: int = 0) -> list[dict]:
+def fetch_polygon(s: requests.Session, rl: _RateLimiter, p: Polygon, month: str, depth: int = 0,
+                  path: str = "crimes-street/all-crime") -> list[dict]:
+    """Every record in a polygon for a month (``path``: street crime, or ``stops-street`` for stop and search)."""
     rl.wait()
-    r = s.post(f"{BASE}/crimes-street/all-crime", data={"poly": poly_param(p), "date": month}, timeout=120)
+    r = s.post(f"{BASE}/{path}", data={"poly": poly_param(p), "date": month}, timeout=120)
     if r.status_code == 503 and depth < 4:
-        return [c for half in split(p) for c in fetch_polygon(s, rl, half, month, depth + 1)]
+        return [c for half in split(p) for c in fetch_polygon(s, rl, half, month, depth + 1, path)]
     r.raise_for_status()
     return r.json()
 

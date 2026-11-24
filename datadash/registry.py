@@ -21,6 +21,7 @@ from .metrics import CLAIMANT_METRICS, ELECTION_METRICS, POLICE_METRICS, MetricM
 from .sources import air_energy as air_src
 from .sources import asylum as asylum_src
 from .sources import electoral as electoral_src
+from .sources import police_stops as stops_src
 from .sources import buses as buses_src
 from .sources import business_demography as business_demography_src
 from .sources import child_poverty as child_poverty_src
@@ -226,6 +227,8 @@ SOURCES: list[Source] = [
       "Domestic certificates lodged in the last 10 years; England & Wales", epc_src.EPC_METRICS,
       lambda c: epc_src.load_epc(c.s, c.names), keep=6),
     S(police, "police", "police.uk street-level crime", "https://data.police.uk/", "", POLICE_METRICS, _police, every=MONTHLY, keep=6),
+    S(stops_src, "stops", "police.uk stop and search", stops_src.SOURCE_URL, "", stops_src.STOP_METRICS,
+      lambda c: stops_src.load_stops(c.s, c.geo, c.population), every=MONTHLY, keep=6),
     Source("elections", "2024 general election results (House of Commons Library)",
            "https://commonslibrary.parliament.uk/research-briefings/cbp-10009/", metrics=tuple(ELECTION_METRICS), run=_run_elections),
     Source("members", "Current MPs (UK Parliament Members API)", "https://members-api.parliament.uk/", run=_run_members, every=DAILY),
