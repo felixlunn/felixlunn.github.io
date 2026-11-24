@@ -53,6 +53,24 @@ export async function getBackend(): Promise<Backend | null> {
   return null;
 }
 
+/**
+ * Add ready-made public datasets (e.g. police.uk by force, from foi/police.json) to a backend: they're listed and
+ * opened like uploads, in their department, but can't be changed or deleted.
+ */
+export function withBuiltins(b: Backend, builtins: Dataset[]): Backend {
+  if (!builtins.length) return b;
+  const forDept = (dept: Department) => builtins.filter((d) => d.department === dept);
+  const isBuiltin = (id: string) => builtins.some((d) => d.id === id);
+  return {
+    ...b,
+    async list(dept) { return [...(await b.list(dept)), ...forDept(dept).map(withoutRows)]; },
+    async get(id) { return builtins.find((d) => d.id === id) ?? b.get(id); },
+    async all(dept) { return [...(await b.all(dept)), ...forDept(dept)]; },
+    async update(id, patch) { if (isBuiltin(id)) throw new Error("Ready-made datasets can't be changed."); return b.update(id, patch); },
+    async remove(d) { if (isBuiltin(d.id)) throw new Error("Ready-made datasets can't be deleted."); return b.remove(d); },
+  };
+}
+
 /** Everything but the rows, for listing. */
 export function withoutRows(d: Dataset): DatasetInfo {
   const { rows: _rows, unmatched: _unmatched, ...info } = d;

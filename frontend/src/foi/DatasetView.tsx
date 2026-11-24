@@ -311,7 +311,8 @@ export function DatasetView({ d: saved, ref_, shapes, seat, backend, canEdit, on
               {d.period && <tr><th>Period covered</th><td>{d.period}</td></tr>}
               {d.requested_on && <tr><th>Request sent</th><td>{d.requested_on}</td></tr>}
               {d.received_on && <tr><th>Response received</th><td>{d.received_on}</td></tr>}
-              <tr><th>Added by</th><td>{d.created_by_email || "unknown"} on {d.created_at.slice(0, 10)}</td></tr>
+              {d.builtin ? <tr><th>Source</th><td>{d.builtin}: public data, updated with the site's data (last {d.created_at.slice(0, 10)})</td></tr>
+                : <tr><th>Added by</th><td>{d.created_by_email || "unknown"} on {d.created_at.slice(0, 10)}</td></tr>}
             </tbody></table>
             {d.notes && <p className="small foi-notes">{d.notes}</p>}
             {notIn.length > 0 && notIn.length < tByCode.size && (

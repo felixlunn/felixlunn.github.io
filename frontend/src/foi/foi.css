@@ -285,3 +285,6 @@
 .foi-legend .lg-editor { display: grid; gap: 5px; width: 220px; }
 .foi-legend .lg-row { display: flex; gap: 4px; align-items: center; }
 .foi-legend .lg-row input { flex: 1; min-width: 0; padding: 4px 7px; border: 1px solid var(--border); border-radius: 5px; background: var(--surface-2); color: inherit; font: inherit; font-size: 12px; }
+
+/* Ready-made public datasets (police.uk) in the dataset list */
+.foi-list-title .tag.builtin { margin-left: 6px; font-weight: 500; background: var(--surface-3); color: var(--text-2); }

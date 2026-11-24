@@ -36,6 +36,7 @@ from .registry import BY_ID, SOURCES, code_files, expected_days, skip_names
 from .sources import boundaries as bsrc
 from .sources import debates as debates_src
 from .sources import foi_geo as foi_src
+from .sources import foi_police
 from .sources import lsoa as lsoa_src
 from .sources import nomis
 from .sources import police_priorities as priorities_src
@@ -175,6 +176,7 @@ def build(out_dir: Path, skip: set[str] | None = None) -> dict:
             c.record(src.id, src.name, src.url, "failed", str(exc)[:300])
 
     # Reference geographies for the password-protected FOI research section (police forces, courts, NHS bodies).
+    ref = None
     if not skipped("foi"):
         src = BY_ID["foi"]
         try:
@@ -186,6 +188,22 @@ def build(out_dir: Path, skip: set[str] | None = None) -> dict:
                      f"{len(ref['points'].get('courts', []))} courts, {len(ref['points'].get('trusts', []))} trusts")
         except Exception as exc:  # noqa: BLE001
             log.exception("FOI reference failed")
+            c.record(src.id, src.name, src.url, "failed", str(exc)[:300])
+            ref = None
+
+    # Ready-made police.uk crime by force for the FOI Policing tab (from the seat figures; needs the reference's force areas).
+    if not skipped("foi_police") and ref is not None:
+        src = BY_ID["foi_police"]
+        try:
+            as_of = datetime.now(timezone.utc).date().isoformat()
+            crime_period = next((x.get("as_of") for x in c.sources if x["id"] == "police" and x["status"] == "ok"), None)
+            sets, problems = foi_police.load_police_datasets(ref, c.frames, crime_period, as_of)
+            if sets:
+                foi_police.write_police_datasets(out_dir, sets, as_of)
+            c.record(src.id, src.name, src.url, "failed" if problems or not sets else "ok",
+                     "; ".join(problems) or ", ".join(f"{d['title']}: {len(d['rows'])} forces" for d in sets), as_of)
+        except Exception as exc:  # noqa: BLE001
+            log.exception("FOI police.uk datasets failed")
             c.record(src.id, src.name, src.url, "failed", str(exc)[:300])
 
     freshness.stamp(c.sources, freshness.load_previous(), expected=expected_days())
