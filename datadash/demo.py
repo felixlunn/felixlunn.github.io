@@ -145,6 +145,8 @@ def build_demo(out_dir: Path, n: int = 650, seed: int = 42) -> dict:
                    "largest_seats": top_n, "seats": sum(counts.values()), "parties": counts, "next_election": "2027-05-06"}
         councils[sc["code"]] = [council] + ([{**council, "name": f"Demo county {i // 9 + 1:03d}", "code": f"DEMO-K{i // 9:03d}",
                                               "tier": "county", "next_election": "2029-05-03"}] if i % 2 else [])
+    from .sources.police_priorities import demo_priorities, write_priorities
+    write_priorities(out_dir, demo_priorities(seats, rng), "demo")
     from .sources.foi_geo import demo_reference, write_foi
     write_foi(out_dir, *demo_reference(geo, seats, frames["population"]["num"].to_dict(), rng))
     return finish(out_dir, geo, seats, metrics, values, sources, demo=True, debates=debates, history=history,

@@ -12,6 +12,7 @@ import CopyLink from "./CopyLink";
 import LocalCouncils from "./LocalCouncils";
 import { ChangeBadge, Sparkline } from "./Trend";
 import { changeValue, formatChange, seriesFor, type History } from "../lib/history";
+import { usePolicing, type PolicingTeam } from "../lib/policing";
 
 interface Props {
   data: DashboardData;
@@ -37,6 +38,8 @@ export default function Dossier({ data, index, onClose, onShowMetric, onDebate, 
   const group = data.peer_groups.find((g) => g.id === seat.peer_group);
   const val = (id: string) => data.values[id]?.[index] ?? null;
   const metricById = useMemo(() => new Map(data.metrics.map((m) => [m.id, m])), [data]);
+  const policing = usePolicing();
+  const teams = policing?.seats[seat.code] ?? [];
 
   const standouts = useMemo(() => {
     return data.metrics
@@ -179,6 +182,22 @@ export default function Dossier({ data, index, onClose, onShowMetric, onDebate, 
               </p>
             )}
             <button className="btn" onClick={onNeighbourhoods}>Explore neighbourhoods (LSOAs)</button>
+          </section>
+        )}
+
+        {teams.length > 0 && (
+          <section>
+            <h3>Local policing priorities</h3>
+            <p className="tiny muted">What neighbourhood policing teams covering parts of the seat say they're focusing on (police.uk{policing?.as_of && policing.as_of !== "demo" ? `, checked ${policing.as_of}` : ""}).</p>
+            <ul className="police-teams">
+              {teams.slice(0, 3).map((t) => <PolicingRow key={t.team} t={t} />)}
+            </ul>
+            {teams.length > 3 && (
+              <details className="small">
+                <summary>{teams.length - 3} more {teams.length - 3 === 1 ? "team" : "teams"}</summary>
+                <ul className="police-teams">{teams.slice(3).map((t) => <PolicingRow key={t.team} t={t} />)}</ul>
+              </details>
+            )}
           </section>
         )}
 
@@ -334,6 +353,21 @@ function PetitionRow({ item, n, ix }: { item: { title: string; url: string }; n:
     <li>
       <a href={item.url} target="_blank" rel="noreferrer">{item.title}</a>
       <span className="tiny muted"> {n.toLocaleString("en-GB")} signatures · ×{ix.toFixed(1)}</span>
+    </li>
+  );
+}
+
+const monthFmt = new Intl.DateTimeFormat("en-GB", { month: "short", year: "numeric" });
+
+function PolicingRow({ t }: { t: PolicingTeam }) {
+  const set = t.priorities[0]?.date ? new Date(t.priorities[0].date) : null;
+  return (
+    <li>
+      <div className="small">
+        {t.url ? <a href={t.url} target="_blank" rel="noopener noreferrer">{t.team}</a> : <strong>{t.team}</strong>}
+        <span className="tiny muted"> · {t.force}{set && !Number.isNaN(set.getTime()) ? ` · set ${monthFmt.format(set)}` : ""}</span>
+      </div>
+      <ul>{t.priorities.map((p, i) => <li key={i}>{p.issue}{p.action && <span className="muted"> ({p.action})</span>}</li>)}</ul>
     </li>
   );
 }
