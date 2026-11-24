@@ -115,7 +115,7 @@ export function Workspace({ backend, user, admin, ref_, shapes }: { backend: Bac
                 {datasets.map((d) => (
                   <li key={d.id}>
                     <button className={d.id === activeId ? "on" : ""} onClick={() => setActiveId(d.id)}>
-                      <span className="foi-list-title">{d.title}</span>
+                      <span className="foi-list-title">{d.title}{d.builtin && <span className="tag builtin" title="Public data, rebuilt with the site's data: nothing to upload">{d.builtin}</span>}</span>
                       <span className="tiny muted">{GEO[d.geography].label} · {d.summary?.rows ?? "?"} rows · {d.period || d.received_on || d.created_at.slice(0, 10)}</span>
                       {headlineText(d.summary) && <span className="tiny muted foi-list-head">{headlineText(d.summary)}</span>}
                     </button>
@@ -136,7 +136,7 @@ export function Workspace({ backend, user, admin, ref_, shapes }: { backend: Bac
         ) : active ? (
           <DatasetView key={active.id} d={active} ref_={ref_} shapes={shapes} seat={seat || null} backend={backend} onPickSeat={setSeat}
             scope={scope} setScope={setScope}
-            canEdit={admin || active.created_by === user.id} onDeleted={reload} />
+            canEdit={!active.builtin && (admin || active.created_by === user.id)} onDeleted={reload} />
         ) : (
           <div className="foi-main foi-empty">
             <FoiMap shapes={null} items={[]} reverse={false} selected={null} highlight={new Set()} onSelect={() => {}} />

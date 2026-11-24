@@ -86,6 +86,7 @@ export function normaliseDataset(raw: unknown, problems: Problems = []): Dataset
     received_on: opt("received_on"), notes: opt("notes"), columns, rows,
     unmatched: Array.isArray(o.unmatched) ? (o.unmatched as Dataset["unmatched"]) : [],
     summary: normaliseSummary(o.summary),
+    ...(typeof o.builtin === "string" && o.builtin ? { builtin: o.builtin } : {}),
     file_path: opt("file_path"), created_by: opt("created_by"), created_by_email: opt("created_by_email") ?? "",
     created_at: opt("created_at") ?? "", updated_at: opt("updated_at") ?? "",
   };

@@ -258,3 +258,20 @@ describe("a key the user sets", () => {
     expect(bandCounts([-5, 0, 20, 50, 80, null], [0, 50])).toEqual([1, 2, 2]); // a value on a boundary goes up
   });
 });
+
+describe("ready-made datasets alongside uploads", () => {
+  it("lists and opens them in their department, but never changes or deletes them", async () => {
+    const { withBuiltins } = await import("./backend");
+    const up = { id: "u1", department: "policing", rows: [], unmatched: [], summary: null } as never;
+    const store = { kind: "demo", list: async () => [up], get: async () => up, all: async () => [up],
+      update: async () => up, remove: async () => undefined } as never;
+    const police = { id: "police-uk-crime", builtin: "police.uk", department: "policing", rows: [{ code: "E1", source_name: "", values: {} }], unmatched: [], summary: null } as never;
+    const b = withBuiltins(store, [police]);
+    expect((await b.list("policing")).map((d) => d.id)).toEqual(["u1", "police-uk-crime"]);
+    expect(await b.list("health")).toEqual([up]);
+    expect((await b.get("police-uk-crime")).rows).toHaveLength(1);
+    expect((await b.all("policing")).map((d) => d.id)).toEqual(["u1", "police-uk-crime"]);
+    await expect(b.remove(police)).rejects.toThrow("can't be deleted");
+    await expect(b.update("police-uk-crime", {})).rejects.toThrow("can't be changed");
+  });
+});
