@@ -3,9 +3,10 @@
 For each constituency its boundary is sent to ``/stops-street`` for each recent month with stop and search data
 (the same polygons as the crime figures, see police.py), and the stops are counted with what they led to.
 
-Not every force publishes stop and search to police.uk, and a stop record doesn't say which force made it. So each
-seat's force is found with ``/locate-neighbourhood`` at a point inside the seat, and seats whose force published no
-stop and search for the months used are left blank rather than shown as having none.
+Not every force publishes stop and search to police.uk every month, and a stop record doesn't say which force made
+it. So each seat's force is found with ``/locate-neighbourhood`` at a point inside the seat; its stops are annualised
+over the months that force published, and seats whose force published fewer than MIN_MONTHS of them are left blank
+rather than shown as having none.
 
 Docs: https://data.police.uk/docs/method/stops-street/
 """
@@ -28,11 +29,12 @@ log = logging.getLogger(__name__)
 
 SOURCE_URL = "https://data.police.uk/docs/method/stops-street/"
 MIN_FOR_SHARES = 20  # outcome shares need at least this many stops to mean much
+MIN_MONTHS = 3  # of the months used, a seat's force must have published at least this many
 
 STOP_METRICS = [
     MetricMeta("stops_per_1k", "Stop and search per 1,000 residents", "policing", "per 1,000",
-               "Stop and searches recorded within the constituency boundary, annualised per 1,000 residents (police.uk). "
-               "Blank where the force doesn't publish stop and search.", "police.uk stop and search", "neutral", 1,
+               "Stop and searches recorded within the constituency boundary, annualised (over the months the force published) per "
+               "1,000 residents (police.uk). Blank where the force doesn't publish stop and search.", "police.uk stop and search", "neutral", 1,
                ("stop_search",)),
     MetricMeta("stops_no_action", "Stop and search: no further action", "policing", "%",
                "Share of stop and searches that ended with no further action (police.uk; seats with at least "
@@ -78,14 +80,16 @@ def seat_force(s: requests.Session, rl: _RateLimiter, geom) -> str | None:
 
 
 def seat_frames(counts: dict[str, Counter], forces: dict[str, str | None], published: dict[str, set[str]],
-                population: pd.Series, months: int) -> tuple[dict[str, pd.DataFrame], list[str]]:
-    """Per-metric frames; seats whose force didn't publish every month used are left out (and listed)."""
-    every = set.intersection(*published.values()) if published else set()
-    blank = sorted(c for c, f in forces.items() if f not in every)
-    keep = [c for c in counts if c not in blank]
+                population: pd.Series) -> tuple[dict[str, pd.DataFrame], list[str]]:
+    """Per-metric frames, annualised over the months each seat's force published; seats whose force published fewer
+    than MIN_MONTHS are left out (and listed)."""
+    months = {c: sum(f in forces_in_month for forces_in_month in published.values()) for c, f in forces.items()}
+    blank = sorted(c for c in forces if months[c] < MIN_MONTHS)
+    keep = [c for c in counts if c in months and c not in blank]
     df = pd.DataFrame({c: counts[c] for c in keep}).T.reindex(columns=["all", "no_action", "arrest"]).fillna(0)
     pop = population.reindex(df.index)
-    out = {"stops_per_1k": pd.DataFrame({"num": df["all"] * (12 / months) * 1000, "den": pop}).dropna()}
+    per_year = df["all"] * 12 / pd.Series({c: months[c] for c in df.index})
+    out = {"stops_per_1k": pd.DataFrame({"num": per_year * 1000, "den": pop}).dropna()}
     enough = df[df["all"] >= MIN_FOR_SHARES]
     out["stops_no_action"] = pd.DataFrame({"num": enough["no_action"] * 100, "den": enough["all"]})
     out["stops_arrest"] = pd.DataFrame({"num": enough["arrest"] * 100, "den": enough["all"]})
@@ -129,10 +133,10 @@ def load_stops(s: requests.Session, boundaries: dict, population: pd.Series, mon
     for code, _ in seats:
         if code not in failed:
             counts[code] = summarise(stops.get(code, []))
-    out, blank = seat_frames(counts, {c: f for c, f in forces.items() if c in counts}, published, population, len(month_list))
+    out, blank = seat_frames(counts, {c: f for c, f in forces.items() if c in counts}, published, population)
     if blank:
-        log.info("Stop and search: %d seats left blank (force not publishing every month)", len(blank))
+        log.info("Stop and search: %d seats left blank (force published fewer than %d of the months)", len(blank), MIN_MONTHS)
     if not len(out["stops_per_1k"]):
         raise RuntimeError("police.uk returned no stop and search data")
-    n_forces = len(set.intersection(*published.values()))
-    return out, f"{min(month_list)} to {max(month_list)}", f"{len(month_list)} months; {n_forces} forces publishing; annualised"
+    n_forces = len({f for fs in published.values() for f in fs})
+    return out, f"{min(month_list)} to {max(month_list)}", f"{len(month_list)} months; {n_forces} forces publishing; annualised over the months each published"
