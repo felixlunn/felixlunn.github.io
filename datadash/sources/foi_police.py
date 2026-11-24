@@ -34,6 +34,11 @@ def _dataset(ds_id: str, title: str, period: str, notes: str, columns: list[dict
     }
 
 
+def _num(v) -> float:
+    """A seat's count, with a missing figure (None or NaN) counting as none."""
+    return float(v) if v is not None and pd.notna(v) else 0.0
+
+
 def crime_dataset(frames: dict[str, pd.DataFrame], areas: list[dict], period: str | None, as_of: str) -> dict | None:
     """Crime by force area, built from the seat figures: each seat's counts shared by the area's share of the seat."""
     if "crime_rate" not in frames:
@@ -44,15 +49,17 @@ def crime_dataset(frames: dict[str, pd.DataFrame], areas: list[dict], period: st
     cols = [c for c in CRIME_COLUMNS if c["key"] in counts or c["key"] in outcomes]
     rows = []
     for a in areas:
-        links = [(seat, share) for seat, share in a.get("seats", []) if seat in counts["crime_rate"].index]
+        links = [(seat, share) for seat, share in a.get("seats", []) if pd.notna(counts["crime_rate"].get(seat))]
         if not links:
             continue
         values = {}
         for mid, s in counts.items():
-            values[mid] = round(sum(float(s.get(seat, 0) or 0) * share for seat, share in links))
+            values[mid] = round(sum(_num(s.get(seat)) * share for seat, share in links))
         for k, f in outcomes.items():
-            num = sum(float(f["num"].get(seat, 0) or 0) * share for seat, share in links if seat in f.index)
-            den = sum(float(f["den"].get(seat, 0) or 0) * share for seat, share in links if seat in f.index)
+            # Seats with no figure (e.g. no crimes with a final outcome yet) are left out of both sides.
+            known = [(seat, share) for seat, share in links if seat in f.index and pd.notna(f.at[seat, "num"]) and pd.notna(f.at[seat, "den"])]
+            num = sum(float(f.at[seat, "num"]) * share for seat, share in known)
+            den = sum(float(f.at[seat, "den"]) * share for seat, share in known)
             values[k] = round(num / den, 1) if den else None
         rows.append({"code": a["code"], "source_name": a["name"], "values": values})
     if len(rows) < 30:
