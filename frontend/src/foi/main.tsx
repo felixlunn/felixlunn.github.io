@@ -1,9 +1,10 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { dataUrl } from "../lib/dataUrl";
-import { getBackend } from "./backend";
-import { checkReference } from "./contract";
+import { getBackend, withBuiltins } from "./backend";
+import { checkReference, normaliseDatasets } from "./contract";
 import FoiApp from "./FoiApp";
+import { summarise } from "./orgs";
 import type { Reference } from "./types";
 import "../styles.css";
 import "./foi.css";
@@ -21,12 +22,15 @@ const root = createRoot(document.getElementById("root")!);
 root.render(<div className="boot">Loading FOI research…</div>);
 
 async function load() {
-  const [backend, ref, shapes] = await Promise.all([
+  const [backend, ref, shapes, police] = await Promise.all([
     getBackend(),
     fetch(dataUrl("foi/reference.json")).then((r) => { if (!r.ok) throw new Error(`foi/reference.json: HTTP ${r.status}`); return r.json().then(checkedReference); }),
     fetch(dataUrl("foi/areas.geojson")).then((r) => { if (!r.ok) throw new Error(`foi/areas.geojson: HTTP ${r.status}`); return r.json() as Promise<GeoJSON.FeatureCollection>; }),
+    // Ready-made public datasets (police.uk by force): optional, the section works without them.
+    fetch(dataUrl("foi/police.json")).then((r) => (r.ok ? r.json() : null)).catch(() => null),
   ]);
-  return { backend, ref, shapes };
+  const builtins = normaliseDatasets(Array.isArray(police?.datasets) ? police.datasets : []).map((d) => ({ ...d, summary: summarise(ref, d) }));
+  return { backend: backend && withBuiltins(backend, builtins), ref, shapes };
 }
 
 load()

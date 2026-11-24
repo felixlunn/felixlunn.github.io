@@ -146,6 +146,9 @@ def build_demo(out_dir: Path, n: int = 650, seed: int = 42) -> dict:
         councils[sc["code"]] = [council] + ([{**council, "name": f"Demo county {i // 9 + 1:03d}", "code": f"DEMO-K{i // 9:03d}",
                                               "tier": "county", "next_election": "2029-05-03"}] if i % 2 else [])
     from .sources.foi_geo import demo_reference, write_foi
-    write_foi(out_dir, *demo_reference(geo, seats, frames["population"]["num"].to_dict(), rng))
+    ref, areas = demo_reference(geo, seats, frames["population"]["num"].to_dict(), rng)
+    write_foi(out_dir, ref, areas)
+    from .sources.foi_police import demo_police_datasets, write_police_datasets
+    write_police_datasets(out_dir, demo_police_datasets(ref, rng), "demo")
     return finish(out_dir, geo, seats, metrics, values, sources, demo=True, debates=debates, history=history,
                   councils={"year": 2026, "by_seat": councils})

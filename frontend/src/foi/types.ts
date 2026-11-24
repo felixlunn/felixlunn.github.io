@@ -79,6 +79,8 @@ export interface Dataset {
   columns: Column[];
   rows: DataRow[];
   unmatched: { source_name: string; values: Record<string, Cell> }[];
+  /** Ready-made public data (e.g. "police.uk"), built with the site's data: read-only, and never in the database. */
+  builtin?: string;
   /** Saved at upload, so datasets can be listed without their rows. null on datasets saved before summaries. */
   summary: DatasetSummary | null;
   file_path: string | null;

@@ -36,6 +36,7 @@ from .sources import ev as ev_src
 from .sources import fire as fire_src
 from .sources import floods as floods_src
 from .sources import foi_geo as foi_src
+from .sources import foi_police as foi_police_src
 from .sources import fuel_poverty as fuel_src
 from .sources import green_space as green_space_src
 from .sources import heat_pumps as heat_pumps_src
@@ -336,6 +337,7 @@ SOURCES: list[Source] = [
     # After the seats are assembled (run by build.py)
     Source("neighbourhoods", "Neighbourhood (LSOA) census profiles", "https://geoportal.statistics.gov.uk/", stage="post"),
     Source("debates", "Upcoming Commons debates (UK Parliament What's On)", debates_src.SOURCE_URL, stage="post", every=DAILY),
+    Source("foi_police", "FOI: police.uk crime by force", foi_police_src.SOURCE_URL, stage="post", module=foi_police_src.__name__),
     Source("foi", "FOI reference: police force areas, courts and tribunals, NHS trusts and areas", foi_src.SOURCE_URL, stage="post"),
 ]
 
