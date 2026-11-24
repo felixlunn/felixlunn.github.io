@@ -25,3 +25,18 @@ def test_missing_categories_keep_their_own_columns():
     d = fp.crime_dataset(frames, areas, None, "2026-11-24")
     assert [c["key"] for c in d["columns"]] == ["crime_rate", "crime_drugs"]
     assert d["rows"][0]["values"] == {"crime_rate": 1, "crime_drugs": 2}
+
+
+def test_blank_seat_figures_dont_break_the_file():
+    # The 24 Nov live run failed: a seat with no final outcomes has NaN there, which JSON can't hold.
+    import json
+    nan = float("nan")
+    frames = {"crime_rate": pd.DataFrame({"num": [1000.0, nan], "den": [1.0, 1.0]}, index=["A", "B"]),
+              "outcome_no_suspect": pd.DataFrame({"num": [5000.0, nan], "den": [100.0, nan]}, index=["A", "B"])}
+    areas = [{"code": f"X{i}", "name": "X", "seats": [["A", 1.0], ["B", 1.0]]} for i in range(30)]
+    areas.append({"code": "Y", "name": "Y", "seats": [["B", 1.0]]})
+    d = fp.crime_dataset(frames, areas, None, "2026-11-24")
+    rows = {r["code"]: r["values"] for r in d["rows"]}
+    assert rows["X0"] == {"crime_rate": 1, "outcome_no_suspect": 50.0}
+    assert "Y" not in rows  # its only seat has no crime figure: left out, not shown as no crime
+    json.dumps(d, allow_nan=False)  # what write_police_datasets does
