@@ -66,6 +66,18 @@ def lad_to_county(s: requests.Session) -> dict[str, str]:
     return {arcgis.field(r, r"LAD\d{2}CD"): arcgis.field(r, r"CTY\d{2}CD") for r in rows}
 
 
+CAUTH_PATTERN = re.compile(r"^LAD(\d{2})_CAUTH\d{2}_EN_LU", re.I)
+
+
+def lad_to_cauth(s: requests.Session) -> dict[str, str]:
+    """Council code -> combined authority code (E47: mayoral and other combined authorities), latest ONS lookup."""
+    names = arcgis.matching(s, CAUTH_PATTERN)
+    if not names:
+        raise LookupError("No council to combined authority lookup found on the ONS portal")
+    latest = max(names, key=lambda n: (int(CAUTH_PATTERN.match(n).group(1)), n))
+    return {arcgis.field(r, r"LAD\d{2}CD"): arcgis.field(r, r"CAUTH\d{2}CD") for r in arcgis.rows(s, arcgis.layer(latest))}
+
+
 def regrouped_weights(weights: pd.DataFrame, mapping: dict[str, str]) -> pd.DataFrame:
     """Seat x council weights regrouped to larger areas (e.g. counties); councils not in ``mapping`` stay as they are."""
     w = weights.assign(lad=weights["lad"].map(lambda c: mapping.get(c, c)))
