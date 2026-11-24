@@ -20,6 +20,7 @@ from typing import TYPE_CHECKING, Callable
 from .metrics import CLAIMANT_METRICS, ELECTION_METRICS, POLICE_METRICS, MetricMeta
 from .sources import air_energy as air_src
 from .sources import asylum as asylum_src
+from .sources import electoral as electoral_src
 from .sources import buses as buses_src
 from .sources import business_demography as business_demography_src
 from .sources import child_poverty as child_poverty_src
@@ -228,6 +229,10 @@ SOURCES: list[Source] = [
     Source("elections", "2024 general election results (House of Commons Library)",
            "https://commonslibrary.parliament.uk/research-briefings/cbp-10009/", metrics=tuple(ELECTION_METRICS), run=_run_elections),
     Source("members", "Current MPs (UK Parliament Members API)", "https://members-api.parliament.uk/", run=_run_members, every=DAILY),
+    # After the election results: the change in electors is measured from the 2024 electorate.
+    S(electoral_src, "electoral", "Electoral registration (ONS electoral statistics)", electoral_src.SOURCE_URL,
+      "Latest 1 December register, current constituencies; UK", electoral_src.ELECTORAL_METRICS,
+      lambda c: electoral_src.load_electoral(c.s, c.frames["turnout"]["den"] if "turnout" in c.frames else None), every=ANNUAL),
     S(questions_src, "questions", "Written questions (UK Parliament)", questions_src.SOURCE_URL, "Tabled by each current MP",
       questions_src.QUESTION_METRICS, lambda c: questions_src.load_questions(c.s, c.members), when=lambda c: bool(c.members)),
     S(nhsbsa_src, "dental", "NHS dental activity (NHSBSA)", nhsbsa_src.SOURCE_URL, "Patients seen by dental practices in each seat; England",

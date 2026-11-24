@@ -379,6 +379,7 @@ SOURCE_LINKS: dict[str, str] = {
     "Home Office police workforce": f"{GOV}/collections/police-workforce-england-and-wales",
     "House of Commons Library": "https://commonslibrary.parliament.uk/research-briefings/cbp-10009/",
     "Insolvency Service": f"{GOV}/collections/individual-insolvency-statistics-releases",
+    "ONS electoral statistics": "https://www.ons.gov.uk/peoplepopulationandcommunity/elections/electoralregistration/datasets/electoralstatisticsforuk",
     "MHCLG Council Taxbase": f"{GOV}/collections/council-taxbase-statistics",
     "MHCLG council tax statistics": f"{GOV}/statistical-data-sets/live-tables-on-council-tax",
     "MHCLG housing supply": f"{GOV}/statistical-data-sets/live-tables-on-net-supply-of-housing",
