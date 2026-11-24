@@ -32,13 +32,14 @@ from .history import assemble_history
 from .http import session
 from .parties import is_lib_dem
 from .metrics import CENSUS_METRICS, THEMES, MetricMeta, census_meta, source_url
-from .registry import BY_ID, SOURCES, expected_days, skip_names
+from .registry import BY_ID, SOURCES, code_files, expected_days, skip_names
 from .sources import boundaries as bsrc
 from .sources import debates as debates_src
 from .sources import foi_geo as foi_src
 from .sources import foi_police
 from .sources import lsoa as lsoa_src
 from .sources import nomis
+from .sources import police_priorities as priorities_src
 from .sources import scotland as scotland_src
 
 log = logging.getLogger("datadash.build")
@@ -158,6 +159,21 @@ def build(out_dir: Path, skip: set[str] | None = None) -> dict:
         except Exception as exc:  # noqa: BLE001
             log.exception("What's On calendar failed")
             c.record(src.id, src.name, src.url, "failed", str(exc))
+
+    # Neighbourhood policing priorities for each seat's briefing (policing.json). Teams update them every few
+    # months, so a fetched copy is reused for a week; if police.uk fails, the copy already live is kept.
+    if not skipped("policing"):
+        src = BY_ID["policing"]
+        try:
+            fetch = c.fetch or (lambda sid, load, keep, files: cached(sid, load, max_age_days=keep, code_files=files))
+            pri = fetch(src.id, lambda: priorities_src.load_priorities(c.s, c.geo), src.keep, code_files(src.module))
+            priorities_src.write_priorities(out_dir, pri, datetime.now(timezone.utc).date().isoformat())
+            n_teams = sum(len(v) for v in pri["seats"].values())
+            c.record(src.id, src.name, src.url, "ok", f"{n_teams} teams' priorities across {len(pri['seats'])} seats; England, Wales & NI",
+                     datetime.now(timezone.utc).date().isoformat())
+        except Exception as exc:  # noqa: BLE001
+            log.exception("Policing priorities failed")
+            c.record(src.id, src.name, src.url, "failed", str(exc)[:300])
 
     # Reference geographies for the password-protected FOI research section (police forces, courts, NHS bodies).
     ref = None
