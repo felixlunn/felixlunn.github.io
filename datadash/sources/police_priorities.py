@@ -3,9 +3,12 @@
 Every neighbourhood policing team publishes its current priorities ("drug dealing around X", "shop theft in the
 town centre"). A seat holds several teams' areas, so a handful of points spread across the seat are each looked up
 with ``/locate-neighbourhood``; each team found is then read with its priorities (``/{force}/{team}/priorities``),
-and named from its force's list of neighbourhoods (``/{force}/neighbourhoods``, one request per force). police.uk
-answers slowly (seconds per request), so many requests are kept in flight, within its rate limit. The result is written to ``policing.json``, which the site loads only when a
-seat's briefing is opened.
+and named from its force's list of neighbourhoods (``/{force}/neighbourhoods``, one request per force). The result is
+written to ``policing.json``, which the site loads only when a seat's briefing is opened.
+
+police.uk throttles hard ("429 Too Many Requests") from shared servers such as GitHub's, so requests go gently, slow
+down further on every 429, and the whole step has a time budget (BUDGET_MINUTES): past it, it stops and the refresh
+keeps the copy already live, rather than holding up (and, at the workflow's time limit, losing) the whole refresh.
 
 Docs: https://data.police.uk/docs/method/neighbourhood-priorities/
 """
@@ -15,7 +18,9 @@ from __future__ import annotations
 import html
 import json
 import logging
+import os
 import re
+import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
@@ -27,7 +32,9 @@ from .police import BASE, _RateLimiter
 log = logging.getLogger(__name__)
 
 SOURCE_URL = "https://data.police.uk/docs/method/neighbourhood-priorities/"
-POINTS = 6  # points looked up per seat: enough to find most of the teams covering it
+POINTS = 4  # points looked up per seat: enough to find most of the teams covering it
+BUDGET_MINUTES = 20  # the most this step may take (override with POLICING_BUDGET_MINUTES)
+WORKERS, PER_SECOND = 6, 6.0  # gentle: police.uk allows 15/s, but throttles shared servers well before that
 PER_TEAM = 3  # newest priorities kept per team
 MAX_CHARS = 280
 
@@ -77,22 +84,48 @@ def priorities(raw: list[dict]) -> list[dict]:
     return out
 
 
+class OutOfTime(RuntimeError):
+    """The step's time budget ran out."""
+
+
 class _Api:
-    def __init__(self, s: requests.Session):
-        self.s, self.rl = s, _RateLimiter()
+    """police.uk requests: rate-limited, slowing down on each 429, and refusing to start once the budget has run out.
+
+    Uses its own session without automatic retries: the shared one retries 429s with long back-offs, which is what let
+    this step run past the workflow's time limit."""
+
+    def __init__(self, s: requests.Session | None, budget_minutes: float = BUDGET_MINUTES):
+        self.s = requests.Session()
+        self.s.headers["User-Agent"] = (s.headers.get("User-Agent") if s is not None else None) or "DataDashboard"
+        self.rl = _RateLimiter(PER_SECOND)
+        self.deadline = time.monotonic() + budget_minutes * 60
 
     def get(self, path: str, **params):
-        self.rl.wait()
-        r = self.s.get(f"{BASE}/{path}", params=params or None, timeout=60)
-        if r.status_code == 404:
-            return None
-        r.raise_for_status()
-        return r.json()
+        for attempt in range(4):
+            if time.monotonic() > self.deadline:
+                raise OutOfTime("police.uk was too slow: stopped at the time budget, keeping the copy already live")
+            self.rl.wait()
+            try:
+                r = self.s.get(f"{BASE}/{path}", params=params or None, timeout=60)
+            except requests.RequestException:
+                time.sleep(2 ** attempt)
+                continue
+            if r.status_code == 404:
+                return None
+            if r.status_code == 429 or r.status_code >= 500:
+                if r.status_code == 429:  # everyone slows down, not just this request
+                    with self.rl.lock:
+                        self.rl.interval = min(self.rl.interval * 1.5, 2.0)
+                time.sleep(2 ** (attempt + 1))
+                continue
+            r.raise_for_status()
+            return r.json()
+        raise requests.HTTPError(f"police.uk kept refusing {path}")
 
 
-def load_priorities(s: requests.Session, boundaries: dict, workers: int = 30) -> dict:
-    """{"seats": {seat code: [{"force", "team", "url", "priorities": [...]}, ...]}} (teams with priorities only)."""
-    api = _Api(s)
+def load_priorities(s: requests.Session, boundaries: dict, workers: int = WORKERS) -> dict:
+    """{"seats": {seat code: [{"force", "team", "priorities": [...]}, ...]}} (teams with priorities only)."""
+    api = _Api(s, float(os.environ.get("POLICING_BUDGET_MINUTES", BUDGET_MINUTES)))
     forces = {f["id"]: f["name"] for f in api.get("forces") or []}
     seats = [(f["properties"]["code"], shape(f["geometry"])) for f in boundaries["features"]
              if not f["properties"]["code"].startswith("S")]  # police.uk doesn't cover Scotland

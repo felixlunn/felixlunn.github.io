@@ -68,3 +68,43 @@ def test_too_few_seats_is_a_failure(monkeypatch):
     feats = [{"type": "Feature", "properties": {"code": "E14000001"}, "geometry": mapping(box(0, 0, 1, 1))}]
     with pytest.raises(RuntimeError):
         pp.load_priorities(None, {"features": feats})
+
+
+class _Resp:
+    def __init__(self, status, body=None):
+        self.status_code, self._body = status, body
+
+    def json(self):
+        return self._body
+
+    def raise_for_status(self):
+        if self.status_code >= 400:
+            raise pp.requests.HTTPError(str(self.status_code))
+
+
+def _api(monkeypatch, replies, budget=20):
+    monkeypatch.setattr(pp.time, "sleep", lambda s: None)
+    api = pp._Api(None, budget)
+    it = iter(replies)
+    api.s.get = lambda url, params=None, timeout=None: next(it)
+    return api
+
+
+def test_slows_down_when_police_uk_says_too_many_requests(monkeypatch):
+    api = _api(monkeypatch, [_Resp(429), _Resp(429), _Resp(200, {"ok": 1})])
+    before = api.rl.interval
+    assert api.get("forces") == {"ok": 1}
+    assert api.rl.interval == pytest.approx(before * 1.5 * 1.5)  # every 429 slows all requests down
+
+
+def test_gives_up_on_a_request_after_a_few_refusals(monkeypatch):
+    api = _api(monkeypatch, [_Resp(429)] * 4)
+    with pytest.raises(pp.requests.HTTPError):
+        api.get("forces")
+
+
+def test_stops_at_the_time_budget(monkeypatch):
+    # The live refresh of 24 Nov ran into the workflow's 90-minute limit; now the step stops itself first.
+    api = _api(monkeypatch, [_Resp(200, [])], budget=0)
+    with pytest.raises(pp.OutOfTime):
+        api.get("forces")
