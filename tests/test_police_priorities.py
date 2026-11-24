@@ -15,6 +15,8 @@ def test_priority_text_made_plain():
     raw = "<p><ul><li>Drug dealing at Prewett Street &amp; Somerset Square.</li><li>Anti-social behaviour</li></ul></p>"
     assert pp.plain(raw) == "Drug dealing at Prewett Street & Somerset Square; Anti-social behaviour"
     assert pp.plain("<p>.</p>") == "" and pp.plain(None) == ""
+    assert pp.plain("DANGEROUS &amp; ANTISOCIAL DRIVING") == "Dangerous & antisocial driving"
+    assert pp.plain("ASB in the CCTV area") == "ASB in the CCTV area"  # ordinary text keeps its capitals
     assert pp.plain("word " * 100).endswith("…") and len(pp.plain("word " * 100)) <= pp.MAX_CHARS + 1
 
 
@@ -25,7 +27,7 @@ def test_newest_priorities_kept():
            {"issue": "<p>x</p>", "issue-date": "2026-12-01T00:00:00"},
            {"issue": "<p>Burglary</p>", "issue-date": "2026-09-01T00:00:00"}]
     assert pp.priorities(raw) == [{"issue": "Shop theft", "date": "2026-11-12"},
-                                  {"issue": "Speeding", "action": "Speed checks weekly", "date": "2026-10-01"},
+                                  {"issue": "Speeding", "date": "2026-10-01"},  # actions left out
                                   {"issue": "Burglary", "date": "2026-09-01"}]
 
 
@@ -44,7 +46,9 @@ def test_teams_found_across_each_seat(monkeypatch):
             return {"force": "kent", "neighbourhood": f"T{int(lng)}{'A' if lng % 1 < 0.5 else 'B'}"}
         if path.endswith("/priorities"):
             return [{"issue": f"<p>Priority for {path.split('/')[1]}</p>", "issue-date": "2026-11-01T00:00:00"}]
-        return {"name": f"Team {path.split('/')[1]}", "contact_details": {"website": "https://example.org/team"}}
+        if path == "kent/neighbourhoods":
+            return [{"id": f"T{i}{h}", "name": f"Team T{i}{h}"} for i in range(120) for h in "AB"]
+        raise AssertionError(f"unexpected request {path}")
 
     monkeypatch.setattr(pp._Api, "get", get)
     monkeypatch.setattr(pp._RateLimiter, "wait", lambda self: None)
@@ -52,8 +56,9 @@ def test_teams_found_across_each_seat(monkeypatch):
     assert len(out) == 120 and "S14000001" not in out
     first = out["E14000000"]
     assert {t["team"] for t in first} == {"Team T0A", "Team T0B"}
-    assert first[0] == {"force": "Kent Police", "team": first[0]["team"], "url": "https://example.org/team",
+    assert first[0] == {"force": "Kent Police", "team": first[0]["team"],
                         "priorities": [{"issue": f"Priority for {first[0]['team'][5:]}", "date": "2026-11-01"}]}
+    assert calls.count("kent/neighbourhoods") == 1  # names: one request per force, not per team
     assert not any(c.startswith("S") for c in calls)
 
 

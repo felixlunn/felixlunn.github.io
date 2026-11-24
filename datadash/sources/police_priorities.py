@@ -2,8 +2,9 @@
 
 Every neighbourhood policing team publishes its current priorities ("drug dealing around X", "shop theft in the
 town centre"). A seat holds several teams' areas, so a handful of points spread across the seat are each looked up
-with ``/locate-neighbourhood``; each team found is then read (``/{force}/{team}``) with its priorities
-(``/{force}/{team}/priorities``). The result is written to ``policing.json``, which the site loads only when a
+with ``/locate-neighbourhood``; each team found is then read with its priorities (``/{force}/{team}/priorities``),
+and named from its force's list of neighbourhoods (``/{force}/neighbourhoods``, one request per force). police.uk
+answers slowly (seconds per request), so many requests are kept in flight, within its rate limit. The result is written to ``policing.json``, which the site loads only when a
 seat's briefing is opened.
 
 Docs: https://data.police.uk/docs/method/neighbourhood-priorities/
@@ -54,20 +55,23 @@ def plain(raw: str | None) -> str:
     t = html.unescape(re.sub(r"<[^>]+>", " ", t))
     t = re.sub(r"\s+", " ", t)
     t = re.sub(r"\s*\.?\s*;\s*", "; ", t).strip(" ;.")  # "item.; item" -> "item; item"
+    letters = [ch for ch in t if ch.isalpha()]
+    if len(letters) > 8 and sum(ch.isupper() for ch in letters) > 0.8 * len(letters):
+        t = t.capitalize()  # "DANGEROUS & ANTISOCIAL DRIVING" -> "Dangerous & antisocial driving"
     if len(t) > MAX_CHARS:
         t = t[:MAX_CHARS].rsplit(" ", 1)[0].rstrip(",;:") + "…"
     return t
 
 
 def priorities(raw: list[dict]) -> list[dict]:
-    """A team's newest priorities: issue text, the action taken (if any) and the date set."""
+    """A team's newest priorities: the issue and the date set. (Teams' "action" updates are left out: they're often
+    long, and would more than double the file the briefing loads.)"""
     out = []
     for p in sorted(raw, key=lambda p: p.get("issue-date") or "", reverse=True):
         issue = plain(p.get("issue"))
         if len(issue) < 4:
             continue
-        action = plain(p.get("action"))
-        out.append({"issue": issue, **({"action": action} if len(action) > 3 else {}), "date": (p.get("issue-date") or "")[:10]})
+        out.append({"issue": issue, "date": (p.get("issue-date") or "")[:10]})
         if len(out) == PER_TEAM:
             break
     return out
@@ -86,7 +90,7 @@ class _Api:
         return r.json()
 
 
-def load_priorities(s: requests.Session, boundaries: dict, workers: int = 12) -> dict:
+def load_priorities(s: requests.Session, boundaries: dict, workers: int = 30) -> dict:
     """{"seats": {seat code: [{"force", "team", "url", "priorities": [...]}, ...]}} (teams with priorities only)."""
     api = _Api(s)
     forces = {f["id"]: f["name"] for f in api.get("forces") or []}
@@ -109,15 +113,20 @@ def load_priorities(s: requests.Session, boundaries: dict, workers: int = 12) ->
                     found.append(key)
         teams = sorted({t for ts in teams_by_seat.values() for t in ts})
         log.info("Policing priorities: %d teams across %d seats", len(teams), len(teams_by_seat))
-        info = {ex.submit(api.get, f"{f}/{n}"): (f, n) for f, n in teams}
+        lists = {ex.submit(api.get, f"{f}/neighbourhoods"): f for f in sorted({f for f, _ in teams})}
         prio = {ex.submit(api.get, f"{f}/{n}/priorities"): (f, n) for f, n in teams}
-        about, pri = {}, {}
-        for fut in as_completed([*info, *prio]):
-            key = info.get(fut) or prio.get(fut)
+        names: dict[tuple[str, str], str] = {}
+        for fut in as_completed(lists):
             try:
-                (about if fut in info else pri)[key] = fut.result()
+                names.update({(lists[fut], x["id"]): x["name"] for x in fut.result() or [] if x.get("id") and x.get("name")})
             except requests.RequestException as exc:
-                log.warning("police.uk team %s failed: %s", "/".join(key), exc)
+                log.warning("police.uk neighbourhoods of %s failed: %s", lists[fut], exc)
+        pri = {}
+        for fut in as_completed(prio):
+            try:
+                pri[prio[fut]] = fut.result()
+            except requests.RequestException as exc:
+                log.warning("police.uk team %s failed: %s", "/".join(prio[fut]), exc)
     out: dict[str, list[dict]] = {}
     for code, ts in teams_by_seat.items():
         entries = []
@@ -125,10 +134,7 @@ def load_priorities(s: requests.Session, boundaries: dict, workers: int = 12) ->
             items = priorities(pri.get((f, n)) or [])
             if not items:
                 continue
-            a = about.get((f, n)) or {}
-            url = (a.get("contact_details") or {}).get("website") or a.get("url_force") or ""
-            entries.append({"force": forces.get(f, f), "team": html.unescape(a.get("name") or n),
-                            **({"url": url} if url.startswith("http") else {}), "priorities": items})
+            entries.append({"force": forces.get(f, f), "team": html.unescape(names.get((f, n)) or n), "priorities": items})
         if entries:
             out[code] = sorted(entries, key=lambda e: max(p["date"] for p in e["priorities"]), reverse=True)
     if len(out) < 100:

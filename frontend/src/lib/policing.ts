@@ -6,7 +6,7 @@ export interface PolicingTeam {
   force: string;
   team: string;
   url?: string;
-  priorities: { issue: string; action?: string; date: string }[];
+  priorities: { issue: string; date: string }[];
 }
 export interface PolicingFile { as_of: string; seats: Record<string, PolicingTeam[]> }
 
@@ -31,4 +31,24 @@ export function usePolicing(): PolicingFile | null {
     return () => { live = false; };
   }, []);
   return p;
+}
+
+/** One line per distinct priority in a seat (forces often set the same one for every team), with the teams that set
+ * it; those set by most teams first, then the newest. */
+export interface PriorityLine { issue: string; teams: string[]; force: string; date: string }
+
+export function priorityLines(teams: PolicingTeam[]): PriorityLine[] {
+  const by = new Map<string, PriorityLine>();
+  for (const t of teams) {
+    for (const p of t.priorities) {
+      const k = p.issue.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+      const line = by.get(k);
+      if (!line) by.set(k, { issue: p.issue, teams: [t.team], force: t.force, date: p.date });
+      else {
+        if (!line.teams.includes(t.team)) line.teams.push(t.team);
+        if (p.date > line.date) line.date = p.date;
+      }
+    }
+  }
+  return [...by.values()].sort((a, b) => b.teams.length - a.teams.length || b.date.localeCompare(a.date));
 }

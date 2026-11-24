@@ -12,7 +12,7 @@ import CopyLink from "./CopyLink";
 import LocalCouncils from "./LocalCouncils";
 import { ChangeBadge, Sparkline } from "./Trend";
 import { changeValue, formatChange, seriesFor, type History } from "../lib/history";
-import { usePolicing, type PolicingTeam } from "../lib/policing";
+import { priorityLines, usePolicing, type PriorityLine } from "../lib/policing";
 
 interface Props {
   data: DashboardData;
@@ -39,7 +39,7 @@ export default function Dossier({ data, index, onClose, onShowMetric, onDebate, 
   const val = (id: string) => data.values[id]?.[index] ?? null;
   const metricById = useMemo(() => new Map(data.metrics.map((m) => [m.id, m])), [data]);
   const policing = usePolicing();
-  const teams = policing?.seats[seat.code] ?? [];
+  const priorities = useMemo(() => priorityLines(policing?.seats[seat.code] ?? []), [policing, seat.code]);
 
   const standouts = useMemo(() => {
     return data.metrics
@@ -185,17 +185,17 @@ export default function Dossier({ data, index, onClose, onShowMetric, onDebate, 
           </section>
         )}
 
-        {teams.length > 0 && (
+        {priorities.length > 0 && (
           <section>
             <h3>Local policing priorities</h3>
             <p className="tiny muted">What neighbourhood policing teams covering parts of the seat say they're focusing on (police.uk{policing?.as_of && policing.as_of !== "demo" ? `, checked ${policing.as_of}` : ""}).</p>
             <ul className="police-teams">
-              {teams.slice(0, 3).map((t) => <PolicingRow key={t.team} t={t} />)}
+              {priorities.slice(0, 5).map((p) => <PriorityRow key={p.issue} p={p} />)}
             </ul>
-            {teams.length > 3 && (
+            {priorities.length > 5 && (
               <details className="small">
-                <summary>{teams.length - 3} more {teams.length - 3 === 1 ? "team" : "teams"}</summary>
-                <ul className="police-teams">{teams.slice(3).map((t) => <PolicingRow key={t.team} t={t} />)}</ul>
+                <summary>{priorities.length - 5} more</summary>
+                <ul className="police-teams">{priorities.slice(5).map((p) => <PriorityRow key={p.issue} p={p} />)}</ul>
               </details>
             )}
           </section>
@@ -359,15 +359,13 @@ function PetitionRow({ item, n, ix }: { item: { title: string; url: string }; n:
 
 const monthFmt = new Intl.DateTimeFormat("en-GB", { month: "short", year: "numeric" });
 
-function PolicingRow({ t }: { t: PolicingTeam }) {
-  const set = t.priorities[0]?.date ? new Date(t.priorities[0].date) : null;
+function PriorityRow({ p }: { p: PriorityLine }) {
+  const set = p.date ? new Date(p.date) : null;
+  const teams = p.teams.length > 3 ? `${p.teams.slice(0, 3).join(", ")} and ${p.teams.length - 3} more` : p.teams.join(", ");
   return (
     <li>
-      <div className="small">
-        {t.url ? <a href={t.url} target="_blank" rel="noopener noreferrer">{t.team}</a> : <strong>{t.team}</strong>}
-        <span className="tiny muted"> · {t.force}{set && !Number.isNaN(set.getTime()) ? ` · set ${monthFmt.format(set)}` : ""}</span>
-      </div>
-      <ul>{t.priorities.map((p, i) => <li key={i}>{p.issue}{p.action && <span className="muted"> ({p.action})</span>}</li>)}</ul>
+      <div className="small">{p.issue}</div>
+      <div className="tiny muted">{teams} · {p.force}{set && !Number.isNaN(set.getTime()) ? ` · set ${monthFmt.format(set)}` : ""}</div>
     </li>
   );
 }
