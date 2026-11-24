@@ -53,7 +53,6 @@ from .sources import ofsted as ofsted_src
 from .sources import petitions as petitions_src
 from .sources import pharmacies as pharmacies_src
 from .sources import police_workforce as police_workforce_src
-from .sources import police_priorities as priorities_src
 from .sources import public_health as public_health_src
 from .sources import pupils as pupils_src
 from .sources import questions as questions_src
@@ -338,8 +337,6 @@ SOURCES: list[Source] = [
     # After the seats are assembled (run by build.py)
     Source("neighbourhoods", "Neighbourhood (LSOA) census profiles", "https://geoportal.statistics.gov.uk/", stage="post"),
     Source("debates", "Upcoming Commons debates (UK Parliament What's On)", debates_src.SOURCE_URL, stage="post", every=DAILY),
-    Source("policing", "Neighbourhood policing priorities (police.uk)", priorities_src.SOURCE_URL, stage="post", every=MONTHLY, keep=7,
-           module=priorities_src.__name__),
     Source("foi_police", "FOI: police.uk crime by force", foi_police_src.SOURCE_URL, stage="post", module=foi_police_src.__name__),
     Source("foi", "FOI reference: police force areas, courts and tribunals, NHS trusts and areas", foi_src.SOURCE_URL, stage="post"),
 ]

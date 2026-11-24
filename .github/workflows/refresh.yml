@@ -64,7 +64,7 @@ jobs:
           restore-keys: sources-v1-
 
       # The data now on the live site: used to tell how long each source's figures have gone unchanged, and the
-      # FOI reference and policing priorities files to fall back on.
+      # FOI reference files to fall back on.
       - name: Fetch the published data
         run: |
           SITE="https://${GITHUB_REPOSITORY_OWNER}.github.io"
@@ -75,8 +75,6 @@ jobs:
           for f in reference.json areas.geojson police.json; do
             curl -sfL --max-time 120 "$SITE/data/foi/$f" -o "frontend/public/data/foi/$f" || rm -f "frontend/public/data/foi/$f"
           done
-          # Likewise the policing priorities (rewritten by the build only when police.uk answers).
-          curl -sfL --max-time 120 "$SITE/data/policing.json" -o frontend/public/data/policing.json || rm -f frontend/public/data/policing.json
 
       - name: Fetch data and compute metrics
         env:
