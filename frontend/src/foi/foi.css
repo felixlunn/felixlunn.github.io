@@ -237,7 +237,8 @@
 .foi-mode { grid-template-columns: 1fr 1fr; margin: 10px 0 8px; }
 .foi-mode > button { text-align: center; padding: 7px 6px; }
 .foi-mode strong { font-size: 12.5px; }
-.foi-kind { display: grid; grid-template-columns: 1fr 1fr; margin-bottom: 8px; }
+/* One equal column per kind (two on Health, more elsewhere): ".seg.mini" alone would leave an empty third column. */
+.seg.mini.foi-kind { grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: 1fr; margin-bottom: 8px; }
 .foi-kind > button { text-align: center; }
 .foi-orgside-tools { display: flex; gap: 6px; margin-bottom: 6px; }
 .foi-orgside-tools input { flex: 1; min-width: 0; padding: 6px 9px; border: 1px solid var(--border); border-radius: 7px; background: var(--surface-2); color: inherit; font: inherit; font-size: 13px; }
