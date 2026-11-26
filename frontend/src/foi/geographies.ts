@@ -60,9 +60,6 @@ export interface DepartmentInfo {
 export const DEPARTMENTS: DepartmentInfo[] = [
   { id: "policing", label: "Policing", geographies: ["police_force"], blurb: "FOI responses from police forces, mapped by police force area.",
     areaViewHint: "Every dataset for one police force" },
-  { id: "justice", label: "Justice", geographies: ["court", "police_force"],
-    blurb: "FOI responses from HMCTS, the MoJ, the CPS and others, by court or by criminal justice area (these follow police force areas).",
-    areaViewHint: "Every dataset for one court or criminal justice area" },
   { id: "health", label: "Health", geographies: ["nhs_trust", "health_area"],
     blurb: "FOI responses from NHS trusts and boards, by trust or by NHS area (integrated care boards in England, health boards in Wales).",
     areaViewHint: "Every dataset for one NHS trust or ICB" },
