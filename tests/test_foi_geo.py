@@ -77,3 +77,53 @@ def test_catchments_from_first_past_the_post_rows():
     shapes = {"E02000001": box(0, 0, 1, 1), "E02000002": box(1, 0, 2, 1), "E02000003": box(2, 0, 3, 1)}
     areas = {a["code"]: a for a in f.catchment_areas(fptp, shapes)}
     assert abs(areas["RB2"]["geometry"].area - 2) < 1e-6 and areas["RA1"]["geometry"].bounds == (0, 0, 1, 1)
+
+
+def test_closed_and_merged_trusts_left_out_with_their_names_kept():
+    # ODS keeps merged trusts "Active": Hammersmith Hospitals (RQN) closed in 2007 and became Imperial (RYJ);
+    # Basildon (RDD) merged into Mid and South Essex (RAJ) in 2020.
+    rec = lambda end=None, succ=None: {"Date": [{"Type": "Operational", "Start": "1994-04-01"}, {"Type": "Legal", "Start": "1994-04-01", "End": end}],  # noqa: E731
+                                       "Succs": {"Succ": [{"Type": "Successor", "Target": {"OrgId": {"extension": succ}}}] if succ else []}}
+    trusts = [{"code": c, "name": n} for c, n in [("RQN", "Hammersmith Hospitals NHS Trust"), ("RYJ", "Imperial College Healthcare NHS Trust"),
+                                                  ("RDD", "Basildon and Thurrock University Hospitals NHS Foundation Trust"),
+                                                  ("RAJ", "Mid and South Essex NHS Foundation Trust"), ("XX1", "Old Trust"), ("XX2", "Middle Trust")]]
+    records = {"RQN": rec("2007-09-30", "RYJ"), "RYJ": rec(), "RDD": rec("2020-03-31", "RAJ"), "RAJ": rec(),
+               "XX1": rec("2010-03-31", "XX2"), "XX2": rec("2015-03-31", "RAJ")}  # closed twice over: ends up at RAJ
+    out = {t["code"]: t for t in f.current_trusts(trusts, records, "2026-11-26")}
+    assert sorted(out) == ["RAJ", "RYJ"]
+    assert out["RYJ"]["aliases"] == ["Hammersmith Hospitals NHS Trust", "RQN"]
+    assert set(out["RAJ"]["aliases"]) == {"Basildon and Thurrock University Hospitals NHS Foundation Trust", "RDD", "Old Trust", "XX1", "Middle Trust", "XX2"}
+    assert f.closed(rec("2030-01-01"), "2026-11-26") == (False, None)  # a future legal end hasn't happened yet
+
+
+def test_trust_kinds():
+    assert f.trust_kind("East London NHS Foundation Trust") == "Mental health & community"
+    assert f.trust_kind("Mersey Care NHS Foundation Trust") == "Mental health & community"
+    assert f.trust_kind("Mid and South Essex NHS Foundation Trust", acute_catchment=True) == "Acute & specialist"
+    assert f.trust_kind("Alder Hey Children's NHS Foundation Trust") == "Acute & specialist"
+    assert f.trust_kind("Hull University Teaching Hospitals NHS Trust") == "Acute & specialist"
+    assert f.trust_kind("North East Ambulance Service NHS Foundation Trust") == "Ambulance"
+    assert f.trust_kind("Bridgewater Community Healthcare NHS Foundation Trust") == "Mental health & community"
+    assert f.trust_kind("Central London Community Healthcare NHS Trust") == "Mental health & community"
+    assert f.trust_kind("Hertfordshire Community NHS Trust") == "Community"
+    assert f.trust_kind("Greater Manchester Mental Health NHS Foundation Trust") == "Mental health & community"  # not "chest"
+    assert f.trust_kind("Liverpool Heart and Chest Hospital NHS Foundation Trust") == "Acute & specialist"
+
+
+def test_catchments_filed_under_a_merged_trust_go_to_its_successor():
+    from shapely.geometry import box
+    from datadash.sources.foi_geo.assemble import catchments_of_current
+    trusts = [{"code": "RAJ", "name": "Mid and South Essex", "aliases": ["Basildon and Thurrock", "RDD"]}, {"code": "RYJ", "name": "Imperial"}]
+    catch = [{"code": "RAJ", "name": "x", "geometry": box(0, 0, 1, 1)}, {"code": "RDD", "name": "old", "geometry": box(1, 0, 2, 1)},
+             {"code": "RYJ", "name": "y", "geometry": box(5, 5, 6, 6)}, {"code": "ZZZ", "name": "gone", "geometry": box(9, 9, 10, 10)}]
+    out = {c["code"]: c for c in catchments_of_current(catch, trusts)}
+    assert sorted(out) == ["RAJ", "RYJ"] and out["RAJ"]["geometry"].area == 2.0 and out["RAJ"]["name"] == "Mid and South Essex"
+
+
+def test_map_shapes_stay_valid_after_simplifying():
+    from shapely.geometry import Polygon, shape as to_shape
+    from datadash.sources.foi_geo.assemble import to_feature
+    # A thin shape whose simplified, rounded outline would cross itself.
+    zig = Polygon([(0, 0), (0.01, 0.00002), (0.02, 0), (0.02, 0.00003), (0.01, 0.00001), (0, 0.00003)])
+    g = to_shape(to_feature({"code": "X", "name": "X", "geometry": zig.buffer(0.0001)}, "trust")["geometry"])
+    assert g.is_valid
