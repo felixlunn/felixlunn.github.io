@@ -36,7 +36,7 @@ from .registry import BY_ID, SOURCES, expected_days, skip_names
 from .sources import boundaries as bsrc
 from .sources import debates as debates_src
 from .sources import foi_geo as foi_src
-from .sources import foi_police
+from .sources import foi_eric, foi_police
 from .sources import lsoa as lsoa_src
 from .sources import nomis
 from .sources import scotland as scotland_src
@@ -188,6 +188,20 @@ def build(out_dir: Path, skip: set[str] | None = None) -> dict:
                      "; ".join(problems) or ", ".join(f"{d['title']}: {len(d['rows'])} forces" for d in sets), as_of)
         except Exception as exc:  # noqa: BLE001
             log.exception("FOI police.uk datasets failed")
+            c.record(src.id, src.name, src.url, "failed", str(exc)[:300])
+
+    # NHS estates returns (ERIC) for the FOI Health tab: kept in the repository, matched to today's trusts.
+    if not skipped("foi_eric") and ref is not None:
+        src = BY_ID["foi_eric"]
+        try:
+            as_of = datetime.now(timezone.utc).date().isoformat()
+            sets, problems = foi_eric.load_eric_datasets(c.s, ref, as_of)
+            if sets:
+                foi_eric.write_eric_datasets(out_dir, sets, as_of)
+            c.record(src.id, src.name, src.url, "failed" if problems or not sets else "ok",
+                     "; ".join(problems) or f"{len(sets)} datasets, {sets[0]['period']}", sets[0]["period"].split(" to ")[-1] if sets else None)
+        except Exception as exc:  # noqa: BLE001
+            log.exception("FOI ERIC datasets failed")
             c.record(src.id, src.name, src.url, "failed", str(exc)[:300])
 
     freshness.stamp(c.sources, freshness.load_previous(), expected=expected_days())

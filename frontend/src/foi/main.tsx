@@ -22,14 +22,17 @@ const root = createRoot(document.getElementById("root")!);
 root.render(<div className="boot">Loading FOI research…</div>);
 
 async function load() {
-  const [backend, ref, shapes, police] = await Promise.all([
+  const [backend, ref, shapes, police, eric] = await Promise.all([
     getBackend(),
     fetch(dataUrl("foi/reference.json")).then((r) => { if (!r.ok) throw new Error(`foi/reference.json: HTTP ${r.status}`); return r.json().then(checkedReference); }),
     fetch(dataUrl("foi/areas.geojson")).then((r) => { if (!r.ok) throw new Error(`foi/areas.geojson: HTTP ${r.status}`); return r.json() as Promise<GeoJSON.FeatureCollection>; }),
     // Ready-made public datasets (police.uk by force): optional, the section works without them.
     fetch(dataUrl("foi/police.json")).then((r) => (r.ok ? r.json() : null)).catch(() => null),
+    // NHS estates returns (ERIC) by trust, ten years.
+    fetch(dataUrl("foi/eric.json")).then((r) => (r.ok ? r.json() : null)).catch(() => null),
   ]);
-  const builtins = normaliseDatasets(Array.isArray(police?.datasets) ? police.datasets : []).map((d) => ({ ...d, summary: summarise(ref, d) }));
+  const ready = [police, eric].flatMap((f) => (Array.isArray(f?.datasets) ? f.datasets : []));
+  const builtins = normaliseDatasets(ready).map((d) => ({ ...d, summary: summarise(ref, d) }));
   return { backend: backend && withBuiltins(backend, builtins), ref, shapes };
 }
 

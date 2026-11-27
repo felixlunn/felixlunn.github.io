@@ -36,6 +36,7 @@ from .sources import ev as ev_src
 from .sources import fire as fire_src
 from .sources import floods as floods_src
 from .sources import foi_geo as foi_src
+from .sources import foi_eric as foi_eric_src
 from .sources import foi_police as foi_police_src
 from .sources import fuel_poverty as fuel_src
 from .sources import green_space as green_space_src
@@ -338,6 +339,8 @@ SOURCES: list[Source] = [
     Source("neighbourhoods", "Neighbourhood (LSOA) census profiles", "https://geoportal.statistics.gov.uk/", stage="post"),
     Source("debates", "Upcoming Commons debates (UK Parliament What's On)", debates_src.SOURCE_URL, stage="post", every=DAILY),
     Source("foi_police", "FOI: police.uk crime by force", foi_police_src.SOURCE_URL, stage="post", module=foi_police_src.__name__),
+    Source("foi_eric", "FOI: NHS estates returns (ERIC) by trust", foi_eric_src.SOURCE_URL, stage="post", module=foi_eric_src.__name__,
+           every=ANNUAL),  # overdue once a new year's returns are out and not yet added to the file
     Source("foi", "FOI reference: police force areas, courts and tribunals, NHS trusts and areas", foi_src.SOURCE_URL, stage="post"),
 ]
 

@@ -248,6 +248,18 @@ figures in the others.
 - Count columns on force or NHS-area datasets can be shown per 100,000 residents. Residents are estimated from the
   seats each area covers.
 
+**Ready-made datasets.** Some public data appears in the FOI section without anyone uploading it, tagged with its
+source. These datasets can't be edited or deleted, and they are rebuilt with each refresh:
+- **police.uk** (Policing): crime by force, from the seat figures.
+- **ERIC** (Health): NHS England's Estates Returns Information Collection, trust-level, 2016/17 to 2025/26.
+  - It covers car parking income, capital investment, fire safety, estates incidents, sites, energy and waste, income, and more.
+  - There is one dataset per theme on each layer (Trusts, Mental health, Ambulance), with every year in each.
+  - Merged trusts' figures are added to the trust that took them over.
+  - digital.nhs.uk blocks automated downloads, so the returns are kept in `datadash/sources/eric/eric_trusts.csv.gz`
+    (one row per trust per year).
+  - To add a year, append that year's trust-level CSV rows to it, with the column names used there.
+  - The source status turns "overdue" about a year after the latest year was added, as a reminder.
+
 ## Method notes
 
 - **Standardisation**: "Where it stands out" and peer groups work on z-scores (seat value minus the mean
