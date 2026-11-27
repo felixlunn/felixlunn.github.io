@@ -281,19 +281,24 @@ describe("a key the user sets", () => {
 });
 
 describe("ready-made datasets alongside uploads", () => {
-  it("lists and opens them in their department, but never changes or deletes them", async () => {
+  it("lists and opens them in their department; admins can remove them for the team, but never change them", async () => {
     const { withBuiltins } = await import("./backend");
     const up = { id: "u1", department: "policing", rows: [], unmatched: [], summary: null } as never;
+    const hidden = new Set<string>();
     const store = { kind: "demo", list: async () => [up], get: async () => up, all: async () => [up],
-      update: async () => up, remove: async () => undefined } as never;
+      update: async () => up, remove: async () => undefined,
+      hiddenBuiltins: async () => new Set(hidden), hideBuiltins: async (ids: string[]) => { ids.forEach((i) => hidden.add(i)); } } as never;
     const police = { id: "police-uk-crime", builtin: "police.uk", department: "policing", rows: [{ code: "E1", source_name: "", values: {} }], unmatched: [], summary: null } as never;
     const b = withBuiltins(store, [police]);
     expect((await b.list("policing")).map((d) => d.id)).toEqual(["u1", "police-uk-crime"]);
     expect(await b.list("health")).toEqual([up]);
     expect((await b.get("police-uk-crime")).rows).toHaveLength(1);
     expect((await b.all("policing")).map((d) => d.id)).toEqual(["u1", "police-uk-crime"]);
-    await expect(b.remove(police)).rejects.toThrow("can't be deleted");
     await expect(b.update("police-uk-crime", {})).rejects.toThrow("can't be changed");
+    await b.remove(police); // removed for the team, not deleted
+    expect(hidden.has("police-uk-crime")).toBe(true);
+    expect((await b.list("policing")).map((d) => d.id)).toEqual(["u1"]);
+    expect((await b.all("policing")).map((d) => d.id)).toEqual(["u1"]);
   });
 });
 

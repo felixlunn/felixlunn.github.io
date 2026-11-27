@@ -30,6 +30,10 @@ export interface Backend {
   create(d: NewDataset, file: File | null): Promise<Dataset>;
   update(id: string, patch: Partial<NewDataset>): Promise<Dataset>;
   remove(d: Dataset): Promise<void>;
+  /** Ready-made datasets (police.uk, ERIC) an admin has removed for the team. */
+  hiddenBuiltins(): Promise<Set<string>>;
+  /** Remove ready-made datasets for the team (admins). */
+  hideBuiltins(ids: string[]): Promise<void>;
   /** A short-lived link to the original uploaded file. */
   fileUrl(path: string): Promise<string>;
 }
@@ -59,15 +63,19 @@ export async function getBackend(): Promise<Backend | null> {
  */
 export function withBuiltins(b: Backend, builtins: Dataset[]): Backend {
   if (!builtins.length) return b;
-  const forDept = (dept: Department) => builtins.filter((d) => d.department === dept);
+  // Leaves out those an admin has removed for the team.
+  const forDept = async (dept: Department) => {
+    const hidden = await b.hiddenBuiltins();
+    return builtins.filter((d) => d.department === dept && !hidden.has(d.id));
+  };
   const isBuiltin = (id: string) => builtins.some((d) => d.id === id);
   return {
     ...b,
-    async list(dept) { return [...(await b.list(dept)), ...forDept(dept).map(withoutRows)]; },
+    async list(dept) { const [own, ready] = await Promise.all([b.list(dept), forDept(dept)]); return [...own, ...ready.map(withoutRows)]; },
     async get(id) { return builtins.find((d) => d.id === id) ?? b.get(id); },
-    async all(dept) { return [...(await b.all(dept)), ...forDept(dept)]; },
+    async all(dept) { const [own, ready] = await Promise.all([b.all(dept), forDept(dept)]); return [...own, ...ready]; },
     async update(id, patch) { if (isBuiltin(id)) throw new Error("Ready-made datasets can't be changed."); return b.update(id, patch); },
-    async remove(d) { if (isBuiltin(d.id)) throw new Error("Ready-made datasets can't be deleted."); return b.remove(d); },
+    async remove(d) { return isBuiltin(d.id) ? b.hideBuiltins([d.id]) : b.remove(d); },
   };
 }
 
@@ -182,6 +190,20 @@ async function supabaseBackend(url: string, key: string): Promise<Backend> {
       fail((await sb.from("foi_datasets").delete().eq("id", d.id)).error);
       if (d.file_path) await sb.storage.from("foi-files").remove([d.file_path]);
     },
+    async hiddenBuiltins() {
+      const { data, error } = await sb.from("foi_hidden_builtins").select("id");
+      // Before supabase/schema.sql adds the table, nothing has been removed.
+      if (error) { console.warn("Removed ready-made datasets:", error.message); return new Set<string>(); }
+      return new Set((data ?? []).map((r: { id: string }) => r.id));
+    },
+    async hideBuiltins(ids) {
+      const { error } = await sb.from("foi_hidden_builtins").upsert(ids.map((id) => ({ id })), { onConflict: "id", ignoreDuplicates: true });
+      if (error && /foi_hidden_builtins|PGRST205|42P01/.test(`${error.code} ${error.message}`)) {
+        throw new Error("Removing ready-made datasets needs a database update first: run supabase/schema.sql again in Supabase (see the README).");
+      }
+      if (error && /row-level security|42501/.test(`${error.code} ${error.message}`)) throw new Error("Only admins can remove ready-made datasets.");
+      fail(error);
+    },
     async fileUrl(path) {
       const { data, error } = await sb.storage.from("foi-files").createSignedUrl(path, 300);
       fail(error);
@@ -192,7 +214,8 @@ async function supabaseBackend(url: string, key: string): Promise<Backend> {
 
 /** Development only: datasets kept in this browser's localStorage; any email and password signs in. */
 function demoBackend(): Backend {
-  const KEY_DATA = "foi.demo.datasets", KEY_USER = "foi.demo.user";
+  const KEY_DATA = "foi.demo.datasets", KEY_USER = "foi.demo.user", KEY_HIDDEN = "foi.demo.hidden";
+  const hidden = (): string[] => { try { return JSON.parse(localStorage.getItem(KEY_HIDDEN) || "[]"); } catch { return []; } };
   const read = (): Dataset[] => { try { return JSON.parse(localStorage.getItem(KEY_DATA) || "[]"); } catch { return []; } };
   const write = (ds: Dataset[]) => { try { localStorage.setItem(KEY_DATA, JSON.stringify(ds)); } catch { /* storage full or blocked */ } };
   const listeners = new Set<(u: User | null) => void>();
@@ -234,6 +257,8 @@ function demoBackend(): Backend {
       return all[i];
     },
     async remove(d) { write(read().filter((x) => x.id !== d.id)); },
+    async hiddenBuiltins() { return new Set(hidden()); },
+    async hideBuiltins(ids) { try { localStorage.setItem(KEY_HIDDEN, JSON.stringify([...new Set([...hidden(), ...ids])])); } catch { /* ignore */ } },
     async fileUrl() { throw new Error("Original files aren't kept in demo mode."); },
   };
 }

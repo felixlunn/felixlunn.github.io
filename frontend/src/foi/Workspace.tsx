@@ -165,7 +165,8 @@ export function Workspace({ backend, user, admin, ref_, shapes }: { backend: Bac
         ) : active ? (
           <DatasetView key={active.id} d={active} ref_={ref_} shapes={shapes} seat={seat || null} backend={backend} onPickSeat={setSeat}
             scope={scope} setScope={setScope}
-            canEdit={!active.builtin && (admin || active.created_by === user.id)} onDeleted={reload} />
+            canEdit={!active.builtin && (admin || active.created_by === user.id)} onDeleted={reload}
+            removable={admin && active.builtin ? (datasets ?? []).filter((x) => x.builtin === active.builtin).map((x) => x.id) : undefined} />
         ) : (
           <div className="foi-main foi-empty">
             <FoiMap shapes={null} items={[]} reverse={false} selected={null} highlight={new Set()} onSelect={() => {}} />

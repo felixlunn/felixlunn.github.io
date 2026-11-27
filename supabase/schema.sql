@@ -8,6 +8,7 @@
 --     (Turn off public sign-ups too, so nobody can create a login themselves.)
 --   * Every member can see every dataset. Only the person who uploaded a dataset, or an admin, can change or delete it.
 --   * Original uploaded files go in a private storage bucket readable only by members.
+--   * Ready-made datasets (police.uk, ERIC) can be removed for the whole team by an admin, and restored.
 
 create extension if not exists pgcrypto;
 
@@ -82,7 +83,16 @@ end $$;
 drop trigger if exists foi_datasets_touch on public.foi_datasets;
 create trigger foi_datasets_touch before update on public.foi_datasets for each row execute function public.foi_touch();
 
+-- Ready-made datasets (police.uk, ERIC: built with the site's data, not uploaded) that an admin has removed for the
+-- team. Deleting a row restores that dataset.
+create table if not exists public.foi_hidden_builtins (
+  id text primary key,
+  hidden_by uuid default auth.uid() references auth.users (id) on delete set null,
+  hidden_at timestamptz not null default now()
+);
+
 alter table public.foi_members enable row level security;
+alter table public.foi_hidden_builtins enable row level security;
 alter table public.foi_datasets enable row level security;
 
 drop policy if exists "members see the team" on public.foi_members;
@@ -104,12 +114,18 @@ drop policy if exists "owners and admins delete datasets" on public.foi_datasets
 create policy "owners and admins delete datasets" on public.foi_datasets for delete to authenticated
   using (public.is_foi_member() and (created_by = auth.uid() or public.is_foi_admin()));
 
+drop policy if exists "members see removed ready-made datasets" on public.foi_hidden_builtins;
+create policy "members see removed ready-made datasets" on public.foi_hidden_builtins for select to authenticated using (public.is_foi_member());
+drop policy if exists "admins remove and restore ready-made datasets" on public.foi_hidden_builtins;
+create policy "admins remove and restore ready-made datasets" on public.foi_hidden_builtins for all to authenticated
+  using (public.is_foi_admin()) with check (public.is_foi_admin());
+
 -- Signed-in users can reach the tables (newer projects don't grant this automatically); the row-level
 -- security policies above then decide what each person may see or change. Nobody signed out can touch anything.
 grant usage on schema public to authenticated;
-grant select, insert, update, delete on public.foi_members, public.foi_datasets to authenticated;
+grant select, insert, update, delete on public.foi_members, public.foi_datasets, public.foi_hidden_builtins to authenticated;
 grant execute on function public.is_foi_member(), public.is_foi_admin() to authenticated;
-revoke all on public.foi_members, public.foi_datasets from anon;
+revoke all on public.foi_members, public.foi_datasets, public.foi_hidden_builtins from anon;
 
 -- Private bucket for the original files (CSV / Excel) as received.
 insert into storage.buckets (id, name, public, file_size_limit)
