@@ -233,6 +233,27 @@ describe("by organisation", () => {
   });
 });
 
+describe("constituency view", () => {
+  it("scores each seat by the figures for the forces serving it", async () => {
+    const { headline, seatScores, servingBySeat } = await import("./orgs");
+    const area = (code: string, seats: [string, number][]) => ({ code, name: code, aliases: [], population: 1, seats });
+    const ref = {
+      version: 1, as_of: "", seats: [{ code: "S1", name: "One", mp: null, party: null }, { code: "S2", name: "Two", mp: null, party: null }],
+      layers: { police: { label: "", areas: [area("F1", [["S1", 1]]), area("F2", [["S1", 0.2], ["S2", 1]]), area("F3", [])] }, health: { label: "", areas: [] } },
+      points: {},
+    } as never;
+    const d = { department: "policing", geography: "police_force", foi_reference: null, authority: null, period: null, requested_on: null, received_on: null,
+      notes: null, unmatched: [], file_path: null, created_by: null, created_by_email: "", created_at: "", updated_at: "", id: "x", title: "Waits",
+      columns: [{ key: "n", label: "Days", unit: "count", direction: "higher_worse" }],
+      rows: [{ code: "F1", source_name: "", values: { n: 30 } }, { code: "F2", source_name: "", values: { n: 5 } }, { code: "F3", source_name: "", values: { n: 10 } }] } as never;
+    const h = headline(ref, d)!;
+    expect(servingBySeat(ref, h).get("S1")!.sort()).toEqual(["F1", "F2"]);
+    const sc = seatScores(ref, [h]);
+    expect(sc.get("S1")).toEqual({ worse: 1, of: 2 }); // F1 (30 days) is above the median (10); F2 isn't
+    expect(sc.get("S2")).toEqual({ worse: 0, of: 1 });
+  });
+});
+
 describe("listing datasets without their rows", () => {
   it("drops rows but keeps (or works out) the summary", async () => {
     const { withoutRows } = await import("./backend");

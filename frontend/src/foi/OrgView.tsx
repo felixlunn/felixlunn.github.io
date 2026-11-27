@@ -145,14 +145,15 @@ function Spark({ h, code }: { h: Headline; code: string }) {
   );
 }
 
-function Card({ h, code, name, via, onOpen }: { h: Headline; code: string; name: string; via?: string; onOpen: () => void }) {
+/** One dataset's figure for one organisation, with a line to copy (about the seat, when given). */
+export function Card({ h, code, name, via, seat, onOpen }: { h: Headline; code: string; name: string; via?: string; seat?: string; onOpen: () => void }) {
   const [copied, setCopied] = useState(false);
   const r = h.byCode.get(code);
   const v = r?.value ?? null;
   const w = worseHalf(h, v);
   const o = r ? outlier(v, h.stats) : null;
   const measure = h.view?.series || h.d.title;
-  const line = campaignLine({ server: displayName(h.d.geography, name), measure: h.col.change ? measure : h.col.period ? `${measure} in ${h.col.period}` : h.col.label,
+  const line = campaignLine({ seat, server: displayName(h.d.geography, name), measure: h.col.change ? measure : h.col.period ? `${measure} in ${h.col.period}` : h.col.label,
     col: h.col, value: v, suppressed: r?.suppressed, values: h.values, median: h.stats.median, plural: GEO[h.d.geography].plural });
   return (
     <article className={`foi-card ${w ? "worse" : ""}`}>

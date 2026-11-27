@@ -157,7 +157,8 @@
 .foi-views { display: grid; gap: 8px; margin-bottom: 8px; }
 .foi-measure { display: flex; gap: 8px; align-items: center; }
 .foi-measure select { flex: 1; padding: 6px 8px; border: 1px solid var(--border); border-radius: 7px; background: var(--surface-1); color: inherit; font: inherit; }
-.seg { display: grid; grid-template-columns: 1fr 1fr 1fr; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+.seg { display: grid; grid-template-columns: 1fr 1fr 1fr; border: 1px solid var(--border); border-radius: 10px; overflow: hidden;
+  gap: 0; align-items: stretch; flex-wrap: nowrap; } /* undo the dashboard's .seg (gap, centred), which left gaps round the highlight */
 .seg > button, .seg > label { display: grid; gap: 1px; text-align: left; padding: 8px 10px; background: var(--surface-1); border: 0; border-right: 1px solid var(--border);
   cursor: pointer; font: inherit; color: inherit; min-width: 0; }
 .seg > :last-child { border-right: 0; }
@@ -234,12 +235,15 @@
 .foi-selected { margin-top: 4px; }
 
 /* By organisation */
-.foi-mode { grid-template-columns: 1fr 1fr; margin: 10px 0 8px; }
-.foi-mode > button { text-align: center; padding: 7px 6px; }
+.foi-mode { grid-template-columns: repeat(3, minmax(0, 1fr)); margin: 10px 0 8px; }
+.foi-mode > button { display: flex; align-items: center; justify-content: center; text-align: center; padding: 7px 4px; line-height: 1.2; }
+@media (max-width: 600px) { .foi-mode > button { border-bottom: 0; border-right: 1px solid var(--border); } .foi-mode > button:last-child { border-right: 0; } }
 .foi-mode strong { font-size: 12.5px; }
 /* One equal column per kind (two on Health, more elsewhere): ".seg.mini" alone would leave an empty third column. */
-.seg.mini.foi-kind { grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: 1fr; margin-bottom: 8px; }
-.foi-kind > button { text-align: center; }
+.seg.mini.foi-kind { grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); margin-bottom: 8px; }
+.seg.mini.foi-kind > button { display: flex; align-items: center; justify-content: center; text-align: center; font-weight: 700;
+  padding: 6px 3px; font-size: 11.5px; line-height: 1.2; overflow-wrap: anywhere; hyphens: auto; }
+@media (max-width: 600px) { .seg.mini.foi-kind > button { border-bottom: 0; border-right: 1px solid var(--border); } .seg.mini.foi-kind > button:last-child { border-right: 0; } }
 .foi-orgside-tools { display: flex; gap: 6px; margin-bottom: 6px; }
 .foi-orgside-tools input { flex: 1; min-width: 0; padding: 6px 9px; border: 1px solid var(--border); border-radius: 7px; background: var(--surface-2); color: inherit; font: inherit; font-size: 13px; }
 .foi-orglist { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; max-height: calc(100vh - 380px); overflow-y: auto; }
@@ -289,3 +293,7 @@
 
 /* Ready-made public datasets (police.uk) in the dataset list */
 .foi-list-title .tag.builtin { margin-left: 6px; font-weight: 500; background: var(--surface-3); color: var(--text-2); }
+/* Constituency view: each organisation serving the seat, then its cards. */
+.foi-seat-org { margin: 0 0 14px; }
+.foi-seat-org > .small { margin-bottom: 6px; }
+.foi-dh h2 .tag { vertical-align: middle; margin-left: 6px; }
