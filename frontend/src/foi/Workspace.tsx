@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { usePersistentState } from "../lib/usePersistentState";
 import { type LdScope } from "./analysis";
 import OrgView, { OrgSidebar } from "./OrgView";
-import ConstituencyView, { ConstituencySidebar } from "./ConstituencyView";
+import ConstituencyView, { ConstituencySidebar, type SeatFilter } from "./ConstituencyView";
 import { headline, headlineText, type Headline } from "./orgs";
 import type { Backend, User } from "./backend";
 import FoiMap from "./FoiMap";
@@ -30,8 +30,8 @@ export function Workspace({ backend, user, admin, ref_, shapes }: { backend: Bac
   const [scope, setScope] = usePersistentState<LdScope>("foi.ldScope", "held", ["held", "target", "both"]);
   const [orgKind, setOrgKind] = useState<Geography>(DEPARTMENT[dept].geographies[0]);
   const [orgCode, setOrgCode] = useState<string | null>(null);
-  const [seatLd, setSeatLd] = usePersistentState("foi.seatLdOnly", "off", ["on", "off"] as const);
-  const seatLdOnly = seatLd === "on", setSeatLdOnly = (v: boolean) => setSeatLd(v ? "on" : "off");
+  // Constituency view: every seat, or only those with a Lib Dem MP.
+  const [seatFilter, setSeatFilter] = usePersistentState<SeatFilter>("foi.seatFilter", "all", ["all", "held"]);
   useEffect(() => { setOrgKind(DEPARTMENT[dept].geographies[0]); setOrgCode(null); }, [dept]);
   const heads = useMemo(() => (allLoaded ? (datasets ?? []) : []).map((d) => loaded.get(d.id)).filter((d): d is Dataset => !!d)
     .map((d) => headline(ref_, d)).filter((h): h is Headline => h !== null), [allLoaded, datasets, loaded, ref_]);
@@ -117,7 +117,7 @@ export function Workspace({ backend, user, admin, ref_, shapes }: { backend: Bac
             {mode !== "datasets" && !areaReady ? <p className="small muted">Loading every dataset…</p> : mode === "orgs" ? (
               <OrgSidebar ref_={ref_} heads={heads} dept={dept} scope={scope} kind={orgKind} setKind={setOrgKind} code={orgCode} setCode={setOrgCode} />
             ) : mode === "seats" ? (
-              <ConstituencySidebar ref_={ref_} heads={heads} scope={scope} setScope={setScope} ldOnly={seatLdOnly} setLdOnly={setSeatLdOnly} seat={seat} setSeat={setSeat} />
+              <ConstituencySidebar ref_={ref_} heads={heads} filter={seatFilter} setFilter={setSeatFilter} seat={seat} setSeat={setSeat} />
             ) : datasets === null ? <p className="small muted">Loading…</p> : !datasets.length ? (
               <p className="small muted">None yet. Upload the first FOI response for {info.label.toLowerCase()}.</p>
             ) : (
@@ -141,7 +141,7 @@ export function Workspace({ backend, user, admin, ref_, shapes }: { backend: Bac
             <p className="foi-loading small">{mode === "datasets" ? `Loading ${activeInfo!.title}…` : `Loading every dataset for ${mode === "orgs" ? "Area" : "Constituency"} view…`}</p>
           </div>
         ) : mode === "seats" ? (
-          <ConstituencyView ref_={ref_} heads={heads} dept={dept} scope={scope} ldOnly={seatLdOnly} seat={seat} setSeat={setSeat}
+          <ConstituencyView ref_={ref_} heads={heads} dept={dept} filter={seatFilter} seat={seat} setSeat={setSeat}
             onOpenDataset={(id) => { setActiveId(id); setMode("datasets"); }} />
         ) : mode === "orgs" ? (
           <OrgView ref_={ref_} shapes={shapes} heads={heads} scope={scope} kind={orgKind} code={orgCode} setCode={setOrgCode}

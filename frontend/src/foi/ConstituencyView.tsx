@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { dataUrl } from "../lib/dataUrl";
-import { forSeat, inScope, ldOf, type LdScope } from "./analysis";
+import { forSeat, ldOf } from "./analysis";
 import FoiMap, { type MapItem } from "./FoiMap";
 import { targets } from "./match";
 import { Card } from "./OrgView";
@@ -17,7 +17,9 @@ import type { Department, Reference } from "./types";
 
 type Seat = Reference["seats"][number];
 
-const WHO: Record<LdScope, string> = { held: "Lib Dem seats", target: "Lib Dem targets", both: "Lib Dem seats and targets" };
+/** Which seats to show: all of them, or only those with a Lib Dem MP. */
+export type SeatFilter = "all" | "held";
+const held = (s: Seat) => ldOf(s) === "held";
 
 function ratio(s: Score | undefined): number {
   return s?.of ? s.worse / s.of : -1;
@@ -31,31 +33,28 @@ function bySeatScore(sc: Map<string, Score>) {
 }
 
 function LdTag({ s }: { s: Seat }) {
-  const st = ldOf(s);
-  return st === "held" ? <span className="tag ld">LD</span> : st === "target" ? <span className="tag tgt">target</span> : null;
+  return held(s) ? <span className="tag ld">LD</span> : null;
 }
 
 /** Sidebar in Constituency view: which Lib Dem seats, a search, and the seats, worst first. */
-export function ConstituencySidebar({ ref_, heads, scope, setScope, ldOnly, setLdOnly, seat, setSeat }: {
-  ref_: Reference; heads: Headline[]; scope: LdScope; setScope: (s: LdScope) => void; ldOnly: boolean; setLdOnly: (v: boolean) => void;
+export function ConstituencySidebar({ ref_, heads, filter, setFilter, seat, setSeat }: {
+  ref_: Reference; heads: Headline[]; filter: SeatFilter; setFilter: (f: SeatFilter) => void;
   seat: string; setSeat: (s: string) => void;
 }) {
   const [q, setQ] = useState("");
   const sc = useMemo(() => seatScores(ref_, heads), [ref_, heads]);
-  const counts = useMemo(() => ({ held: ref_.seats.filter((s) => ldOf(s) === "held").length, target: ref_.seats.filter((s) => ldOf(s) === "target").length }), [ref_]);
+  const nHeld = useMemo(() => ref_.seats.filter(held).length, [ref_]);
   const shown = useMemo(() => ref_.seats
-    .filter((s) => (!ldOnly || inScope(s, scope)) && (!q || s.name.toLowerCase().includes(q.toLowerCase()) || (s.mp ?? "").toLowerCase().includes(q.toLowerCase())))
-    .sort(bySeatScore(sc)), [ref_, sc, ldOnly, scope, q]);
+    .filter((s) => (filter === "all" || held(s)) && (!q || s.name.toLowerCase().includes(q.toLowerCase()) || (s.mp ?? "").toLowerCase().includes(q.toLowerCase())))
+    .sort(bySeatScore(sc)), [ref_, sc, filter, q]);
   return (
     <div className="foi-orgside">
-      <div className="seg mini foi-kind" role="tablist" aria-label="Which Lib Dem seats">
-        <button className={scope === "held" ? "on" : ""} onClick={() => setScope("held")}>Held ({counts.held})</button>
-        {counts.target > 0 && <button className={scope === "target" ? "on" : ""} onClick={() => setScope("target")}>Targets ({counts.target})</button>}
-        {counts.target > 0 && <button className={scope === "both" ? "on" : ""} onClick={() => setScope("both")}>Both</button>}
+      <div className="seg mini foi-kind" role="tablist" aria-label="Which seats">
+        <button role="tab" aria-selected={filter === "all"} className={filter === "all" ? "on" : ""} onClick={() => setFilter("all")}>All ({ref_.seats.length})</button>
+        <button role="tab" aria-selected={filter === "held"} className={filter === "held" ? "on" : ""} onClick={() => setFilter("held")}>LD held ({nHeld})</button>
       </div>
       <div className="foi-orgside-tools">
         <input type="search" placeholder="Find a constituency or MP" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Find a constituency" />
-        <button className={`chip ld ${ldOnly ? "on" : ""}`} aria-pressed={ldOnly} onClick={() => setLdOnly(!ldOnly)} title={`Only ${WHO[scope]}`}>LD</button>
       </div>
       {!heads.length && <p className="small muted">No datasets here yet.</p>}
       <ul className="foi-orglist">
@@ -64,7 +63,7 @@ export function ConstituencySidebar({ ref_, heads, scope, setScope, ldOnly, setL
           return (
             <li key={s.code}>
               <button className={s.code === seat ? "on" : ""} onClick={() => setSeat(s.code)}>
-                <span className="foi-orgname">{s.name}{inScope(s, scope) && <LdTag s={s} />}</span>
+                <span className="foi-orgname">{s.name}<LdTag s={s} /></span>
                 {x?.of ? <span className="foi-orgscore" title={`${x.worse} of ${x.of} figures for the organisations serving it are in the worse half`}>
                   <span className="bar"><span style={{ width: `${(x.worse / x.of) * 100}%` }} /></span>{x.worse}/{x.of}
                 </span> : <span className="tiny muted">–</span>}
@@ -86,8 +85,8 @@ function loadBoundaries() {
 }
 
 /** Map and seat profile in Constituency view. */
-export default function ConstituencyView({ ref_, heads, dept, scope, ldOnly, seat, setSeat, onOpenDataset }: {
-  ref_: Reference; heads: Headline[]; dept: Department; scope: LdScope; ldOnly: boolean; seat: string; setSeat: (s: string) => void;
+export default function ConstituencyView({ ref_, heads, dept, filter, seat, setSeat, onOpenDataset }: {
+  ref_: Reference; heads: Headline[]; dept: Department; filter: SeatFilter; seat: string; setSeat: (s: string) => void;
   onOpenDataset: (id: string) => void;
 }) {
   const [shapes, setShapes] = useState<GeoJSON.FeatureCollection | null>(null);
@@ -99,8 +98,8 @@ export default function ConstituencyView({ ref_, heads, dept, scope, ldOnly, sea
     return { code: s.code, name: s.name, sub: [s.mp, s.party].filter(Boolean).join(", "), lat: s.lat, lon: s.lon,
       value: x?.of ? (x.worse / x.of) * 100 : null, label: x?.of ? `${x.worse} of ${x.of} figures in the worse half` : "No comparable figures" };
   }), [ref_, sc]);
-  const highlight = useMemo(() => new Set(ref_.seats.filter((s) => inScope(s, scope)).map((s) => s.code)), [ref_, scope]);
-  const dimmed = useMemo(() => (ldOnly ? new Set(ref_.seats.filter((s) => !inScope(s, scope)).map((s) => s.code)) : undefined), [ref_, scope, ldOnly]);
+  const highlight = useMemo(() => new Set(ref_.seats.filter(held).map((s) => s.code)), [ref_]);
+  const dimmed = useMemo(() => (filter === "held" ? new Set(ref_.seats.filter((s) => !held(s)).map((s) => s.code)) : undefined), [ref_, filter]);
   const chosen = ref_.seats.find((s) => s.code === seat);
   return (
     <div className="foi-main">
@@ -111,26 +110,26 @@ export default function ConstituencyView({ ref_, heads, dept, scope, ldOnly, sea
       <section className="foi-detail">
         {chosen
           ? <SeatProfile ref_={ref_} heads={heads} dept={dept} s={chosen} score={sc.get(chosen.code)} onOpenDataset={onOpenDataset} />
-          : <SeatOverview ref_={ref_} heads={heads} scope={scope} ldOnly={ldOnly} sc={sc} setSeat={setSeat} />}
+          : <SeatOverview ref_={ref_} heads={heads} filter={filter} sc={sc} setSeat={setSeat} />}
       </section>
     </div>
   );
 }
 
-function SeatOverview({ ref_, heads, scope, ldOnly, sc, setSeat }: {
-  ref_: Reference; heads: Headline[]; scope: LdScope; ldOnly: boolean; sc: Map<string, Score>; setSeat: (s: string) => void;
+function SeatOverview({ ref_, heads, filter, sc, setSeat }: {
+  ref_: Reference; heads: Headline[]; filter: SeatFilter; sc: Map<string, Score>; setSeat: (s: string) => void;
 }) {
-  const worst = ref_.seats.filter((s) => (sc.get(s.code)?.of ?? 0) > 0 && (!ldOnly || inScope(s, scope))).sort(bySeatScore(sc)).slice(0, 12);
+  const worst = ref_.seats.filter((s) => (sc.get(s.code)?.of ?? 0) > 0 && (filter === "all" || held(s))).sort(bySeatScore(sc)).slice(0, 12);
   return (
     <>
       <h2>Constituencies: across all datasets</h2>
       <p className="small muted">
         {heads.length} {heads.length === 1 ? "dataset" : "datasets"}. Choose a seat on the map or in the list to see every figure for the
-        organisations that serve it. {WHO[scope]} are outlined.
+        organisations that serve it. Seats with a Lib Dem MP are outlined.
       </p>
       {worst.length > 0 && (
         <>
-          <h3 className="foi-h">Most often served by the worse half{ldOnly ? `: ${WHO[scope]}` : ""}</h3>
+          <h3 className="foi-h">Most often served by the worse half{filter === "held" ? ": Lib Dem seats" : ""}</h3>
           <ol className="foi-worst">
             {worst.map((s) => (
               <li key={s.code}>
