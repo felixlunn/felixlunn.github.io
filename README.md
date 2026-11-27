@@ -259,6 +259,11 @@ source. These datasets can't be edited or deleted, and they are rebuilt with eac
     (one row per trust per year).
   - To add a year, append that year's trust-level CSV rows to it, with the column names used there.
   - The source status turns "overdue" about a year after the latest year was added, as a reminder.
+- **Removing them:** admins can remove a ready-made dataset for the whole team from its ⋯ menu ("Remove this dataset",
+  or "Remove all … datasets" for every one from that source on the tab). This needs `supabase/schema.sql` to have
+  been run since this was added, which creates the `foi_hidden_builtins` table. To bring datasets back, run in the
+  Supabase SQL Editor `delete from foi_hidden_builtins;` (all of them), or for some only, e.g.
+  `delete from foi_hidden_builtins where id like 'eric-parking%';`.
 
 ## Method notes
 

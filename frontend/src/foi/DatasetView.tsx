@@ -16,8 +16,10 @@ import { useMapFilter } from "./useMapFilter";
 import { bands, loadKeys, saveKeys } from "./key";
 /** Dataset view: one FOI response on the map, with its Lib Dem seats, ranking and details. */
 
-export function DatasetView({ d: saved, ref_, shapes, seat, backend, canEdit, onDeleted, onPickSeat, scope, setScope }: {
+export function DatasetView({ d: saved, ref_, shapes, seat, backend, canEdit, removable, onDeleted, onPickSeat, scope, setScope }: {
   d: Dataset; ref_: Reference; shapes: GeoJSON.FeatureCollection; seat: string | null; backend: Backend; canEdit: boolean; onDeleted: () => void;
+  /** Ready-made datasets an admin may remove: the ids of all this tab's datasets from the same source. */
+  removable?: string[];
   onPickSeat: (code: string) => void;
   scope: LdScope;
   setScope: (s: LdScope) => void;
@@ -120,6 +122,11 @@ export function DatasetView({ d: saved, ref_, shapes, seat, backend, canEdit, on
     if (!confirm(`Delete “${d.title}” for everyone on the team? This can't be undone.`)) return;
     try { await backend.remove(d); onDeleted(); } catch (e) { alert((e as Error).message); }
   };
+  const removeReady = async (ids: string[]) => {
+    const what = ids.length === 1 ? `“${d.title}”` : `all ${ids.length} ${d.builtin} datasets on this tab`;
+    if (!confirm(`Remove ${what} for everyone on the team? They can be brought back (see the README).`)) return;
+    try { await backend.hideBuiltins(ids); onDeleted(); } catch (e) { alert((e as Error).message); }
+  };
 
   const shown = rows.filter((r) => pass(r) && (!filter || r.target.name.toLowerCase().includes(filter.toLowerCase())));
   const dimmed = useMemo(() => (activeFilter ? new Set(items.map((i) => i.code).filter((c) => !visible.has(c))) : undefined), [activeFilter, items, visible]);
@@ -143,6 +150,8 @@ export function DatasetView({ d: saved, ref_, shapes, seat, backend, canEdit, on
               <button onClick={exportCsv}>Download the data (CSV)</button>
               {d.file_path && <button onClick={openFile}>Open the original file</button>}
               {canEdit && <button className="bad" onClick={remove}>Delete this dataset</button>}
+              {removable && <button className="bad" onClick={() => removeReady([d.id])}>Remove this dataset</button>}
+              {removable && removable.length > 1 && <button className="bad" onClick={() => removeReady(removable)}>Remove all {removable.length} {d.builtin} datasets</button>}
             </div>
           </details>
         </header>
