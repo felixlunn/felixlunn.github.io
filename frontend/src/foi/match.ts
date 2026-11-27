@@ -1,5 +1,6 @@
 /** Matching the area or organisation names in an FOI response to known police forces, courts and NHS bodies. */
 
+import { areasOf, GEO, hospitalTrusts } from "./geographies";
 import type { Geography, Reference, Target } from "./types";
 
 const STOP: Record<Geography, RegExp> = {
@@ -7,6 +8,8 @@ const STOP: Record<Geography, RegExp> = {
   court: /\b(the|hmcts)\b/g,
   nhs_trust: /\b(the|nhs|foundation|trust|ft)\b/g,
   health_area: /\b(the|nhs|integrated care board|icb|university|local health board|health board|lhb|board)\b/g,
+  mh_trust: /\b(the|nhs|foundation|trust|ft)\b/g,
+  ambulance_trust: /\b(the|nhs|foundation|trust|ft|service|services|university)\b/g,
 };
 
 export function norm(s: string): string {
@@ -24,10 +27,9 @@ export function isTotal(name: string): boolean {
 }
 
 export function targets(ref: Reference, g: Geography): Target[] {
-  if (g === "police_force") return ref.layers.police.areas.map((a) => ({ code: a.code, name: a.name, keys: [a.code, ...a.aliases], population: a.population }));
-  if (g === "health_area") return ref.layers.health.areas.map((a) => ({ code: a.code, name: a.name, keys: [a.code, ...a.aliases], population: a.population }));
+  if (GEO[g].isArea) return areasOf(ref, g).map((a) => ({ code: a.code, name: a.name, keys: [a.code, ...a.aliases], population: a.population }));
   if (g === "court") return (ref.points.courts ?? []).map((c) => ({ code: c.id, name: c.name, keys: [c.id, c.name, ...c.codes], sub: c.types.join(", ") }));
-  return (ref.points.trusts ?? []).map((t) => ({ code: t.code, name: t.name, keys: [t.code, t.name, ...(t.aliases ?? [])], sub: t.kind }));
+  return hospitalTrusts(ref).map((t) => ({ code: t.code, name: t.name, keys: [t.code, t.name, ...(t.aliases ?? [])], sub: t.kind }));
 }
 
 export interface Match { code: string | null; how: "exact" | "close" | "none" | "total" }

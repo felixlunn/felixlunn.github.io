@@ -191,9 +191,14 @@ The site will be at `https://<owner>.github.io/<repo>/`. Generated data are not 
 
 `foi.html` (linked as **FOI research** in the dashboard header) is a login-only area for FOI research. The team
 uploads FOI responses (CSV or Excel). Each response is matched to police force areas, courts and tribunals, NHS trusts
-or NHS areas, then mapped and ranked. Choosing a seat shows the force, courts or trusts that serve it. It has three tabs:
-**Policing** (by force), **Justice** (by court, or by criminal justice area, which follows police force areas) and
-**Health** (by trust, or by ICB / Welsh health board).
+or NHS areas, then mapped and ranked. Choosing a seat shows the force or trusts that serve it. It has two tabs:
+**Policing** (by force) and **Health**, with four map layers: hospital **Trusts** (acute catchments), **ICBs** (and
+Welsh health boards), **Mental health trusts** and **Ambulance trusts**.
+
+- **Which trust is on which Health layer** comes from the team's list, `datadash/sources/foi_geo/trust_groups.json`
+  (edit it to move a trust; old names are matched to today's trusts). Mental health and ambulance trusts publish no
+  boundaries, so their areas are built from councils: ambulance services follow regions and counties; each council goes
+  to the mental health trust running the most sites there (NHS ODS), with corrections in the same file.
 
 - **Public reference data:** the boundaries and organisation lists it matches against are public. They include OHID's acute trust catchment areas (each neighbourhood is assigned to the trust most of its residents are admitted to). Courts have no published catchments, so each court in a response is drawn over the land nearest to it among the courts in that response, marked as approximate. The pipeline writes
   them to `data/foi/` (step `foi`).

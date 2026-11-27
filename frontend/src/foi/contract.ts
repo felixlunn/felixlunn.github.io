@@ -19,7 +19,8 @@ export function checkReference(r: unknown): Problems {
   field(p, o, "points", ["object"], "reference");
   field(p, o, "seats", ["array"], "reference");
   const layers = (o.layers ?? {}) as Record<string, { areas?: unknown }>;
-  for (const l of ["police", "health"]) {
+  for (const l of ["police", "health", "mental_health", "ambulance"]) {
+    if (l !== "police" && l !== "health" && layers[l] === undefined) continue;  // added Nov 2026: older files lack them
     field(p, layers, l, ["object"], "reference.layers");
     each(p, layers[l]?.areas, `layers.${l}.areas`, (a, at) => {
       for (const k of ["code", "name"]) field(p, a, k, ["string"], at);

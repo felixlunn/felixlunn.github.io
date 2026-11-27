@@ -33,7 +33,8 @@ $$;
 create table if not exists public.foi_datasets (
   id uuid primary key default gen_random_uuid(),
   department text not null check (department in ('policing', 'justice', 'health')),
-  geography text not null check (geography in ('police_force', 'court', 'nhs_trust', 'health_area')),
+  geography text not null constraint foi_datasets_geography_check
+    check (geography in ('police_force', 'court', 'nhs_trust', 'health_area', 'mh_trust', 'ambulance_trust')),
   title text not null check (length(title) between 1 and 200),
   foi_reference text check (length(foi_reference) <= 100),
   authority text check (length(authority) <= 200),
@@ -65,6 +66,10 @@ alter table public.foi_datasets add column if not exists summary jsonb;
 update public.foi_datasets
   set summary = jsonb_build_object('rows', jsonb_array_length(rows), 'unmatched', jsonb_array_length(unmatched), 'headline', null)
   where summary is null;
+-- Nov 2026: mental health and ambulance trusts as FOI Health geographies.
+alter table public.foi_datasets drop constraint if exists foi_datasets_geography_check;
+alter table public.foi_datasets add constraint foi_datasets_geography_check
+  check (geography in ('police_force', 'court', 'nhs_trust', 'health_area', 'mh_trust', 'ambulance_trust'));
 
 create or replace function public.foi_touch() returns trigger language plpgsql as $$
 begin

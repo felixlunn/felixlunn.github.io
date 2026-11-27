@@ -1,7 +1,9 @@
 /** FOI research section: shared types. */
 
 export type Department = "policing" | "health";
-export type Geography = "police_force" | "court" | "nhs_trust" | "health_area";
+export type Geography = "police_force" | "court" | "nhs_trust" | "health_area" | "mh_trust" | "ambulance_trust";
+/** Reference layers of areas (police force areas, NHS areas, mental health and ambulance trust areas). */
+export type AreaLayer = "police" | "health" | "mental_health" | "ambulance";
 export type Direction = "higher_worse" | "higher_better" | "neutral";
 
 export interface RefArea {
@@ -16,6 +18,8 @@ export interface RefArea {
 export interface RefCourt { id: string; name: string; types: string[]; lat: number; lon: number; codes: string[]; area: string | null; seat: string | null }
 export interface RefTrust {
   code: string; name: string; kind: string; postcode: string; lat: number; lon: number; area: string | null; seat: string | null;
+  /** The FOI Health map layers it's on ("hospital", "mental_health", "ambulance"); missing in older files (= hospital). */
+  groups?: string[];
   /** Names and codes of closed trusts it took over (mergers), so older FOI responses still match. */
   aliases?: string[];
   /** Acute trusts: seats in the trust's official catchment (OHID), with the share of each seat covered. */
@@ -25,7 +29,9 @@ export interface RefTrust {
 export interface Reference {
   version: number;
   as_of: string;
-  layers: { police: { label: string; areas: RefArea[] }; health: { label: string; areas: RefArea[] } };
+  /** mental_health and ambulance are missing from reference files built before Nov 2026. */
+  layers: { police: { label: string; areas: RefArea[] }; health: { label: string; areas: RefArea[] } }
+    & Partial<Record<"mental_health" | "ambulance", { label: string; areas: RefArea[] }>>;
   points: { courts?: RefCourt[]; trusts?: RefTrust[] };
   /** ld: "held" (Lib Dem seat) or "target" (Lib Dems second in 2024). */
   seats: { code: string; name: string; mp: string | null; party: string | null; lon?: number; lat?: number; ld?: "held" | "target" }[];
