@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { usePersistentState } from "../lib/usePersistentState";
 import { type LdScope } from "./analysis";
 import OrgView, { OrgSidebar } from "./OrgView";
+import ConstituencyView, { ConstituencySidebar } from "./ConstituencyView";
 import { headline, headlineText, type Headline } from "./orgs";
 import type { Backend, User } from "./backend";
 import FoiMap from "./FoiMap";
@@ -10,7 +11,7 @@ import { DEPARTMENT, DEPARTMENTS, GEO } from "./geographies";
 import { type Dataset, type DatasetInfo, type Department, type Geography, type NewDataset, type Reference } from "./types";
 import { SeatPicker } from "./SeatPicker";
 import { DatasetView } from "./DatasetView";
-/** The FOI workspace: departments, the two views (Dataset view / Area view), uploads and the seat picker. */
+/** The FOI workspace: departments, the three views (Dataset / Area / Constituency view), uploads and the seat picker. */
 
 export function Workspace({ backend, user, admin, ref_, shapes }: { backend: Backend; user: User; admin: boolean; ref_: Reference; shapes: GeoJSON.FeatureCollection }) {
   const [dept, setDept] = useState<Department>(() => (DEPARTMENTS.some((d) => d.id === location.hash.slice(1)) ? location.hash.slice(1) as Department : "policing"));
@@ -22,12 +23,15 @@ export function Workspace({ backend, user, admin, ref_, shapes }: { backend: Bac
   const [activeId, setActiveId] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [seat, setSeat] = usePersistentState<string>("foi.seat", "");
-  // Two ways in: one dataset at a time, or one organisation (trust / ICB / force / court) across every dataset.
-  const [mode, setMode] = usePersistentState("foi.mode", "datasets", ["datasets", "orgs"] as const);
-  // Which Lib Dem seats to focus on (held, targets or both): shared by both views and remembered.
+  // Three ways in: one dataset at a time, one organisation (trust / ICB / force / court) across every dataset, or one
+  // constituency across every dataset (through the organisations serving it).
+  const [mode, setMode] = usePersistentState("foi.mode", "datasets", ["datasets", "orgs", "seats"] as const);
+  // Which Lib Dem seats to focus on (held, targets or both): shared by all the views and remembered.
   const [scope, setScope] = usePersistentState<LdScope>("foi.ldScope", "held", ["held", "target", "both"]);
   const [orgKind, setOrgKind] = useState<Geography>(DEPARTMENT[dept].geographies[0]);
   const [orgCode, setOrgCode] = useState<string | null>(null);
+  const [seatLd, setSeatLd] = usePersistentState("foi.seatLdOnly", "off", ["on", "off"] as const);
+  const seatLdOnly = seatLd === "on", setSeatLdOnly = (v: boolean) => setSeatLd(v ? "on" : "off");
   useEffect(() => { setOrgKind(DEPARTMENT[dept].geographies[0]); setOrgCode(null); }, [dept]);
   const heads = useMemo(() => (allLoaded ? (datasets ?? []) : []).map((d) => loaded.get(d.id)).filter((d): d is Dataset => !!d)
     .map((d) => headline(ref_, d)).filter((h): h is Headline => h !== null), [allLoaded, datasets, loaded, ref_]);
@@ -50,9 +54,9 @@ export function Workspace({ backend, user, admin, ref_, shapes }: { backend: Bac
     return () => { live = false; };
   }, [mode, activeId, loaded, backend, keep]);
 
-  // Area view compares every dataset, so it loads them all (once per department).
+  // Area and Constituency view compare every dataset, so they load them all (once per department).
   useEffect(() => {
-    if (mode !== "orgs" || allLoaded || datasets === null) return;
+    if (mode === "datasets" || allLoaded || datasets === null) return;
     let live = true;
     backend.all(dept).then((ds) => { if (live) { keep(ds); setAllLoaded(true); } }).catch((e: Error) => { if (live) setError(e.message); });
     return () => { live = false; };
@@ -105,9 +109,15 @@ export function Workspace({ backend, user, admin, ref_, shapes }: { backend: Bac
               <button role="tab" aria-selected={mode === "orgs"} className={mode === "orgs" ? "on" : ""} onClick={() => setMode("orgs")} title={DEPARTMENT[dept].areaViewHint}>
                 <strong>Area view</strong>
               </button>
+              <button role="tab" aria-selected={mode === "seats"} className={mode === "seats" ? "on" : ""} onClick={() => setMode("seats")}
+                title="One constituency: every figure for the organisations that serve it">
+                <strong>Constituency view</strong>
+              </button>
             </div>
-            {mode === "orgs" && !areaReady ? <p className="small muted">Loading every dataset…</p> : mode === "orgs" ? (
+            {mode !== "datasets" && !areaReady ? <p className="small muted">Loading every dataset…</p> : mode === "orgs" ? (
               <OrgSidebar ref_={ref_} heads={heads} dept={dept} scope={scope} kind={orgKind} setKind={setOrgKind} code={orgCode} setCode={setOrgCode} />
+            ) : mode === "seats" ? (
+              <ConstituencySidebar ref_={ref_} heads={heads} scope={scope} setScope={setScope} ldOnly={seatLdOnly} setLdOnly={setSeatLdOnly} seat={seat} setSeat={setSeat} />
             ) : datasets === null ? <p className="small muted">Loading…</p> : !datasets.length ? (
               <p className="small muted">None yet. Upload the first FOI response for {info.label.toLowerCase()}.</p>
             ) : (
@@ -125,11 +135,14 @@ export function Workspace({ backend, user, admin, ref_, shapes }: { backend: Bac
             )}
           </div>
         </aside>
-        {(mode === "orgs" && !areaReady) || (mode === "datasets" && activeInfo && !active) ? (
+        {(mode !== "datasets" && !areaReady) || (mode === "datasets" && activeInfo && !active) ? (
           <div className="foi-main foi-empty">
             <FoiMap shapes={null} items={[]} reverse={false} selected={null} highlight={new Set()} onSelect={() => {}} />
-            <p className="foi-loading small">{mode === "orgs" ? "Loading every dataset for Area view…" : `Loading ${activeInfo!.title}…`}</p>
+            <p className="foi-loading small">{mode === "datasets" ? `Loading ${activeInfo!.title}…` : `Loading every dataset for ${mode === "orgs" ? "Area" : "Constituency"} view…`}</p>
           </div>
+        ) : mode === "seats" ? (
+          <ConstituencyView ref_={ref_} heads={heads} dept={dept} scope={scope} ldOnly={seatLdOnly} seat={seat} setSeat={setSeat}
+            onOpenDataset={(id) => { setActiveId(id); setMode("datasets"); }} />
         ) : mode === "orgs" ? (
           <OrgView ref_={ref_} shapes={shapes} heads={heads} scope={scope} kind={orgKind} code={orgCode} setCode={setOrgCode}
             setKindAndCode={(g, c) => { setOrgKind(g); setOrgCode(c); }} onOpenDataset={(id) => { setActiveId(id); setMode("datasets"); }} />

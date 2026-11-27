@@ -3,7 +3,7 @@
  * and an overview of which organisations most often fall in the worse half.
  */
 
-import { fmtValue, ranked, summary, type Ranked } from "./analysis";
+import { fmtValue, ranked, seatsServed, summary, type Ranked } from "./analysis";
 import { targets } from "./match";
 import { withYearViews, type YearView } from "./periods";
 import { GEO } from "./geographies";
@@ -90,6 +90,43 @@ export function scores(heads: Headline[], g: Geography): Map<string, Score> {
       s.of++;
       if (w) s.worse++;
       out.set(code, s);
+    }
+  }
+  return out;
+}
+
+/** Constituency view: for one dataset, the organisations with a figure that serve each seat (seat -> codes). */
+const bySeatCache = new WeakMap<Headline, Map<string, string[]>>();
+
+export function servingBySeat(ref: Reference, h: Headline): Map<string, string[]> {
+  let out = bySeatCache.get(h);
+  if (out) return out;
+  out = new Map();
+  for (const [code, seats] of seatsServed(ref, h.d.geography, new Set(h.byCode.keys()))) {
+    if (!h.byCode.has(code)) continue;
+    for (const s of seats) {
+      const list = out.get(s);
+      if (list) list.push(code); else out.set(s, [code]);
+    }
+  }
+  bySeatCache.set(h, out);
+  return out;
+}
+
+/** Each seat's record: of the figures for the organisations serving it (one per dataset and organisation), how
+ * many are in the worse half. */
+export function seatScores(ref: Reference, heads: Headline[]): Map<string, Score> {
+  const out = new Map<string, Score>();
+  for (const h of heads) {
+    for (const [seat, codes] of servingBySeat(ref, h)) {
+      for (const code of codes) {
+        const w = worseHalf(h, h.byCode.get(code)?.value ?? null);
+        if (w === null) continue;
+        const sc = out.get(seat) ?? { worse: 0, of: 0 };
+        sc.of++;
+        if (w) sc.worse++;
+        out.set(seat, sc);
+      }
     }
   }
   return out;
