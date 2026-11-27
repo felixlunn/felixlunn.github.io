@@ -105,14 +105,18 @@ def catchments_of_current(catchments: list[dict], trusts: list[dict]) -> list[di
 
 def assemble(geo: dict, seats: list[dict], population: dict[str, float], police: list[dict], health: list[dict],
              courts: list[dict] | None, trusts: list[dict] | None, as_of: str,
-             catchments: list[dict] | None = None) -> tuple[dict, dict]:
+             catchments: list[dict] | None = None, mental_health: list[dict] | None = None,
+             ambulance: list[dict] | None = None) -> tuple[dict, dict]:
     """(reference JSON, areas GeoJSON) from loaded layers. Pure apart from geometry work: used by the demo too."""
     locator = SeatLocator(geo)
     layers, features = {}, []
-    for layer, label, areas in (("police", "Police force areas", police), ("health", "NHS areas (ICBs and Welsh health boards)", health)):
+    area_layers = [("police", "Police force areas", police), ("health", "NHS areas (ICBs and Welsh health boards)", health),
+                   ("mental_health", "Mental health trusts (approximate areas)", mental_health), ("ambulance", "Ambulance trusts", ambulance)]
+    for layer, label, areas in [x for x in area_layers if x[2] is not None]:
         links = seat_overlaps(areas, geo)
         layers[layer] = {"label": label, "areas": [
-            {"code": a["code"], "name": a["name"], "aliases": police_aliases(a["name"]) if layer == "police" else [a["name"]],
+            {"code": a["code"], "name": a["name"],
+             "aliases": police_aliases(a["name"]) if layer == "police" else [a["name"], *a.get("aliases", [])],
              "population": area_population(links[a["code"]], population), "seats": links[a["code"]]}
             for a in sorted(areas, key=lambda a: a["name"])]}
         features += [to_feature(a, layer) for a in areas]

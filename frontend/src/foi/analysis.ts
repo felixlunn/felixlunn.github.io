@@ -3,7 +3,7 @@
 import { targets } from "./match";
 import { describe } from "./stats";
 import { ordinal } from "../lib/format";
-import { GEO } from "./geographies";
+import { areasOf, GEO, hospitalTrusts } from "./geographies";
 import { nearestCourtBySeat } from "./nearest";
 import { type Column, type Dataset, type Geography, type Reference, type Target } from "./types";
 
@@ -11,7 +11,7 @@ export interface Point { code: string; name: string; lat: number; lon: number; a
 
 export function points(ref: Reference, g: Geography): Point[] {
   if (g === "court") return (ref.points.courts ?? []).map((c) => ({ code: c.id, name: c.name, lat: c.lat, lon: c.lon, area: c.area, seat: c.seat, sub: c.types.join(", ") }));
-  if (g === "nhs_trust") return (ref.points.trusts ?? []).map((t) => ({ code: t.code, name: t.name, lat: t.lat, lon: t.lon, area: t.area, seat: t.seat, sub: t.kind }));
+  if (g === "nhs_trust") return hospitalTrusts(ref).map((t) => ({ code: t.code, name: t.name, lat: t.lat, lon: t.lon, area: t.area, seat: t.seat, sub: t.kind }));
   return [];
 }
 
@@ -52,21 +52,20 @@ export function overallRate(rows: Ranked[]): number | null {
 
 /** The targets that serve a seat: the area(s) it lies in, or the courts / trusts in it and in its wider area. */
 export function forSeat(ref: Reference, g: Geography, seat: string): { code: string; why: string }[] {
-  if (g === "police_force" || g === "health_area") {
-    const areas = g === "police_force" ? ref.layers.police.areas : ref.layers.health.areas;
-    return areas.flatMap((a) => {
+  if (GEO[g].isArea) {
+    return areasOf(ref, g).flatMap((a) => {
       const hit = a.seats.find(([s]) => s === seat);
       return hit ? [{ code: a.code, why: hit[1] >= 0.97 ? "covers the whole seat" : `covers ${Math.round(hit[1] * 100)}% of the seat` }] : [];
     });
   }
   const pts = points(ref, g);
   // Acute trusts: their official catchment says which seats they serve.
-  const fromCatchment = g === "nhs_trust" ? (ref.points.trusts ?? []).flatMap((t) => {
+  const fromCatchment = g === "nhs_trust" ? hospitalTrusts(ref).flatMap((t) => {
     const hit = t.catchment?.find(([s]) => s === seat);
     return hit ? [{ code: t.code, why: hit[1] >= 0.97 ? "its catchment covers the whole seat" : `its catchment covers ${Math.round(hit[1] * 100)}% of the seat` }] : [];
   }) : [];
   const done = new Set(fromCatchment.map((x) => x.code));
-  const areaLayer = g === "court" ? ref.layers.police.areas : ref.layers.health.areas;
+  const areaLayer = areasOf(ref, GEO[g].parent ?? "health_area");
   const seatAreas = new Set(areaLayer.filter((a) => a.seats.some(([s]) => s === seat)).map((a) => a.code));
   const areaName = new Map(areaLayer.map((a) => [a.code, a.name]));
   return [...fromCatchment, ...pts.filter((p) => !done.has(p.code) && (p.seat === seat || (p.area && seatAreas.has(p.area))))
@@ -103,10 +102,10 @@ export function seatsServed(ref: Reference, g: Geography, inResponse: Set<string
     if (!out.has(code)) out.set(code, new Set());
     out.get(code)!.add(seat);
   };
-  if (g === "police_force" || g === "health_area") {
-    for (const a of (g === "police_force" ? ref.layers.police.areas : ref.layers.health.areas)) for (const [s] of a.seats) add(a.code, s);
+  if (GEO[g].isArea) {
+    for (const a of areasOf(ref, g)) for (const [s] of a.seats) add(a.code, s);
   } else if (g === "nhs_trust") {
-    for (const t of ref.points.trusts ?? []) {
+    for (const t of hospitalTrusts(ref)) {
       if (t.catchment?.length) for (const [s] of t.catchment) add(t.code, s);
       else add(t.code, t.seat);
     }
@@ -150,12 +149,12 @@ export function mainServer(ref: Reference, g: Geography, inResponse: Set<string>
     const cur = out.get(seat);
     if (!cur || (share ?? 0) > (cur.share ?? 0)) out.set(seat, { code, share });
   };
-  if (g === "police_force" || g === "health_area") {
-    for (const a of (g === "police_force" ? ref.layers.police.areas : ref.layers.health.areas)) {
+  if (GEO[g].isArea) {
+    for (const a of areasOf(ref, g)) {
       if (inResponse.has(a.code)) for (const [s, share] of a.seats) offer(s, a.code, share);
     }
   } else if (g === "nhs_trust") {
-    const trusts = (ref.points.trusts ?? []).filter((t) => inResponse.has(t.code));
+    const trusts = hospitalTrusts(ref).filter((t) => inResponse.has(t.code));
     for (const t of trusts) for (const [s, share] of t.catchment ?? []) offer(s, t.code, share);
     for (const t of trusts) if (t.seat && !out.has(t.seat)) out.set(t.seat, { code: t.code });
   } else {

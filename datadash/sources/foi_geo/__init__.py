@@ -18,10 +18,13 @@ Modules: ``loaders`` fetches each layer, ``assemble`` builds the published files
 from __future__ import annotations
 
 import logging
+import re
 
 import requests
 
 from ... import arcgis
+from ..councils import lad_to_county
+from . import health_layers as hl
 from .assemble import (
     area_of_points, area_population, assemble, ld_status, nation_area, police_aliases, seat_overlaps, to_feature, write_foi,
 )
@@ -54,14 +57,38 @@ def load_foi_reference(s: requests.Session, geo: dict, seats: list[dict], popula
     except Exception as exc:
         log.exception("NHS trusts list failed")
         problems.append(f"NHS trusts: {exc}"[:200])
+    mental_health = ambulance = None
+    if trusts is not None:
+        try:
+            mental_health, ambulance = load_health_layers(s, names, trusts)
+        except Exception as exc:  # noqa: BLE001
+            log.exception("Mental health / ambulance trust areas failed")
+            problems.append(f"mental health and ambulance trust areas: {exc}"[:200])
     catchments = None
     try:
         catchments, _ = load_catchments(s, arcgis.services(s, MSOA_PATTERN))
     except Exception as exc:  # noqa: BLE001
         log.exception("Trust catchments failed")
         problems.append(f"trust catchments: {exc}"[:200])
-    ref, areas = assemble(geo, seats, population, police, health, courts, trusts, as_of, catchments)
+    ref, areas = assemble(geo, seats, population, police, health, courts, trusts, as_of, catchments, mental_health, ambulance)
     return ref, areas, problems
+
+
+def load_health_layers(s: requests.Session, names: list[str], trusts: list[dict]) -> tuple[list[dict], list[dict]]:
+    """(mental health trust areas, ambulance trust areas), and each trust's layers (``groups``) set on it."""
+    lads, regions = load_layer(s, names, "lad"), load_layer(s, names, "region")
+    groups = hl.trust_groups(trusts, {t["code"]: t.get("kind", "") for t in trusts})
+    for t in trusts:
+        t["groups"] = groups[t["code"]]
+    mh = {t["code"]: t for t in trusts if "mental_health" in t["groups"]}
+    owners = hl.mh_owners(lads, hl.mh_site_counts(s, sorted(mh)))
+    mental_health = hl.areas_from_councils(owners, lads, {c: t["name"] for c, t in mh.items()})
+    for a in mental_health:  # former names still match uploads
+        a["aliases"] = [x for x in mh[a["code"]].get("aliases", []) if not re.fullmatch(r"[A-Z0-9]{3,5}", x)]
+    amb_owner, amb_names = hl.ambulance_owners(lads, regions, lad_to_county(s), trusts)
+    ambulance = hl.areas_from_councils(amb_owner, lads, amb_names)
+    log.info("FOI mental health trust areas: %d; ambulance: %d", len(mental_health), len(ambulance))
+    return mental_health, ambulance
 
 
 __all__ = [

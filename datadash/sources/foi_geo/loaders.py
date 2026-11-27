@@ -33,6 +33,9 @@ LAYERS = {
     # kind: (service name pattern with groups (year, resolution), code field pattern, name field pattern)
     "police": (re.compile(r"^Police_Force_Areas_(?:Dec_)?(\d{4})_EW_(BUC|BSC|BGC)$", re.IGNORECASE), r"PFA\d{2}CD", r"PFA\d{2}NM"),
     "icb": (re.compile(r"^Integrated_Care_Boards_April_(\d{4})(?:_Boundaries)?_EN_(BUC|BSC|BGC)$", re.IGNORECASE), r"ICB\d{2}CD", r"ICB\d{2}NM"),
+    # Councils and regions: what mental health and ambulance trust areas are built from (health_layers.py).
+    "lad": (re.compile(r"^Local_Authority_Districts_(?:May|December)_(\d{4})_Boundaries_UK_(BUC|BSC|BGC)$", re.IGNORECASE), r"LAD\d{2}CD", r"LAD\d{2}NM"),
+    "region": (re.compile(r"^Regions_(?:May|December)_(\d{4})_Boundaries_EN_(BUC|BSC|BGC)$", re.IGNORECASE), r"RGN\d{2}CD", r"RGN\d{2}NM"),
     "lhb": (re.compile(r"^Local_Health_Boards_December_(\d{4})_WA_(BUC|BSC|BGC)$", re.IGNORECASE), r"LHB\d{2}CD", r"LHB\d{2}NM"),
 }
 
@@ -137,7 +140,9 @@ def current_trusts(trusts: list[dict], records: dict[str, dict], today: str) -> 
 
 
 def load_trusts(s: requests.Session) -> list[dict]:
-    orgs = get_json(s, ODS_URL, params={"PrimaryRoleId": "RO197", "Status": "Active", "Limit": 1000}).get("Organisations", [])
+    # NHS trusts, and the few registered as care trusts (RO107: e.g. Black Country Healthcare, Bradford District Care).
+    orgs = [o for role in ("RO197", "RO107")
+            for o in get_json(s, ODS_URL, params={"PrimaryRoleId": role, "Status": "Active", "Limit": 1000}).get("Organisations", [])]
     trusts = [{"code": o["OrgId"], "name": title_name(o["Name"]), "postcode": (o.get("PostCode") or "").strip().upper()}
               for o in orgs if o.get("OrgId") and o.get("Name") and "ONLINE" not in o["Name"].upper()]
     with ThreadPoolExecutor(max_workers=8) as ex:

@@ -8,7 +8,7 @@ import type { Backend } from "./backend";
 import FoiMap, { type MapItem } from "./FoiMap";
 import { targets } from "./match";
 import { csv, download, slug } from "../lib/format";
-import { GEO } from "./geographies";
+import { areasOf, GEO, hospitalTrusts } from "./geographies";
 import { type Dataset, type Reference } from "./types";
 import { ViewPicker, YearBars } from "./YearViews";
 import { LibDemPanel } from "./LibDemPanel";
@@ -75,14 +75,13 @@ export function DatasetView({ d: saved, ref_, shapes, seat, backend, canEdit, on
   const rowByCode = useMemo(() => new Map(d.rows.map((r) => [r.code, r])), [d.rows]);
   const seatLinks = useMemo(() => (seat ? forSeat(ref_, d.geography, seat) : []), [ref_, d.geography, seat]);
   const highlight = useMemo(() => new Set(seatLinks.map((l) => l.code)), [seatLinks]);
-  const layer = d.geography === "police_force" || d.geography === "court" ? "police" : "health";
   // What to shade: official boundaries (forces, NHS areas), official trust catchments, or approximate court areas.
   const layerShapes = useMemo(() => mapShapes(ref_, shapes, d.geography, new Set(rowByCode.keys())), [ref_, shapes, d.geography, rowByCode]);
   const mapNote = GEO[d.geography].mapNote ?? null;
 
   const unit = ph ? " per 100,000 residents" : "";
   // Trusts with an official catchment are always drawn (as shapes); other places only when in the response.
-  const withCatchment = useMemo(() => new Set(d.geography === "nhs_trust" ? (ref_.points.trusts ?? []).filter((t) => t.catchment).map((t) => t.code) : []), [ref_, d.geography]);
+  const withCatchment = useMemo(() => new Set(d.geography === "nhs_trust" ? hospitalTrusts(ref_).filter((t) => t.catchment).map((t) => t.code) : []), [ref_, d.geography]);
   const rankedByCode = useMemo(() => new Map(rows.map((r) => [r.target.code, r])), [rows]);
   const items: MapItem[] = useMemo(() => {
     const val = rankedByCode;
@@ -105,7 +104,7 @@ export function DatasetView({ d: saved, ref_, shapes, seat, backend, canEdit, on
   const selRow = selected ? rowByCode.get(selected) : null;
   const linkedSeats = (code: string) => {
     if (GEO[d.geography].isArea) {
-      const a = (layer === "police" ? ref_.layers.police.areas : ref_.layers.health.areas).find((x) => x.code === code);
+      const a = areasOf(ref_, d.geography).find((x) => x.code === code);
       return a?.seats.length ?? 0;
     }
     return null;

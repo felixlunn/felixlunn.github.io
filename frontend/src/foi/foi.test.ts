@@ -275,3 +275,31 @@ describe("ready-made datasets alongside uploads", () => {
     await expect(b.update("police-uk-crime", {})).rejects.toThrow("can't be changed");
   });
 });
+
+describe("Health map layers", () => {
+  it("lists mental health and ambulance trusts as areas, and keeps them off the Trusts layer", async () => {
+    const { targets } = await import("./match");
+    const { forSeat } = await import("./analysis");
+    const { DEPARTMENT, hospitalTrusts } = await import("./geographies");
+    const area = (code: string, name: string, seats: [string, number][], aliases: string[] = []) => ({ code, name, aliases: [name, ...aliases], population: 1000, seats });
+    const ref = {
+      version: 1, as_of: "", seats: [],
+      layers: { police: { label: "", areas: [] }, health: { label: "", areas: [] },
+        mental_health: { label: "", areas: [area("RW4", "Mersey Care NHS Foundation Trust", [["S1", 1]], ["North West Boroughs Healthcare NHS Foundation Trust"])] },
+        ambulance: { label: "", areas: [area("RX7", "North West Ambulance Service NHS Trust", [["S1", 1], ["S2", 0.4]])] } },
+      points: { trusts: [
+        { code: "RQ6", name: "Liverpool University Hospitals", kind: "Acute & specialist", postcode: "", lat: 0, lon: 0, area: null, seat: "S1", groups: ["hospital"] },
+        { code: "RW4", name: "Mersey Care NHS Foundation Trust", kind: "Mental health & community", postcode: "", lat: 0, lon: 0, area: null, seat: "S1", groups: ["mental_health"] },
+      ] },
+    } as never;
+    expect(DEPARTMENT.health.geographies).toEqual(["nhs_trust", "health_area", "mh_trust", "ambulance_trust"]);
+    expect(hospitalTrusts(ref).map((t) => t.code)).toEqual(["RQ6"]);
+    expect(targets(ref, "nhs_trust").map((t) => t.code)).toEqual(["RQ6"]);
+    // An old name still finds its trust's area.
+    expect(targets(ref, "mh_trust")[0].keys).toContain("North West Boroughs Healthcare NHS Foundation Trust");
+    expect(forSeat(ref, "ambulance_trust", "S2")).toEqual([{ code: "RX7", why: "covers 40% of the seat" }]);
+    // A reference file from before these layers: no areas, no error.
+    const old = { ...(ref as object), layers: { police: { label: "", areas: [] }, health: { label: "", areas: [] } } } as never;
+    expect(targets(old, "mh_trust")).toEqual([]);
+  });
+});

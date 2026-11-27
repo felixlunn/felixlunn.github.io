@@ -41,4 +41,9 @@ def demo_reference(geo: dict, seats: list[dict], population: dict[str, float], r
         t = min(acute, key=lambda t: (t["lon"] - c.x) ** 2 + (t["lat"] - c.y) ** 2)
         nearest.setdefault(t["code"], []).append(shape(f["geometry"]).buffer(0.001))
     catchments = [{"code": k, "name": k, "geometry": unary_union(v)} for k, v in nearest.items()]
-    return assemble(geo, seats, population, police, health, courts, trusts, "demo", catchments)
+    for t in trusts:  # which Health map layer each demo trust is on
+        t["groups"] = ["ambulance"] if t["kind"] == "Ambulance" else ["mental_health"] if t["kind"].startswith("Mental") else ["hospital"]
+    mental_health = [{**a, "code": a["code"].replace("DEMO-MH", "DMH"), "name": a["name"].replace("Demo mental health", "Demo Mental Health NHS Trust")}
+                     for a in blocks(4, 6, "DEMO-MH", "Demo mental health")]
+    ambulance = [{**a, "name": f"Demo Ambulance Service {a['code'][-2:]}"} for a in blocks(2, 4, "DEMO-AMB", "Demo ambulance")]
+    return assemble(geo, seats, population, police, health, courts, trusts, "demo", catchments, mental_health, ambulance)
