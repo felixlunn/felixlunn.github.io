@@ -23,6 +23,16 @@ export function Workspace({ backend, user, admin, ref_, shapes }: { backend: Bac
   const [activeId, setActiveId] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [seat, setSeat] = usePersistentState<string>("foi.seat", "");
+  // Dataset view: find a dataset by its title, source or what it's by.
+  const [q, setQ] = useState("");
+  const shownDatasets = useMemo(() => {
+    const words = q.toLowerCase().split(/\s+/).filter(Boolean);
+    if (!datasets || !words.length) return datasets;
+    return datasets.filter((d) => {
+      const text = [d.title, d.authority, d.builtin, d.foi_reference, d.period, GEO[d.geography].label, d.created_by_email].filter(Boolean).join(" ").toLowerCase();
+      return words.every((w) => text.includes(w));
+    });
+  }, [datasets, q]);
   // Three ways in: one dataset at a time, one organisation (trust / ICB / force / court) across every dataset, or one
   // constituency across every dataset (through the organisations serving it).
   const [mode, setMode] = usePersistentState("foi.mode", "datasets", ["datasets", "orgs", "seats"] as const);
@@ -97,7 +107,7 @@ export function Workspace({ backend, user, admin, ref_, shapes }: { backend: Bac
         <aside className="sidebar foi-side">
           <nav className="tabs" role="tablist">
             {DEPARTMENTS.map((d) => (
-              <button key={d.id} role="tab" aria-selected={d.id === dept} className={d.id === dept ? "on" : ""} onClick={() => { setDept(d.id); setActiveId(null); }}>{d.label}</button>
+              <button key={d.id} role="tab" aria-selected={d.id === dept} className={d.id === dept ? "on" : ""} onClick={() => { setDept(d.id); setActiveId(null); setQ(""); }}>{d.label}</button>
             ))}
           </nav>
           <div className="foi-side-body">
@@ -121,8 +131,13 @@ export function Workspace({ backend, user, admin, ref_, shapes }: { backend: Bac
             ) : datasets === null ? <p className="small muted">Loading…</p> : !datasets.length ? (
               <p className="small muted">None yet. Upload the first FOI response for {info.label.toLowerCase()}.</p>
             ) : (
+              <>
+              <div className="foi-orgside-tools">
+                <input type="search" placeholder="Find a dataset" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Find a dataset" />
+              </div>
+              {!shownDatasets!.length && <p className="small muted">No datasets match “{q}”.</p>}
               <ul className="foi-list">
-                {datasets.map((d) => (
+                {shownDatasets!.map((d) => (
                   <li key={d.id}>
                     <button className={d.id === activeId ? "on" : ""} onClick={() => setActiveId(d.id)}>
                       <span className="foi-list-title">{d.title}{d.builtin && <span className="tag builtin" title="Public data, rebuilt with the site's data: nothing to upload">{d.builtin}</span>}</span>
@@ -132,6 +147,7 @@ export function Workspace({ backend, user, admin, ref_, shapes }: { backend: Bac
                   </li>
                 ))}
               </ul>
+              </>
             )}
           </div>
         </aside>

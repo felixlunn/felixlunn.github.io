@@ -157,7 +157,7 @@ export function DatasetView({ d: saved, ref_, shapes, seat, backend, canEdit, on
             </span>
           )}
           <button className={`chip ld ${ldOnly ? "on" : ""}`} aria-pressed={ldOnly} onClick={() => setLdOnly(!ldOnly)}
-            title="Only those serving at least one of these seats">{scope === "held" ? "Lib Dem seats" : scope === "target" ? "Lib Dem targets" : "Lib Dem seats & targets"}{ld.size ? ` (${ld.size})` : ""}</button>
+            title="Only those serving at least one of these seats">{scope === "held" ? "Lib Dem seats" : scope === "target" ? "Lib Dem targets" : "Lib Dem seats & targets"}</button>
           {canPerHead(d, col) && (
             <button className={`chip ${perHead ? "on" : ""}`} aria-pressed={perHead} onClick={() => setPerHead(!perHead)}
               title="Estimated from the residents of the seats each area covers">Per 100,000</button>
