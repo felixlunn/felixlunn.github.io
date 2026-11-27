@@ -1,6 +1,6 @@
 /** FOI research section: shared types. */
 
-export type Department = "policing" | "justice" | "health";
+export type Department = "policing" | "health";
 export type Geography = "police_force" | "court" | "nhs_trust" | "health_area";
 export type Direction = "higher_worse" | "higher_better" | "neutral";
 

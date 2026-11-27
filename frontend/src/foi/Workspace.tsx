@@ -13,7 +13,7 @@ import { DatasetView } from "./DatasetView";
 /** The FOI workspace: departments, the two views (Dataset view / Area view), uploads and the seat picker. */
 
 export function Workspace({ backend, user, admin, ref_, shapes }: { backend: Backend; user: User; admin: boolean; ref_: Reference; shapes: GeoJSON.FeatureCollection }) {
-  const [dept, setDept] = useState<Department>(() => (["policing", "justice", "health"].includes(location.hash.slice(1)) ? location.hash.slice(1) as Department : "policing"));
+  const [dept, setDept] = useState<Department>(() => (DEPARTMENTS.some((d) => d.id === location.hash.slice(1)) ? location.hash.slice(1) as Department : "policing"));
   // The list: every dataset without its rows. Rows load when a dataset is opened, or all at once for Area view.
   const [datasets, setDatasets] = useState<DatasetInfo[] | null>(null);
   const [loaded, setLoaded] = useState<Map<string, Dataset>>(() => new Map());
