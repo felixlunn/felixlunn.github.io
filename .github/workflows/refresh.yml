@@ -72,7 +72,7 @@ jobs:
           curl -sfL --max-time 60 "$SITE/data/data.json" -o previous.json || rm -f previous.json
           # Keep the FOI reference files already live: the build overwrites them, so they survive only if its foi step fails.
           mkdir -p frontend/public/data/foi
-          for f in reference.json areas.geojson police.json; do
+          for f in reference.json areas.geojson police.json eric.json; do
             curl -sfL --max-time 120 "$SITE/data/foi/$f" -o "frontend/public/data/foi/$f" || rm -f "frontend/public/data/foi/$f"
           done
 

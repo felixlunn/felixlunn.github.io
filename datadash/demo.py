@@ -150,5 +150,7 @@ def build_demo(out_dir: Path, n: int = 650, seed: int = 42) -> dict:
     write_foi(out_dir, ref, areas)
     from .sources.foi_police import demo_police_datasets, write_police_datasets
     write_police_datasets(out_dir, demo_police_datasets(ref, rng), "demo")
+    from .sources.foi_eric import demo_eric_datasets, write_eric_datasets
+    write_eric_datasets(out_dir, demo_eric_datasets(ref), "demo")
     return finish(out_dir, geo, seats, metrics, values, sources, demo=True, debates=debates, history=history,
                   councils={"year": 2026, "by_seat": councils})
