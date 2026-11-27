@@ -7,12 +7,14 @@ import json
 import re
 from pathlib import Path
 
+import shapely
 from shapely.geometry import mapping, shape
 from shapely.ops import unary_union
 
 from ... import arcgis
 from ...geo import SeatLocator
 from ...parties import is_lib_dem
+from .loaders import trust_kind
 
 SIMPLIFY = 0.003  # degrees (~300 m): plenty for areas the size of a police force or ICB
 MIN_SHARE = 0.03  # ignore slivers where generalised boundaries don't quite line up
@@ -68,7 +70,9 @@ def area_of_points(points: list[dict], areas: list[dict]) -> None:
 
 
 def to_feature(a: dict, layer: str) -> dict:
-    g = mapping(a["geometry"].simplify(SIMPLIFY, preserve_topology=True))
+    # Snap to the 4-decimal grid the file uses, keeping the shape valid (simplifying then rounding coordinates could
+    # make a shape's edges cross, which draws oddly: seven trust catchments did in Nov 2026).
+    g = mapping(shapely.set_precision(a["geometry"].simplify(SIMPLIFY, preserve_topology=True), 1e-4))
     return {"type": "Feature", "properties": {"layer": layer, "code": a["code"], "name": a["name"]},
             "geometry": {"type": g["type"], "coordinates": arcgis.round_coords(g["coordinates"], 4)}}
 
@@ -80,6 +84,23 @@ def ld_status(seat: dict) -> dict:
     if is_lib_dem(seat.get("second_party_2024")):
         return {"ld": "target"}
     return {}
+
+
+def catchments_of_current(catchments: list[dict], trusts: list[dict]) -> list[dict]:
+    """Catchments under current trusts: one filed under a closed trust's code (OHID's file can predate a merger) goes to
+    the trust that took it over, merged with that trust's own; catchments of no current trust are left out."""
+    heir = {t["code"]: t["code"] for t in trusts}
+    for t in trusts:
+        for a in t.get("aliases", []):
+            if re.fullmatch(r"[A-Z0-9]{3,5}", a):  # aliases hold former codes as well as names
+                heir.setdefault(a, t["code"])
+    shapes: dict[str, list] = {}
+    for c in catchments:
+        if c["code"] in heir:
+            shapes.setdefault(heir[c["code"]], []).append(c["geometry"])
+    names = {t["code"]: t["name"] for t in trusts}
+    return [{"code": code, "name": names[code], "geometry": parts[0] if len(parts) == 1 else unary_union(parts).buffer(0)}
+            for code, parts in shapes.items()]
 
 
 def assemble(geo: dict, seats: list[dict], population: dict[str, float], police: list[dict], health: list[dict],
@@ -103,11 +124,11 @@ def assemble(geo: dict, seats: list[dict], population: dict[str, float], police:
         points["courts"] = sorted(courts, key=lambda c: c["name"])
     if trusts is not None:
         area_of_points(trusts, health)
-        known = {t["code"] for t in trusts}
-        drawn = [c for c in (catchments or []) if c["code"] in known]
+        drawn = catchments_of_current(catchments or [], trusts)
         links = seat_overlaps(drawn, geo)
         for t in trusts:
             t["seat"] = locator.seat(t["lon"], t["lat"])
+            t["kind"] = trust_kind(t["name"], t["code"] in links)
             if t["code"] in links:  # official catchment: the seats whose residents mostly use the trust
                 t["catchment"] = links[t["code"]]
         points["trusts"] = sorted(trusts, key=lambda t: t["name"])

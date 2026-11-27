@@ -27,7 +27,7 @@ export function targets(ref: Reference, g: Geography): Target[] {
   if (g === "police_force") return ref.layers.police.areas.map((a) => ({ code: a.code, name: a.name, keys: [a.code, ...a.aliases], population: a.population }));
   if (g === "health_area") return ref.layers.health.areas.map((a) => ({ code: a.code, name: a.name, keys: [a.code, ...a.aliases], population: a.population }));
   if (g === "court") return (ref.points.courts ?? []).map((c) => ({ code: c.id, name: c.name, keys: [c.id, c.name, ...c.codes], sub: c.types.join(", ") }));
-  return (ref.points.trusts ?? []).map((t) => ({ code: t.code, name: t.name, keys: [t.code, t.name], sub: t.kind }));
+  return (ref.points.trusts ?? []).map((t) => ({ code: t.code, name: t.name, keys: [t.code, t.name, ...(t.aliases ?? [])], sub: t.kind }));
 }
 
 export interface Match { code: string | null; how: "exact" | "close" | "none" | "total" }

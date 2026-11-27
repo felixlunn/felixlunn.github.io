@@ -5,6 +5,8 @@ from __future__ import annotations
 
 import logging
 import re
+from concurrent.futures import ThreadPoolExecutor
+from datetime import date
 
 import pandas as pd
 import requests
@@ -83,21 +85,67 @@ def title_name(name: str) -> str:
     return re.sub(r"(?<=-)(\w)", lambda m: m.group(1).upper(), " ".join(words))
 
 
-def trust_kind(name: str) -> str:
+SPECIALIST = re.compile(r"\b(children|women|heart|chest|orthopaedic|cancer|christie|marsden|moorfields|papworth|clatterbridge|"
+                        r"brompton|eye hospital|neuro|walton centre)\b")  # whole words: "Manchester" isn't "chest"
+
+
+def trust_kind(name: str, acute_catchment: bool = False) -> str:
+    """ODS doesn't record a trust's type, so: an official acute catchment (OHID), a hospital or specialist name means
+    acute & specialist; then ambulance and community by name; the rest are mental health & community trusts (which
+    seldom say so: "Mersey Care", "Berkshire Healthcare")."""
     n = name.lower()
     if "ambulance" in n:
         return "Ambulance"
-    if re.search(r"mental health|partnership|psychiatr|tavistock|care trust", n):
+    if acute_catchment:
+        return "Acute & specialist"
+    if re.search(r"mental|psychiatr", n):
         return "Mental health & community"
-    if "community" in n:
+    if SPECIALIST.search(n) or re.search(r"hospital|infirmary", n):
+        return "Acute & specialist"
+    if "community" in n and not re.search(r"mental|partnership|health and care|healthcare", n):
         return "Community"
-    return "Acute & specialist"
+    return "Mental health & community"
+
+
+def closed(record: dict, today: str) -> tuple[bool, str | None]:
+    """(has the trust closed, its successor's code) from its ODS record. ODS keeps merged and dissolved trusts
+    "Active" for years; a legal end date in the past, or a successor, says they've gone."""
+    legal_end = next((d.get("End") for d in record.get("Date", []) if d.get("Type") == "Legal"), None)
+    succ = next((x.get("Target", {}).get("OrgId", {}).get("extension") for x in record.get("Succs", {}).get("Succ", [])
+                 if x.get("Type") == "Successor"), None)
+    return bool((legal_end and legal_end <= today) or succ), succ
+
+
+def current_trusts(trusts: list[dict], records: dict[str, dict], today: str) -> list[dict]:
+    """The trusts still open, each with the names and codes of the closed trusts it took over (``aliases``), so FOI
+    responses using an old name still match."""
+    status = {code: closed(rec, today) for code, rec in records.items()}
+    by_code = {t["code"]: t for t in trusts}
+    open_now = [t for t in trusts if not status.get(t["code"], (False, None))[0]]
+    for t in trusts:
+        gone, succ = status.get(t["code"], (False, None))
+        if not gone:
+            continue
+        seen = {t["code"]}
+        while succ and status.get(succ, (False, None))[0] and succ not in seen:  # merged again since
+            seen.add(succ)
+            succ = status[succ][1]
+        heir = by_code.get(succ or "")
+        if heir is not None and not status.get(heir["code"], (False, None))[0]:
+            heir.setdefault("aliases", []).extend([t["name"], t["code"]])
+    return open_now
 
 
 def load_trusts(s: requests.Session) -> list[dict]:
     orgs = get_json(s, ODS_URL, params={"PrimaryRoleId": "RO197", "Status": "Active", "Limit": 1000}).get("Organisations", [])
     trusts = [{"code": o["OrgId"], "name": title_name(o["Name"]), "postcode": (o.get("PostCode") or "").strip().upper()}
               for o in orgs if o.get("OrgId") and o.get("Name") and "ONLINE" not in o["Name"].upper()]
+    with ThreadPoolExecutor(max_workers=8) as ex:
+        records = dict(zip([t["code"] for t in trusts],
+                           ex.map(lambda t: get_json(s, f"{ODS_URL}/{t['code']}").get("Organisation", {}), trusts)))
+    before = len(trusts)
+    trusts = current_trusts(trusts, records, date.today().isoformat())
+    log.info("NHS trusts: %d open (%d closed or merged left out)", len(trusts), before - len(trusts))
     pcs = sorted({t["postcode"] for t in trusts if t["postcode"]})
     where = {}
     for i in range(0, len(pcs), 100):
@@ -111,7 +159,7 @@ def load_trusts(s: requests.Session) -> list[dict]:
     for t in trusts:
         if t["postcode"] in where:
             t["lat"], t["lon"] = where[t["postcode"]]
-            t["kind"] = trust_kind(t["name"])
+            t["kind"] = trust_kind(t["name"])  # refined in assemble, once catchments are known
             out.append(t)
     if len(out) < 150:
         raise ValueError(f"Expected ~200 NHS trusts, got {len(out)}")

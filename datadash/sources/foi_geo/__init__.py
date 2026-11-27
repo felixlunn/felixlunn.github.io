@@ -27,7 +27,7 @@ from .assemble import (
 )
 from .demo import demo_reference
 from .loaders import (
-    LAYERS, MSOA_PATTERN, catchment_areas, find_catchment_file, load_catchments, load_courts, load_layer, load_trusts,
+    LAYERS, MSOA_PATTERN, catchment_areas, closed, current_trusts, find_catchment_file, load_catchments, load_courts, load_layer, load_trusts,
     parse_fptp, pick_service, title_name, trust_kind,
 )
 
@@ -68,5 +68,5 @@ __all__ = [
     "SOURCE_URL", "LAYERS", "load_foi_reference", "write_foi", "demo_reference", "assemble", "area_of_points",
     "area_population", "ld_status", "nation_area", "police_aliases", "seat_overlaps", "to_feature", "catchment_areas",
     "find_catchment_file", "load_catchments", "load_courts", "load_layer", "load_trusts", "parse_fptp", "pick_service",
-    "title_name", "trust_kind", "MSOA_PATTERN",
+    "title_name", "trust_kind", "MSOA_PATTERN", "closed", "current_trusts",
 ]

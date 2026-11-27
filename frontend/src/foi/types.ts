@@ -16,6 +16,8 @@ export interface RefArea {
 export interface RefCourt { id: string; name: string; types: string[]; lat: number; lon: number; codes: string[]; area: string | null; seat: string | null }
 export interface RefTrust {
   code: string; name: string; kind: string; postcode: string; lat: number; lon: number; area: string | null; seat: string | null;
+  /** Names and codes of closed trusts it took over (mergers), so older FOI responses still match. */
+  aliases?: string[];
   /** Acute trusts: seats in the trust's official catchment (OHID), with the share of each seat covered. */
   catchment?: [string, number][];
 }
